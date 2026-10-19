@@ -29,6 +29,12 @@ cd "$ROOT"
 for bin in gh claude just uv git; do command -v "$bin" >/dev/null || { echo "missing: $bin" >&2; exit 1; }; done
 [[ -z "$(git status --porcelain)" ]] || { echo "working tree not clean — commit or stash first" >&2; exit 1; }
 
+# One run per repo at a time: a second launch (by another agent or by hand) refuses instead of colliding.
+mkdir -p build
+LOCK="build/night.lock"
+if [[ -f "$LOCK" ]] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then echo "a night run is already active (pid $(cat "$LOCK")); not starting another" >&2; exit 3; fi
+echo $$ > "$LOCK"; trap 'rm -f "$LOCK"' EXIT
+
 DATE="$(date +%Y-%m-%d)"
 BRANCH="night/$DATE"
 LOGDIR="build/night/$DATE"            # raw logs: gitignored
