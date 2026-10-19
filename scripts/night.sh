@@ -7,10 +7,11 @@
 #   scripts/night.sh                 # run all open `night` issues
 #   scripts/night.sh --max 3         # at most 3 issues
 #   scripts/night.sh --dry-run       # show what would run, call nothing
-#   scripts/night.sh --model opus    # pass a model to claude
+#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-fable-5-1)
+# Resumable: re-running on the same day continues night/<date> and skips issues already committed there.
 set -euo pipefail
 
-LABEL="night"; MAX=99; DRY=0; MODEL=""; RETRIES=1
+LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-fable-5-1}"; RETRIES=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --label) LABEL="$2"; shift 2 ;;
@@ -93,10 +94,12 @@ if git show-ref --verify --quiet "refs/heads/$BRANCH"; then git switch --quiet "
 caffeinate -dimsu -w $$ &              # keep the Mac awake while this script lives
 uv sync --quiet
 
-{ echo "# Night run $DATE"; echo; echo "Branch \`$BRANCH\` · label \`$LABEL\` · started $(date +%H:%M)"; echo; } > "$REPORT"
+if [[ -f "$REPORT" ]]; then echo "Resumed $(date +%H:%M) · model \`$MODEL\`" >> "$REPORT"; echo >> "$REPORT"
+else { echo "# Night run $DATE"; echo; echo "Branch \`$BRANCH\` · label \`$LABEL\` · model \`$MODEL\` · started $(date +%H:%M)"; echo; } > "$REPORT"; fi
 DONE=0; STOPPED=""
 
 for n in $ISSUES; do
+  if git log --format=%s main..HEAD | grep -q "^night: #$n "; then echo "== #$n already done on $BRANCH, skipping"; continue; fi
   title=$(gh issue view "$n" --json title --jq .title)
   body=$(gh issue view "$n" --json body --jq .body)
   echo "== #$n $title"
