@@ -1,0 +1,36 @@
+[project]
+name = "foundation-models-workshop"
+version = "0.1.0"
+description = "When Foundation Models Fall Short: From Off-the-Shelf AI to Problem-Specific Adaptation"
+requires-python = ">=3.12,<3.13"  # Colab's Python line; keep in step with SPEC.md › Environment
+# Runtime deps = what the notebook imports. Prefer packages Colab preinstalls; pin to the Colab
+# version recorded in SPEC.md › Environment so the smoke run sees what students see.
+dependencies = [
+    "numpy",
+    "matplotlib",
+]
+
+[dependency-groups]
+dev = [
+    "jupytext>=1.16",
+    "nbclient>=0.10",
+    "nbformat>=5.10",
+    "ipykernel>=6.29",
+    "pytest>=8",
+    "ruff>=0.6",
+    "jupyterlab>=4",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E402"]  # notebook sections import where they are taught
+
+[tool.ruff.lint.per-file-ignores]
+"sections/*.py" = ["F821", "F811"]  # names come from earlier sections (one shared kernel)
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"
