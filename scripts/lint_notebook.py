@@ -43,19 +43,27 @@ def is_helper_cell(src: str) -> bool:
     )
 
 
-def spec_files() -> set[str]:
+def spec_rows() -> dict[str, str]:
+    """sections/NN_x.py -> status, from SPEC.md's sections table."""
     if not SPEC.exists():
         fail("SPEC.md", "missing")
-        return set()
-    return set(re.findall(r"sections/\d\d_[\w-]+\.py", SPEC.read_text()))
+        return {}
+    rows = {}
+    for line in SPEC.read_text().splitlines():
+        m = re.match(r"^\|\s*\d+\s*\|\s*(sections/\d\d_[\w-]+\.py)\s*\|.*\|\s*([\w-]+)\s*\|\s*$", line)
+        if m:
+            rows[m.group(1)] = m.group(2).lower()
+    return rows
 
 
 def main() -> int:
     files = sorted(SECTIONS.glob("[0-9][0-9]_*.py"))
     on_disk = {f"sections/{p.name}" for p in files}
-    listed = spec_files()
+    rows = spec_rows()
+    listed = set(rows)
     for missing in sorted(listed - on_disk):
-        fail(missing, "listed in SPEC.md sections table but file does not exist (N-016)")
+        if rows[missing] != "todo":  # unbuilt sections may be missing
+            fail(missing, f"status '{rows[missing]}' in SPEC.md but the file does not exist (N-016)")
     for extra in sorted(on_disk - listed):
         fail(extra, "file exists but is not listed in SPEC.md sections table (N-016)")
 
@@ -89,6 +97,8 @@ def main() -> int:
                         f"helper-only cell ({n_lines} lines) needs '# @title ...' to collapse (N-008)",
                     )
                 continue
+            if re.search(r"\bstyle\s*=", src):
+                fail(where, "markdown uses style= — Colab strips it; use a bgcolor table + <font> (N-025)")
             for line in src.splitlines():
                 for m in Q_RE.finditer(line):
                     q = int(m.group(1))

@@ -57,6 +57,14 @@ revert_protected() {  # $1 issue number, $2 issue body
   done
 }
 
+# Progressive gate (ADR-0002): content tests only switch on for sections marked built, so an issue
+# that builds section NN (body line "SECTION: NN") must leave that section's status at "done".
+section_marked_done() {  # $1 issue body; succeeds if no SECTION line or the row says done
+  local nn; nn=$(grep -m1 -oE '^SECTION: [0-9]{2}' <<<"$1" | awk '{print $2}' || true)
+  [[ -z "$nn" ]] && return 0
+  grep -qE "^\|[[:space:]]*[0-9]+[[:space:]]*\|[[:space:]]*sections/${nn}_[^|]*\|.*\|[[:space:]]*done[[:space:]]*\|[[:space:]]*$" SPEC.md
+}
+
 prompt_for() {  # $1 issue number, $2 title, $3 body, $4 optional failure tail
   cat <<EOF
 You are implementing GitHub issue #$1 "$2" in this repository, unattended (nobody can answer questions).
@@ -96,7 +104,9 @@ for n in $ISSUES; do
   for attempt in $(seq 0 "$RETRIES"); do
     claude "${CLAUDE_ARGS[@]}" "$(prompt_for "$n" "$title" "$body" "$tail_msg")" > "$LOGDIR/issue-$n-try$attempt.json" 2>&1 || true
     revert_protected "$n" "$body"
-    if just check > "$LOGDIR/issue-$n-check$attempt.log" 2>&1; then ok=1; break; fi
+    if ! section_marked_done "$body"; then
+      echo "SECTION status in SPEC.md was not set to done — the content tests for it never ran." > "$LOGDIR/issue-$n-check$attempt.log"
+    elif just check > "$LOGDIR/issue-$n-check$attempt.log" 2>&1; then ok=1; break; fi
     tail_msg=$(tail -40 "$LOGDIR/issue-$n-check$attempt.log")
   done
 

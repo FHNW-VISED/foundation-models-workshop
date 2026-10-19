@@ -14,6 +14,7 @@ The `.ipynb` is a **build artifact**. The source is the small Jupytext files in 
 ⛔ Do not read the whole `sections/` folder "for context". `just api` plus the SPEC table is the context.
 ⛔ Do not edit `SPEC.md`, except the **Status** column of the sections table for the section you finished.
 ⛔ Do not edit `RULES.md`, `scripts/`, `tests/`, `pyproject.toml` or `uv.lock` unless the issue names them.
+`FACILITATION.md` (N-033): when you finish a section, add or update its row in the section-by-section table.
 
 ## Commands
 
