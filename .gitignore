@@ -5,4 +5,8 @@ __pycache__/
 build/
 data/*
 !data/.gitkeep
+!data/specialised.json
+!data/ATTRIBUTION.md
+!data/README.md
+!data/smoke/
 .DS_Store

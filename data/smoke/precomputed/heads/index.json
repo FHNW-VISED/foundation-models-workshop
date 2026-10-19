@@ -1,0 +1,331 @@
+{
+ "seed": 42,
+ "model": "vit_small_patch16_dinov3.lvd1689m",
+ "sam": "facebook/sam2.1-hiera-small",
+ "heads": [
+  {
+   "file": "heads/pets_full_256.safetensors",
+   "dataset": "pets",
+   "regime": "full",
+   "section": "01/08",
+   "supervision": "full masks (upper reference)",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.09,
+   "held_metrics": {
+    "iou": 0.1363,
+    "dice": 0.2341,
+    "recall": 0.9862,
+    "precision": 0.1364
+   }
+  },
+  {
+   "file": "heads/pets_scribbles_256.safetensors",
+   "dataset": "pets",
+   "regime": "scribbles",
+   "section": "04",
+   "supervision": "auto-scribbles; unlabelled pixels ignored",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 0.00506,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.1778,
+    "dice": 0.2871,
+    "recall": 0.9843,
+    "precision": 0.1779
+   }
+  },
+  {
+   "file": "heads/pets_hidden_bg_256.safetensors",
+   "dataset": "pets",
+   "regime": "hidden_bg",
+   "section": "03",
+   "supervision": "missing labels, missing = background, plain BCE (the naive baseline)",
+   "loss": "plain",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.03,
+   "held_metrics": {
+    "iou": 0.1242,
+    "dice": 0.2133,
+    "recall": 0.5096,
+    "precision": 0.1903,
+    "recall_on_hidden_fg_train": 0.1373
+   }
+  },
+  {
+   "file": "heads/pets_hidden_bg_balanced_256.safetensors",
+   "dataset": "pets",
+   "regime": "hidden_bg_balanced",
+   "section": "03",
+   "supervision": "missing labels, missing = background, balanced BCE",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.1817,
+    "dice": 0.2908,
+    "recall": 0.7778,
+    "precision": 0.222,
+    "recall_on_hidden_fg_train": 0.2496
+   }
+  },
+  {
+   "file": "heads/pets_masked_256.safetensors",
+   "dataset": "pets",
+   "regime": "masked",
+   "section": "05",
+   "supervision": "missing labels, hidden pixels (dilated 3 px) ignored by the loss",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 0.85752,
+   "train_sec": 0.03,
+   "held_metrics": {
+    "iou": 0.1587,
+    "dice": 0.2657,
+    "recall": 0.9841,
+    "precision": 0.1588,
+    "recall_on_hidden_fg_train": 0.8634
+   }
+  },
+  {
+   "file": "heads/pets_pseudo_256.safetensors",
+   "dataset": "pets",
+   "regime": "pseudo",
+   "section": "06",
+   "supervision": "SAM 2.1 pseudo-labels from scribble points, probability >= 0.5",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.05,
+   "held_metrics": {
+    "iou": 0.211,
+    "dice": 0.3265,
+    "recall": 0.9389,
+    "precision": 0.2164
+   }
+  },
+  {
+   "file": "heads/pets_full5_256.safetensors",
+   "dataset": "pets",
+   "regime": "full5",
+   "section": "01",
+   "supervision": "full masks of 5 pets",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "english_cocker_spaniel_103",
+    "chihuahua_17"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.03,
+   "held_metrics": {
+    "iou": 0.1363,
+    "dice": 0.2341,
+    "recall": 0.9862,
+    "precision": 0.1364
+   }
+  },
+  {
+   "file": "heads/hrfcrop_full_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "full",
+   "section": "01/08",
+   "supervision": "full masks (upper reference)",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.07,
+   "held_metrics": {
+    "iou": 0.1143,
+    "dice": 0.2051,
+    "recall": 0.7693,
+    "precision": 0.119,
+    "cldice": 0.3112
+   }
+  },
+  {
+   "file": "heads/hrfcrop_scribbles_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "scribbles",
+   "section": "04",
+   "supervision": "auto-scribbles; unlabelled pixels ignored",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 0.01347,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.1245,
+    "dice": 0.2204,
+    "recall": 0.6648,
+    "precision": 0.1323,
+    "cldice": 0.2973
+   }
+  },
+  {
+   "file": "heads/hrfcrop_hidden_bg_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "hidden_bg",
+   "section": "03",
+   "supervision": "missing labels, missing = background, plain BCE (the naive baseline)",
+   "loss": "plain",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.0596,
+    "dice": 0.1077,
+    "recall": 0.3871,
+    "precision": 0.3581,
+    "cldice": 0.1143,
+    "recall_on_hidden_fg_train": 0.0737
+   }
+  },
+  {
+   "file": "heads/hrfcrop_hidden_bg_balanced_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "hidden_bg_balanced",
+   "section": "03",
+   "supervision": "missing labels, missing = background, balanced BCE",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.0974,
+    "dice": 0.177,
+    "recall": 0.7906,
+    "precision": 0.1029,
+    "cldice": 0.2464,
+    "recall_on_hidden_fg_train": 0.6135
+   }
+  },
+  {
+   "file": "heads/hrfcrop_masked_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "masked",
+   "section": "05",
+   "supervision": "missing labels, hidden pixels (dilated 3 px) ignored by the loss",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 0.83775,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.1031,
+    "dice": 0.1866,
+    "recall": 0.771,
+    "precision": 0.1092,
+    "cldice": 0.2655,
+    "recall_on_hidden_fg_train": 0.6919
+   }
+  },
+  {
+   "file": "heads/hrfcrop_pseudo_256.safetensors",
+   "dataset": "hrfcrop",
+   "regime": "pseudo",
+   "section": "06",
+   "supervision": "SAM 2.1 pseudo-labels from scribble points, probability >= 0.5",
+   "loss": "balanced",
+   "long_side": 256,
+   "steps": 30,
+   "lr": 0.05,
+   "model": "vit_small_patch16_dinov3.lvd1689m",
+   "train_names": [
+    "07_dr",
+    "08_dr"
+   ],
+   "labelled_fraction": 1.0,
+   "train_sec": 0.04,
+   "held_metrics": {
+    "iou": 0.0644,
+    "dice": 0.1209,
+    "recall": 0.6806,
+    "precision": 0.0669,
+    "cldice": 0.109
+   }
+  }
+ ]
+}

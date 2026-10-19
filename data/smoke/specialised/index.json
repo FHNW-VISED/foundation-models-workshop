@@ -1,0 +1,156 @@
+{
+ "dataset": "hrfcrop",
+ "name": "HRF retina vessels",
+ "task": "vessel vs background",
+ "licence": "CC BY 4.0",
+ "citation": "Budai A, Bock R, Maier A, Hornegger J, Michelson G. Robust Vessel Segmentation in Fundus Images. International Journal of Biomedical Imaging, 2013.",
+ "seed": 42,
+ "thin_structures": true,
+ "eval_region": "fov",
+ "metric_extras": [
+  "cldice"
+ ],
+ "feature_long_side": 1024,
+ "encoding": {
+  "masks": "PNG, 255 = foreground. Ground truth: evaluation only (SPEC L-005).",
+  "scribbles": "PNG, 0 = unlabelled, 1 = foreground stroke, 2 = background stroke",
+  "visible": "PNG, 255 = labelled foreground; the rest of the true foreground is hidden (missing labels)",
+  "fov": "PNG, 255 = inside the evaluation region"
+ },
+ "n_fit": 2,
+ "n_held": 2,
+ "items": [
+  {
+   "name": "07_dr",
+   "split": "fit",
+   "size_hw": [
+    256,
+    256
+   ],
+   "image": "images/07_dr.jpg",
+   "mask": "masks/07_dr.png",
+   "scribbles": "scribbles/07_dr.png",
+   "visible": "visible/07_dr.png",
+   "fg_fraction": 0.1255,
+   "n_fg_strokes": 42,
+   "n_bg_strokes": 4,
+   "scribbled_fraction": 0.01465,
+   "hidden_fg_fraction": 0.374,
+   "fov": "fov/07_dr.png",
+   "full": {
+    "image": "full/07_dr.jpg",
+    "mask": "full_masks/07_dr.png",
+    "fov": "full_fov/07_dr.png",
+    "size_hw": [
+     171,
+     256
+    ],
+    "crop_xywh_native": [
+     470,
+     1114,
+     1024,
+     1024
+    ]
+   }
+  },
+  {
+   "name": "08_dr",
+   "split": "fit",
+   "size_hw": [
+    256,
+    256
+   ],
+   "image": "images/08_dr.jpg",
+   "mask": "masks/08_dr.png",
+   "scribbles": "scribbles/08_dr.png",
+   "visible": "visible/08_dr.png",
+   "fg_fraction": 0.1009,
+   "n_fg_strokes": 47,
+   "n_bg_strokes": 5,
+   "scribbled_fraction": 0.01228,
+   "hidden_fg_fraction": 0.558,
+   "fov": "fov/08_dr.png",
+   "full": {
+    "image": "full/08_dr.jpg",
+    "mask": "full_masks/08_dr.png",
+    "fov": "full_fov/08_dr.png",
+    "size_hw": [
+     171,
+     256
+    ],
+    "crop_xywh_native": [
+     1665,
+     1148,
+     1024,
+     1024
+    ]
+   }
+  },
+  {
+   "name": "05_g",
+   "split": "held",
+   "size_hw": [
+    256,
+    256
+   ],
+   "image": "images/05_g.jpg",
+   "mask": "masks/05_g.png",
+   "scribbles": "scribbles/05_g.png",
+   "visible": "visible/05_g.png",
+   "fg_fraction": 0.0747,
+   "n_fg_strokes": 92,
+   "n_bg_strokes": 5,
+   "scribbled_fraction": 0.01553,
+   "hidden_fg_fraction": 0.529,
+   "fov": "fov/05_g.png",
+   "full": {
+    "image": "full/05_g.jpg",
+    "mask": "full_masks/05_g.png",
+    "fov": "full_fov/05_g.png",
+    "size_hw": [
+     171,
+     256
+    ],
+    "crop_xywh_native": [
+     1494,
+     590,
+     1024,
+     1024
+    ]
+   }
+  },
+  {
+   "name": "09_g",
+   "split": "held",
+   "size_hw": [
+    256,
+    256
+   ],
+   "image": "images/09_g.jpg",
+   "mask": "masks/09_g.png",
+   "scribbles": "scribbles/09_g.png",
+   "visible": "visible/09_g.png",
+   "fg_fraction": 0.059,
+   "n_fg_strokes": 75,
+   "n_bg_strokes": 4,
+   "scribbled_fraction": 0.01462,
+   "hidden_fg_fraction": 0.441,
+   "fov": "fov/09_g.png",
+   "full": {
+    "image": "full/09_g.jpg",
+    "mask": "full_masks/09_g.png",
+    "fov": "full_fov/09_g.png",
+    "size_hw": [
+     171,
+     256
+    ],
+    "crop_xywh_native": [
+     2249,
+     1061,
+     1024,
+     1024
+    ]
+   }
+  }
+ ]
+}

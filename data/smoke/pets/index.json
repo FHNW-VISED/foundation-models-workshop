@@ -1,0 +1,90 @@
+{
+ "dataset": "pets",
+ "name": "Oxford-IIIT Pet",
+ "task": "pet vs background",
+ "licence": "CC BY-SA 4.0",
+ "citation": "Parkhi OM, Vedaldi A, Zisserman A, Jawahar CV. Cats and Dogs. CVPR 2012.",
+ "seed": 42,
+ "thin_structures": false,
+ "eval_region": "all",
+ "metric_extras": [],
+ "feature_long_side": 512,
+ "encoding": {
+  "masks": "PNG, 255 = foreground. Ground truth: evaluation only (SPEC L-005).",
+  "scribbles": "PNG, 0 = unlabelled, 1 = foreground stroke, 2 = background stroke",
+  "visible": "PNG, 255 = labelled foreground; the rest of the true foreground is hidden (missing labels)",
+  "fov": "PNG, 255 = inside the evaluation region"
+ },
+ "n_fit": 2,
+ "n_held": 2,
+ "items": [
+  {
+   "name": "english_cocker_spaniel_103",
+   "split": "fit",
+   "size_hw": [
+    195,
+    256
+   ],
+   "image": "images/english_cocker_spaniel_103.jpg",
+   "mask": "masks/english_cocker_spaniel_103.png",
+   "scribbles": "scribbles/english_cocker_spaniel_103.png",
+   "visible": "visible/english_cocker_spaniel_103.png",
+   "fg_fraction": 0.3442,
+   "n_fg_strokes": 4,
+   "n_bg_strokes": 3,
+   "scribbled_fraction": 0.00535,
+   "hidden_fg_fraction": 0.454
+  },
+  {
+   "name": "chihuahua_17",
+   "split": "fit",
+   "size_hw": [
+    144,
+    256
+   ],
+   "image": "images/chihuahua_17.jpg",
+   "mask": "masks/chihuahua_17.png",
+   "scribbles": "scribbles/chihuahua_17.png",
+   "visible": "visible/chihuahua_17.png",
+   "fg_fraction": 0.1174,
+   "n_fg_strokes": 1,
+   "n_bg_strokes": 3,
+   "scribbled_fraction": 0.00477,
+   "hidden_fg_fraction": 0.714
+  },
+  {
+   "name": "boxer_173",
+   "split": "held",
+   "size_hw": [
+    256,
+    192
+   ],
+   "image": "images/boxer_173.jpg",
+   "mask": "masks/boxer_173.png",
+   "scribbles": "scribbles/boxer_173.png",
+   "visible": "visible/boxer_173.png",
+   "fg_fraction": 0.0629,
+   "n_fg_strokes": 3,
+   "n_bg_strokes": 4,
+   "scribbled_fraction": 0.00669,
+   "hidden_fg_fraction": 0.031
+  },
+  {
+   "name": "Siamese_182",
+   "split": "held",
+   "size_hw": [
+    179,
+    256
+   ],
+   "image": "images/Siamese_182.jpg",
+   "mask": "masks/Siamese_182.png",
+   "scribbles": "scribbles/Siamese_182.png",
+   "visible": "visible/Siamese_182.png",
+   "fg_fraction": 0.1946,
+   "n_fg_strokes": 3,
+   "n_bg_strokes": 5,
+   "scribbled_fraction": 0.00607,
+   "hidden_fg_fraction": 0.422
+  }
+ ]
+}
