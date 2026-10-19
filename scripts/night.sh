@@ -35,7 +35,7 @@ LOCK="build/night.lock"
 if [[ -f "$LOCK" ]] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then echo "a night run is already active (pid $(cat "$LOCK")); not starting another" >&2; exit 3; fi
 echo $$ > "$LOCK"; trap 'rm -f "$LOCK"' EXIT
 
-DATE="$(date +%Y-%m-%d)"
+DATE="${NIGHT_DATE:-$(date +%Y-%m-%d)}"   # NIGHT_DATE=YYYY-MM-DD resumes an earlier night past midnight
 BRANCH="night/$DATE"
 LOGDIR="build/night/$DATE"            # raw logs: gitignored
 REPORT="reports/night-$DATE.md"       # summary: committed, becomes the PR body
