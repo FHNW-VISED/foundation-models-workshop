@@ -80,7 +80,7 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 | # | File | Title | Objective (one line) | Level | Time | Status |
 |---|---|---|---|---|---|---|
 | 0 | sections/00_setup.py | Setup & the question | Load the cached models and data; see the question and outcomes | 🟢 | 5 | done |
-| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 15 | todo |
+| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 15 | done |
 | 2 | sections/02_falls_short.py | Where it falls short | Run the same tools on the specialised task and probe SAM with escalating prompts | 🟡 | 20 | todo |
 | 3 | sections/03_hidden_labels.py | Hide the labels: the naive baseline | Train a head with "missing = background" and watch it fail differently | 🟡 | 20 | todo |
 | 4 | sections/04_ladder.py | The adaptation ladder | Zero-shot → one-shot → scribbles: see how predictions change at each rung | 🟡 | 25 | todo |
