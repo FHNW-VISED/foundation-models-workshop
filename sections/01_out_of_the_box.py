@@ -186,7 +186,8 @@ for it in PETS_EVAL:
     zero_shot["point"].append(iou(sam.probability(it["image"], points=[pt], labels=[1]) >= 0.5, it["mask"]))
     zero_shot["box"].append(iou(sam.probability(it["image"], box=box_prompt(it)) >= 0.5, it["mask"]))
 zero_shot = {k: float(np.mean(v)) for k, v in zero_shot.items()}
-RESULTS["pets_zero_shot_iou"] = zero_shot["point"]  # the headline: one click, nothing else
+RESULTS["pets_zero_shot_iou"] = zero_shot["box"]  # the headline: SAM's best single prompt, one box
+RESULTS["pets_zero_shot_point_iou"] = zero_shot["point"]
 RESULTS["pets_zero_shot_box_iou"] = zero_shot["box"]
 RESULTS["pets_zero_shot_seconds"] = round(time.monotonic() - t0, 1)
 print(
@@ -301,9 +302,9 @@ def load_head(dataset: dict, regime: str, long_side: int | None = None) -> tuple
 
 
 # %% [markdown]
-# This cell trains the head on the full masks of five fit pets (section 1 is the only place training sees
-# full masks) and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
-# `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint instead.
+# This cell trains the head on the full masks of five fit pets (sections 1 and 2 are the only places
+# training sees full masks) and prints the seconds it took. Not done in a minute, or on a CPU and in a
+# hurry? Set `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint instead.
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed head "full5" instead of training
@@ -344,7 +345,8 @@ RESULTS["pets_head"] = {
 }
 print(
     f"linear head on {len(PETS_EVAL)} held-out pets · mean IoU {RESULTS['pets_head_iou']:.3f} "
-    f"(SAM one click: {RESULTS['pets_zero_shot_iou']:.3f}, one box: {RESULTS['pets_zero_shot_box_iou']:.3f})"
+    f"(SAM one click: {RESULTS['pets_zero_shot_point_iou']:.3f}, "
+    f"one box: {RESULTS['pets_zero_shot_box_iou']:.3f})"
 )
 panels = []
 for it, pred, v in list(zip(PETS_EVAL, head_preds, head_ious, strict=True))[:3]:
