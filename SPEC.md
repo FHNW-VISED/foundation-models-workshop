@@ -89,7 +89,7 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 | 7 | sections/07_use_fm_directly.py | Path 3 · Skip specialist training | Prompt the foundation model directly with scribble points and boxes | 🟡 | 10 | done |
 | 8 | sections/08_compare.py | Compare everything | Fill the comparison table, predicting the winner first | 🟡 | 15 | done |
 | 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 20 | done |
-| 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | todo |
+| 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | done |
 
 **Block 1** = sections 0–3 (+ the start of 4), "when it works and when it doesn't", ending on the cliffhanger before coffee.
 **Block 2** = sections 4–10, "ways out".
