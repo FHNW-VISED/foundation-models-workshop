@@ -52,6 +52,11 @@ echo "issues to run: $(echo $ISSUES | tr '\n' ' ')"
 TOOLS="Read,Edit,Write,Glob,Grep,Bash(just:*),Bash(uv run:*),Bash(uv add:*),Bash(ls:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Bash(grep:*)"
 CLAUDE_ARGS=(-p --permission-mode acceptEdits --allowedTools "$TOOLS" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --output-format json)
 [[ -n "$MODEL" ]] && CLAUDE_ARGS+=(--model "$MODEL")
+# Subagents are never Fable: Sonnet unless the agent names haiku/opus; the hook blocks "fable" and forks.
+export CLAUDE_CODE_SUBAGENT_MODEL="${NIGHT_SUBAGENT_MODEL:-sonnet}"
+[[ "$CLAUDE_CODE_SUBAGENT_MODEL" == *fable* ]] && { echo "NIGHT_SUBAGENT_MODEL must not be fable" >&2; exit 2; }
+GUARD="python3 $ROOT/scripts/subagent_guard.py"
+CLAUDE_ARGS+=(--settings "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Agent|Task\",\"hooks\":[{\"type\":\"command\",\"command\":\"$GUARD\"}]}]}}")
 
 # The gate must not be weakened by the agent it gates: undo edits to these paths unless the
 # issue's FILES line names them explicitly.

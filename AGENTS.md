@@ -28,6 +28,10 @@ The `.ipynb` is a **build artifact**. The source is the small Jupytext files in 
 
 Environment: `uv` only (`uv add <pkg>` if an issue allows a new dependency). Never `pip install` into the system.
 
+⛔ **Subagents are never Fable.** If you use the Agent tool, pass `model: "haiku"` (searches, lookups) or
+`"sonnet"` (the default); `"opus"` only for the heaviest task. Never `"fable"`, never `subagent_type: "fork"`
+(a fork inherits your model). The runner blocks both.
+
 ## How the sections work
 
 - Each file in `sections/` is Jupytext **percent** format. `# %% [markdown]` starts a markdown cell (lines prefixed `# `), and `# %%` starts a code cell.
