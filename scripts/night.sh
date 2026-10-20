@@ -7,13 +7,13 @@
 #   scripts/night.sh                 # run all open `night` issues
 #   scripts/night.sh --max 3         # at most 3 issues
 #   scripts/night.sh --dry-run       # show what would run, call nothing
-#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-fable-5-1)
+#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-opus-5-5)
 # Resumable: re-running on the same day continues night/<date> and skips issues already committed there.
 # NIGHT_DATE=YYYY-MM-DD continues an earlier night's branch; NIGHT_UNTIL=<epoch s> starts no issue after it.
 # Claude session limit: the issue is undone (no failure label), the reset time goes to build/night.limit, run stops.
 set -euo pipefail
 
-LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-fable-5-1}"; RETRIES=1
+LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-opus-5-5}"; RETRIES=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --label) LABEL="$2"; shift 2 ;;
