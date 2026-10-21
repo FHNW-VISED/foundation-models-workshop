@@ -1,8 +1,6 @@
 # %% [markdown]
 # ## 6. Path 2 · Recover supervision
 #
-# **Objective:** turn SAM pseudo-labels and Grad-CAM maps into training signal.
-#
 # Path 1 kept the label file and changed the loss. Path 2 does the opposite: it keeps the loss and fills in
 # the labels. A second model looks at every pixel nobody painted and makes a guess, and the head trains on
 # those guesses as if a person had drawn them. That is a **pseudo-label**. Think of handing your half-done

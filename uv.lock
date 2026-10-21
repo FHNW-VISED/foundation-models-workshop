@@ -437,6 +437,7 @@ dev = [
     { name = "ipykernel" },
     { name = "jupyterlab" },
     { name = "jupytext" },
+    { name = "markdown" },
     { name = "nbclient" },
     { name = "nbformat" },
     { name = "pytest" },
@@ -463,6 +464,7 @@ dev = [
     { name = "ipykernel", specifier = ">=6.29" },
     { name = "jupyterlab", specifier = ">=4" },
     { name = "jupytext", specifier = ">=1.16" },
+    { name = "markdown", specifier = ">=3.11.2" },
     { name = "nbclient", specifier = ">=0.10" },
     { name = "nbformat", specifier = ">=5.10" },
     { name = "pytest", specifier = ">=8" },
@@ -1038,6 +1040,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/19/8c/0f2ff2a8b7513e68871a74740c17a504b0488c679b379e6445ebb7bd78dc/lazy_loader-0.6.tar.gz", hash = "sha256:2f4b7824d6401958639008a0cae20c776b61dff619accd6890693e2de8260167", size = 18438, upload-time = "2026-09-21T21:31:32.982Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/23/93/4e45e37f26c820216704b36b8e67cc55c490a7abd287a78a26a2c0e21386/lazy_loader-0.6-py3-none-any.whl", hash = "sha256:77253be3391b06124a0e16105bd663b6c54470af1a9ca8e1cf026f38d58ed056", size = 8791, upload-time = "2026-09-21T21:31:31.632Z" },
+]
+
+[[package]]
+name = "markdown"
+version = "3.11.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/32/0b4d0297064244f04af4331b65de16237cc3cce07474171ee14222a28981/markdown-3.11.2.tar.gz", hash = "sha256:87bf5d90f2d2882e2c02fcda182c2800456b985bff38913867c49706481514b0", size = 491445, upload-time = "2026-10-19T19:41:42.687Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/66/bcab3b677b71ad286b4e607e3427499537c76e13ad2e22584ba7a7d9882c/markdown-3.11.2-py3-none-any.whl", hash = "sha256:f80390747a2a0ff2ba54da074ce4f862f72a6685f608cd2637b646a6d83993f5", size = 114266, upload-time = "2026-10-19T19:41:41.244Z" },
 ]
 
 [[package]]

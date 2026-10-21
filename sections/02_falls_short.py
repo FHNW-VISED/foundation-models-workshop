@@ -1,21 +1,26 @@
 # %% [markdown]
 # ## 2. Where it falls short
-#
-# **Objective:** run the same tools on the specialised task and probe SAM with escalating prompts.
-#
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# Run the same tools on the specialised task and probe SAM with escalating prompts.
+
+# %% [markdown]
 # Same three tools, same cells, new task. Section 1 gave you three numbers on pets: SAM with one click,
 # SAM with one box, and a linear head on five full masks. Here they meet the specialised images, where the
 # objects are thin, branching and low-contrast. Then we push SAM with more and more prompts, and give
 # DINOv3 twice the resolution, to see which of the two limits the result.
 #
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: why thin structures
-# are hard.</b> DINOv3 describes the image in 16 × 16 px patches. A vessel 5 px wide covers a third of a
+
+# %% [markdown]
+# <!-- callout: theory | Theory: why thin structures are hard -->
+# DINOv3 describes the image in 16 × 16 px patches. A vessel 5 px wide covers a third of a
 # patch, so its description is mostly "background with a dark line in it", and the head can only say
 # "vessel" or "not" for the whole square. SAM sees finer detail, but it was trained on a billion masks of
-# <i>objects</i>: compact things with a clear inside and outside. A vessel tree has
+# *objects*: compact things with a clear inside and outside. A vessel tree has
 # no inside, and one click on it is ambiguous (this vessel? the whole tree? the eye?).
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # This helper cell defines what this section measures with: the evaluation region (the fundus, not the
 # black border around it), skeletons for the thin-structure metric, clicks spread along a person's
 # scribbles, and a figure that marks every click.
@@ -88,15 +93,18 @@ print(
 
 # %% [markdown]
 # ### 2.1 SAM: one click, one box, again
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The next
-# cell is the section-1 cell on a specialised image: one click on a vessel (a pixel of a person's
-# scribble), then a box around all of them. Before you run it: what will SAM segment from one click on a
-# thin line? And what is "the object" inside a box that covers the whole image?</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell and compare the panels with the pets in section 1.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# The next cell is the section-1 cell on a specialised image: one click on a vessel (a pixel of a
+# person's scribble), then a box around all of them. Before you run it: what will SAM segment from one
+# click on a thin line? And what is "the object" inside a box that covers the whole image?
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell and compare the panels with the pets in section 1.
+
+# %% [markdown]
 # **Q5.** 🟡 What did SAM segment from the click, and from the box: a vessel, part of the tree, a blob, the
 # whole fundus? Try two other images by changing the index (on a CPU session there are 12).
 #
@@ -126,23 +134,25 @@ show_masks(
 
 # %% [markdown]
 # ### 2.2 A second number for thin structures: clDice
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: clDice.</b> IoU counts
+
+# %% [markdown]
+# <!-- callout: theory | Theory: clDice -->
+# IoU counts
 # pixels, and on thin structures pixels mislead. Predict every vessel twice as wide as it is and IoU drops
 # to about 0.5, although nothing was missed; miss all the capillaries and IoU barely moves, because they
-# hold few pixels. <b>clDice</b> (Shit et al., CVPR 2021) compares <i>centre lines</i> instead. It takes
+# hold few pixels. **clDice** (Shit et al., CVPR 2021) compares *centre lines* instead. It takes
 # the skeleton of each mask and asks two questions: which share of the predicted centre line lies inside
-# the true vessels (<i>topology precision</i>), and which share of the true centre line the prediction
-# covers (<i>topology sensitivity</i>). clDice is their harmonic mean: 1.0 when the tree is traced
+# the true vessels (*topology precision*), and which share of the true centre line the prediction
+# covers (*topology sensitivity*). clDice is their harmonic mean: 1.0 when the tree is traced
 # exactly, low when branches are missing or invented. We report it next to IoU for the specialised task.
-# </font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 3 min).</b>
-# Fill <code>my_cldice</code>: two boolean masks in, one float out. <code>skeleton(mask)</code> gives the
-# centre line. Topology precision = pixels of <code>skeleton(pred)</code> inside <code>truth</code>, divided
-# by the pixels of <code>skeleton(pred)</code>; topology sensitivity is the same with the roles swapped.
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 3 min) -->
+# Fill `my_cldice`: two boolean masks in, one float out. `skeleton(mask)` gives the
+# centre line. Topology precision = pixels of `skeleton(pred)` inside `truth`, divided
+# by the pixels of `skeleton(pred)`; topology sensitivity is the same with the roles swapped.
 # Return 0.0 when either skeleton is empty. The cell checks your version on two play masks, a good trace
-# and a blob that covers everything, and continues with ours if you skip it.</font></td></tr></table>
+# and a blob that covers everything, and continues with ours if you skip it.
 
 # %%
 # ✍️ YOUR CODE
@@ -186,11 +196,14 @@ print(
 # clicks spread along the scribbles a person drew, then the box, on every evaluation image. It also scores
 # the laziest possible answer, a mask that says "everything is foreground": a prediction no better than
 # that line has learnt nothing about the task.
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> Write down
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# Write down
 # what you expect from 1 to 20 clicks: will IoU rise steadily, jump at some point, or stay flat? Will the
-# box beat 20 clicks? And where will the grey "everything" line sit?</font></td></tr></table>
-#
+# box beat 20 clicks? And where will the grey "everything" line sit?
+
+# %% [markdown]
 # This cell runs the prompt ladder on every evaluation image (one SAM image encoding per image, then four
 # cheap prompt decodings) and keeps the mean IoU, clDice and the share of the fundus SAM marks per setting.
 
@@ -267,13 +280,15 @@ show_clicks(
 # background clicks too.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: over-trusting SAM's
-# confident masks.</b> SAM returns a crisp mask for every prompt, and its own confidence score is high for
-# a mask of the whole eye, because the whole eye <i>is</i> a good object. Nothing in the output says "this
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: over-trusting SAM's confident masks -->
+# SAM returns a crisp mask for every prompt, and its own confidence score is high for
+# a mask of the whole eye, because the whole eye *is* a good object. Nothing in the output says "this
 # is the wrong kind of thing". Always score against a baseline that knows nothing (the grey line), and
-# look at the mask.</font></td></tr></table>
-#
+# look at the mask.
+
+# %% [markdown]
 # ### 2.4 What DINOv3 sees here
 #
 # This cell shows the same 3-colour PCA of the DINOv3 patch features as section 1.3, now on specialised
@@ -310,11 +325,14 @@ show_masks(panels, width=2.6)
 # pixels of the 1024 px crop; at 1024 px, 16 × 16. (DINOv2 papers use 518 px: 37 patches of 14 px. DINOv3's
 # patches are 16 px, so 512 is the same idea.) Double the side and you get four times the patches, and
 # roughly four to sixteen times the compute.
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> With
-# <i>perfect</i> labels, will the head beat SAM here? And will doubling the resolution help IoU, clDice,
-# both or neither? Write two guesses.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# With
+# *perfect* labels, will the head beat SAM here? And will doubling the resolution help IoU, clDice,
+# both or neither? Write two guesses.
+
+# %% [markdown]
 # This cell trains one head per resolution on the five fit images and prints the seconds it took. Not done
 # in a minute, or on a CPU and in a hurry? Set `TRAIN_YOURSELF = False` and run it again: it loads our
 # checkpoints (trained the same way on all fit images).
@@ -386,23 +404,25 @@ show_masks(
 )
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: resolution is not
-# free.</b> Self-attention compares every patch with every other, so doubling the side multiplies the
+# <!-- callout: pitfall | Pitfall: resolution is not free -->
+# Self-attention compares every patch with every other, so doubling the side multiplies the
 # patches by four and the attention cost by up to sixteen. At 1024 px, one specialised image is 4096 patches.
 # On the full 3504 px fundus it would be 48 000: that is why we work on crops and why the features are
 # precomputed. When the structure is thinner than a patch, check the resolution before anything else.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # ### 2.6 The failure gallery
 #
 # Numbers average the failures away; the gallery shows them. The next cell sorts the evaluation images
 # from worst to best (by the head's IoU at the higher resolution) and shows three at a time: the image, SAM
 # with a box, the head, and the ground truth. The last row puts the same models on the whole fundus, shrunk
 # to 1024 px, where the vessels are only 1–3 px wide.
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell, then page through the gallery.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell, then page through the gallery.
+
+# %% [markdown]
 # **Q8.** 🟡 For the worst images, is the failure the same kind for SAM and for the head? Look for: missed
 # thin vessels, vessels drawn too wide, the optic disc or the border marked as vessel, whole regions marked.
 # Page with the start index:
@@ -465,12 +485,12 @@ show_masks(
 RESULTS["specialised_full_view"] = full_s
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">👥 <b>Pairs, 5 min: whose image
-# fails worst?</b> Each of you picks a different <code>GALLERY_START</code> or <code>demo</code> index and
+# <!-- callout: question | 👥 Pairs, 5 min: whose image fails worst? -->
+# Each of you picks a different `GALLERY_START` or `demo` index and
 # finds the worst mask you can. Show it to your neighbour and name the failure in three words ("misses thin
 # vessels", "marks the disc", "the whole eye"). Is it the same failure for SAM and for the head?
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # <details><summary>What people usually find</summary>
 #
 # The two tools fail differently. SAM tends to fail <i>globally</i>: it marks a whole region, or one thick
@@ -511,14 +531,15 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Two
+# <!-- callout: across | Across approaches -->
+# Two
 # different limits showed up. SAM's limit is its idea of an object: more prompts make the mask bigger, not
 # thinner. The head's limit is the patch: even with perfect labels it can only answer per 16 px square, and
 # resolution is one lever (look at how far it moved IoU and clDice, and whether they agreed). From here on
 # the question changes from "does it work?" to "what information can we add, cheaply, to make it work?".
 # Perfect masks cost 3–5 hours per fundus, so the next sections only use cheap, incomplete ones.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # **Q9.** 🟡 You now have a small checklist for a new problem. Which two or three signs from this section
 # would tell you, on your own data, that a foundation model is not good enough out of the box?
 #
@@ -531,14 +552,15 @@ plt.show()
 # And always: the mask looks crisp and confident, so look at it next to the truth.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Try it on your image (optional,
-# 2 min).</b> Got a photo of something thin or specialised (a leaf's veins, a crack, a cable, a
-# micrograph)? Upload it with the folder icon on the left, put its path in <code>MY_IMAGE</code> and one or
-# more <code>(x, y)</code> clicks on the thing in <code>MY_CLICKS</code>, then run the cell. Left empty, it
+
+# %% [markdown]
+# <!-- callout: your-turn | Try it on your image (optional, 2 min) -->
+# Got a photo of something thin or specialised (a leaf's veins, a crack, a cable, a
+# micrograph)? Upload it with the folder icon on the left, put its path in `MY_IMAGE` and one or
+# more `(x, y)` clicks on the thing in `MY_CLICKS`, then run the cell. Left empty, it
 # runs on the demo image. Section 9 does this properly, with scribbles and the whole ladder.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # This cell runs SAM on your image (or the demo image) with your clicks and shows the mask, the quickest way
 # to see whether your own problem looks more like the pets or like this section.
 

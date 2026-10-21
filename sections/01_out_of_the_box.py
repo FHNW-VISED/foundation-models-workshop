@@ -1,22 +1,28 @@
 # %% [markdown]
 # ## 1. Out of the box: pets
-#
-# **Objective:** see a foundation model segment pets almost perfectly, zero-shot.
-#
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# See a foundation model segment pets almost perfectly, zero-shot.
+
+# %% [markdown]
 # Three tools, no training data of ours: **SAM** segments whatever you point at, **DINOv3** turns an image
 # into a grid of features that already "know" what belongs together, and a **linear head** on those
 # features learns a new class from a handful of masks in seconds. Here they meet the easy task. Keep the
 # numbers you get: section 2 runs exactly the same three cells on the specialised task.
 #
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: two kinds of
-# foundation model.</b> <b>SAM</b> (Segment Anything) is <i>promptable</i>: you give it an image and a
+
+# %% [markdown]
+# <!-- callout: theory | Theory: two kinds of foundation model -->
+# **SAM** (Segment Anything) is *promptable*: you give it an image and a
 # hint (a click, a box), and it returns the mask of the object the hint is on. Nothing is trained. It
-# learnt "what an object is" from a billion masks of everyday photos. <b>DINOv3</b> is a <i>feature
-# extractor</i>: it cuts the image into 16 × 16 px patches and returns a 384-number description of each
+# learnt "what an object is" from a billion masks of everyday photos. **DINOv3** is a *feature
+# extractor*: it cuts the image into 16 × 16 px patches and returns a 384-number description of each
 # patch, learnt without any labels. Two patches with similar descriptions look alike to the model. On
 # their own the features segment nothing; a tiny classifier on top of them does, and that is the
-# <b>linear head</b> we train below.</font></td></tr></table>
-#
+# **linear head** we train below.
+
+# %% [markdown]
 # This helper cell defines the two pieces this section measures with: how to turn a person's hint into a
 # SAM prompt, and `show_masks()`, the figure used for every comparison in the notebook (prediction in
 # violet, ground truth in green, prompts in teal).
@@ -104,14 +110,18 @@ print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PE
 # %% [markdown]
 # ### 1.1 SAM: one click, one box
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The next
-# cell gives SAM a single click on a pet, then a box around it. Before you run it: will one click be
-# enough for a clean mask of the whole animal, and what could go wrong (fur vs floor, the tail, a second
-# animal)? Say it to your neighbour or write it down.</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell and look at the three panels.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# The next cell gives SAM a single click on a pet, then a box around it. Before you run it: will one
+# click be enough for a clean mask of the whole animal, and what could go wrong (fur vs floor, the tail,
+# a second animal)? Say it to your neighbour or write it down.
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell and look at the three panels.
+
+# %% [markdown]
 # **Q2.** 🟡 Where do the one-click mask and the box mask differ from the ground truth, if at all? Is the
 # difference at the object's boundary, or is a whole part missing or added? Try the same cell on another
 # pet by changing the index.
@@ -147,12 +157,13 @@ show_masks(
 # approaches on a hundred images. We use one metric for the whole workshop: **IoU** (intersection over
 # union), the overlap between the prediction and the ground truth divided by the area covered by either.
 # 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 2 min).</b>
-# Fill <code>my_iou</code>: two boolean arrays in, one float out. Pixels where both are True are the
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min) -->
+# Fill `my_iou`: two boolean arrays in, one float out. Pixels where both are True are the
 # intersection; pixels where at least one is True are the union. If the union is empty, return 1.0 (two
 # empty masks agree). The cell below checks your version on a 4 × 4 play example and continues with
-# ours if you skip it.</font></td></tr></table>
+# ours if you skip it.
 
 # %%
 # ✍️ YOUR CODE
@@ -227,12 +238,14 @@ show_masks(panels, width=2.6)
 # </details>
 #
 # ### 1.4 A linear head on five pets
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The next
-# cells train a classifier with 385 parameters on the patch features of just <b>five</b> pets with full
-# masks, then score it on the held-out ones. Will its IoU land above, near or below SAM's one-click number
-# from 1.2? Write down a number before you run.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# The next cells train a classifier with 385 parameters on the patch features of just **five** pets with
+# full masks, then score it on the held-out ones. Will its IoU land above, near or below SAM's one-click
+# number from 1.2? Write down a number before you run.
+
+# %% [markdown]
 # This helper cell defines the head used for every training step in the notebook: a 1 × 1 convolution on
 # standardised patch features, trained with a balanced cross-entropy that ignores pixels labelled −1, plus
 # `load_head()` for our precomputed checkpoints.
@@ -357,12 +370,13 @@ for it, pred, v in list(zip(PETS_EVAL, head_preds, head_ious, strict=True))[:3]:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Two ways
-# to the same mask, scored on the same hidden ground truth: SAM needs <i>one hint per image</i> and no
-# training; the head needs <i>five full masks once</i> and then runs on every image with no hint. Keep both
+# <!-- callout: across | Across approaches -->
+# Two ways to the same mask, scored on the same hidden ground truth: SAM needs *one hint per image* and
+# no training; the head needs *five full masks once* and then runs on every image with no hint. Keep both
 # numbers: the comparison table in section 8 starts with them, and section 2 reruns both on the
-# specialised task.</font></td></tr></table>
-#
+# specialised task.
+
+# %% [markdown]
 # **Q4.** 🟡 Compare the two numbers you got with the prediction you wrote down. Which approach would you
 # pick for 10 000 pet photos, and which for 10 photos? What does each one ask of a person?
 #
@@ -374,13 +388,14 @@ show_masks(panels, width=2.6)
 # objects get smaller. Hardware or seed may change the numbers; the trade-off stays.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">👥 <b>Optional, 3 min.</b> Compare
-# the demo pet with your neighbour's: did one click fail on either of yours? If it did, was the click on
-# an ambiguous spot (fur against a similar floor, a collar, a second animal)?</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: a clean mask is not
-# a correct one.</b> SAM always returns a confident-looking mask, whatever you click on. On pets that is
+
+# %% [markdown]
+# <!-- callout: question | 👥 Optional, 3 min -->
+# Compare the demo pet with your neighbour's: did one click fail on either of yours? If it did, was the
+# click on an ambiguous spot (fur against a similar floor, a collar, a second animal)?
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: a clean mask is not a correct one -->
+# SAM always returns a confident-looking mask, whatever you click on. On pets that is
 # usually the right object. Keep that habit of looking at the mask next to the ground truth: in the next
 # section it is the only thing that shows the model has quietly segmented the wrong thing.
-# </font></td></tr></table>

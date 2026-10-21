@@ -1,28 +1,31 @@
 # %% [markdown]
 # ## 5. Path 1 · Learn from less
 #
-# **Objective:** treat missing labels as unknown; write the masked loss, then 🔴 a PU-inspired loss.
-#
 # Back to the half-finished label file of section 3. The naive head failed because we passed the file to
 # the loss as it was, and the file calls every unpainted pixel "background". Path 1 keeps the same file,
 # the same features and the same head, and changes only what the loss is told about the unpainted pixels.
 # Two answers. **Masked:** "unknown", so the loss skips them; the only background it hears about is a few
 # strokes someone drew on clear background. **🔴 PU:** "unlabelled, and about this share of them is
 # vessel", so the loss uses every pixel but corrects for the vessels hiding among them.
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: learning from positives
-# and unknowns.</b> A <b>masked loss</b> is any loss with a mask that removes pixels from it: an ignored
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# treat missing labels as unknown; write the masked loss, then 🔴 a PU-inspired loss.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: learning from positives and unknowns -->
+# A **masked loss** is any loss with a mask that removes pixels from it: an ignored
 # pixel adds nothing to the loss and sends no gradient. The partial cross-entropy of section 4 is one;
 # here we write it ourselves. Ignoring pixels is safe only if some known background is left, otherwise
-# "everything is vessel" scores a perfect zero. <b>Positive-unlabelled (PU) learning</b> starts from the
+# "everything is vessel" scores a perfect zero. **Positive-unlabelled (PU) learning** starts from the
 # opposite end: some positives are labelled, everything else is unlabelled, and no negative is known. If
 # the labelled positives are a random sample of all positives and you know (or guess) the share of
-# positives, the <i>prior</i>, you can still estimate the loss you would get with complete labels (Elkan
-# &amp; Noto, KDD 2008; Kiryo et al., "Positive-Unlabeled Learning with Non-Negative Risk Estimator",
-# NeurIPS 2017, <a href="https://arxiv.org/abs/1703.00593">arXiv:1703.00593</a>). We use their
-# non-negative version on a single pixel classifier, which is why we call it PU-<i>inspired</i>.
-# </font></td></tr></table>
-#
+# positives, the *prior*, you can still estimate the loss you would get with complete labels (Elkan
+# & Noto, KDD 2008; Kiryo et al., "Positive-Unlabeled Learning with Non-Negative Risk Estimator",
+# NeurIPS 2017, [arXiv:1703.00593](https://arxiv.org/abs/1703.00593)). We use their
+# non-negative version on a single pixel classifier, which is why we call it PU-*inspired*.
+
+# %% [markdown]
 # This helper cell defines a training loop that takes the loss as an argument (the same linear head,
 # features and steps as every head so far), a report with the numbers of section 3 plus the held-out ones
 # of section 4, and one colour for each head of this path.
@@ -175,16 +178,16 @@ show_masks(
 # </details>
 #
 # ### 5.2 Write the masked loss
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 4 min).</b>
-# Fill <code>masked_loss</code>. In: <code>logits</code> (float tensor, any shape), <code>labels</code>
-# (same shape, 1.0 = vessel, 0.0 = background) and <code>ignore_mask</code> (same shape, bool, True =
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 4 min) -->
+# Fill `masked_loss`. In: `logits` (float tensor, any shape), `labels`
+# (same shape, 1.0 = vessel, 0.0 = background) and `ignore_mask` (same shape, bool, True =
 # unknown). Out: one scalar tensor. It is the balanced loss of every head so far, with one change: ignored
 # pixels count for nothing. Take the binary cross-entropy of each pixel
-# (<code>F.binary_cross_entropy_with_logits(..., reduction="none")</code>), average it over the known
+# (`F.binary_cross_entropy_with_logits(..., reduction="none")`), average it over the known
 # vessel pixels and over the known background pixels separately, and return the mean of the two averages.
 # The cell checks your version on a 2 × 3 play example and continues with ours if you skip it.
-# </font></td></tr></table>
 
 
 # %%
@@ -221,12 +224,13 @@ _with, _without = (
 print(f"play example · loss {_with:.4f} with two pixels unknown, {_without:.4f} with none")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> Same
+# <!-- callout: your-turn | Your prediction -->
+# Same
 # label file as the naive head, but the unpainted pixels are now unknown. On the hidden vessels of the
 # training images, will its recall be closer to the naive head's or to the section-2 head's (full masks)?
 # And on new images, will it mark more of the fundus than the naive head, or less? Write two guesses.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # This cell trains the head with your masked loss (or ours) on the masked labels of 5.1 and prints the
 # seconds it took. Not done in a minute, or on a CPU and in a hurry? Set `TRAIN_YOURSELF = False` and run it
 # again: it loads our "masked" checkpoint, which was trained with a stricter rule (the text it prints says
@@ -311,10 +315,12 @@ def path_chart(names: list[str]) -> None:
 path_chart(list(PATH_COLOURS))
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
+# <!-- callout: question | Question -->
+# Run the next
 # cell: it shows the hidden vessels each head found on a training image, then the error maps of section 4
-# on the held-out demo image (violet found, orange invented, green missed).</font></td></tr></table>
-#
+# on the held-out demo image (violet found, orange invented, green missed).
+
+# %% [markdown]
 # **Q19.** 🟡 Which hidden vessels does the masked head recover that the naive head missed? On the
 # held-out image, what did each head pay for what it found: compare the orange. Try another training image:
 #
@@ -366,21 +372,24 @@ show_masks(
 # the loss was told about the unpainted pixels, in opposite directions.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: "ignore" is not
-# free.</b> Every pixel you ignore is a pixel the model may call anything. A masked loss with almost no
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: "ignore" is not free -->
+# Every pixel you ignore is a pixel the model may call anything. A masked loss with almost no
 # known background drifts towards "everything is foreground", and the training loss still looks perfect.
 # Watch the share of the image the model marks, and give the loss some background close to the objects,
-# not only easy background far away.</font></td></tr></table>
-#
+# not only easy background far away.
+
+# %% [markdown]
 # ### 5.3 🔴 Optional: a PU-inspired loss
 #
 # The masked head needed background strokes; the PU head needs none. It reads every unpainted pixel as
-# <i>unlabelled</i>: a mix of background and the vessels nobody painted. If you know roughly what share of
+# *unlabelled*: a mix of background and the vessels nobody painted. If you know roughly what share of
 # the vessels was painted, you know roughly how much vessel hides in that mix, and you can subtract it.
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: the PU trick in three
-# lines.</b> Let the <b>prior</b> π be the share of vessel pixels in the fundus. Painted share ÷ share of
+
+# %% [markdown]
+# <!-- callout: theory | Theory: the PU trick in three lines -->
+# Let the **prior** π be the share of vessel pixels in the fundus. Painted share ÷ share of
 # the vessels that was painted gives an estimate; we read the second number from the annotator ("I did
 # about half", here the dataset config). (1) Loss on the true vessels: the painted ones, target "vessel".
 # (2) Every pixel, target "background", mixes π × (vessels) + (1 − π) × (background); so the loss on the
@@ -388,8 +397,8 @@ show_masks(
 # Average (1) and (2), the balanced loss again. That estimate can dip below zero when the head overfits the
 # few painted vessels; the non-negative trick of Kiryo et al. clips it at zero. It assumes the painted
 # vessels are a random sample of all vessels, which is true here because we hid segments at random.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # **Q20.** 🔴 The prior rests on one number from the annotator, `LABELLED_SHARE`. Read `pu_loss` in the next
 # cell, run it, then pretend the annotator was wrong: train again with a smaller and a larger share. Which
 # way does the head move on recall and on the marked share?
@@ -469,16 +478,19 @@ path_chart([APPROACH_NAMES["naive"], APPROACH_NAMES["masked"], APPROACH_NAMES["p
 # labelled check set, you can pick the share that matches it.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Path 1
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Path 1
 # keeps the label file, the features and the head of section 3 and changes one thing, what the loss is told
 # about unpainted pixels. Naive: "background", so the head learns that vessels are background. Masked:
 # "unknown", so the hidden vessels come back, and the missing background lets it over-mark. PU: "a known
 # mix", the same pixels with a correction that rests on one guess. None of them adds information about the
 # hidden vessels; they only stop the loss from telling lies, or tell smaller ones. The labels are not cheap
 # either: half a vessel map is still hours per image. Section 6 tries to recover the missing labels with a
-# second model instead.</font></td></tr></table>
-#
+# second model instead.
+
+# %% [markdown]
 # This cell writes the annotation effort of the three Path 1 heads for the comparison table of section 8,
 # with the assumptions of section 4: the painted half of each vessel map, plus seconds per background stroke.
 

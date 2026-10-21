@@ -12,10 +12,14 @@ import sys
 from pathlib import Path
 
 import jupytext
+from build import CALLOUT_KINDS, parse_marker
 
 ROOT = Path(__file__).resolve().parent.parent
 SECTIONS = ROOT / "sections"
 SPEC = ROOT / "SPEC.md"
+SETUP_SRC = ROOT / "setup_check.py"
+ANY_MARKER_RE = re.compile(r"<!--\s*callout\b")
+TABLE_BOX_RE = re.compile(r"<table\b[^>]*\bbgcolor", re.I | re.S)
 
 Q_RE = re.compile(r"\*\*Q(\d+)\.?\*\*")
 LEVELS = ("🟢", "🟡", "🔴")
@@ -41,6 +45,36 @@ def is_helper_cell(src: str) -> bool:
         and all(isinstance(n, defs) for n in body)
         and any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) for n in body)
     )
+
+
+def check_callouts(where: str, src: str) -> bool:
+    """N-034 checks on one markdown cell. True if the cell is a (well-placed) callout."""
+    if TABLE_BOX_RE.search(src):
+        fail(where, "coloured box as <table bgcolor>: Colab cuts it; use a callout marker (N-034)")
+    marker = parse_marker(src)
+    if marker is None:
+        if ANY_MARKER_RE.search(src):
+            fail(where, "callout marker must be the first line of its own markdown cell (N-034)")
+        return False
+    kind, title, _ = marker
+    if kind not in CALLOUT_KINDS:
+        fail(where, f"unknown callout kind '{kind}' (known: {', '.join(CALLOUT_KINDS)}) (N-034)")
+    if "<" in title or "*" in title:
+        fail(where, "callout title must be plain text: no '<' or '*' (N-034)")
+    if len(ANY_MARKER_RE.findall(src)) > 1:
+        fail(where, "one callout per cell (N-034)")
+    return True
+
+
+def has_objective(cells: list) -> bool:
+    """N-003: '**Objective:**' in the heading cell, or an objective callout as the second cell
+    (third when the second is the title banner)."""
+    if "**Objective:**" in cells[0].source:
+        return True
+    kinds = [
+        (m[0] if c.cell_type == "markdown" and (m := parse_marker(c.source)) else None) for c in cells[1:3]
+    ]
+    return kinds[:1] == ["objective"] or kinds[:2] == ["banner", "objective"]
 
 
 def spec_rows() -> dict[str, str]:

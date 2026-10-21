@@ -1,32 +1,36 @@
 # %% [markdown]
 # ## 8. Compare everything
 #
-# **Objective:** fill the comparison table, predicting the winner first.
-#
 # Every section since 2 ended with a small table of its own, each against a slightly different neighbour.
 # This section puts all of them in one table, scored on the same held-out images and the same hidden
 # ground truth, so that the question becomes the one you face on a real project: not "which approach has
 # the highest number" but "which approach would I pay for". A recipe that wins on accuracy can lose on
 # annotation hours, or win on average and fail badly on one image in five. The table has one row per
 # approach and five things to read in each row; the plot underneath shows the trade-off at a glance.
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: the five columns.</b>
-# <b>Accuracy</b>: the mean IoU over the held-out images, plus clDice for thin structures (does the mask
-# follow the centre lines?). <b>Annotation effort</b>: what a person had to draw, turned into minutes:
-# strokes and boxes at a few seconds each, complete or half-complete masks at hours each. <b>Reliability</b>:
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# fill the comparison table, predicting the winner first.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: the five columns -->
+# **Accuracy**: the mean IoU over the held-out images, plus clDice for thin structures (does the mask
+# follow the centre lines?). **Annotation effort**: what a person had to draw, turned into minutes:
+# strokes and boxes at a few seconds each, complete or half-complete masks at hours each. **Reliability**:
 # how much the IoU varies from one held-out image to the next (the standard deviation); a small spread
-# means you can trust the average on a new image, a large one means some images fail badly. <b>Compute</b>:
-# seconds of training plus inference in this session. <b>Scalability</b> is a sentence, not a number: what
-# it costs to segment the next thousand images.</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FFF8E1"><tr><td><font color="#5D4037">🧾 <b>Assumptions behind the
-# minutes.</b> A scribble stroke, a click or a box takes about <b>2 seconds</b> to draw. A complete vessel
-# map of one fundus image takes <b>3 to 5 hours</b> (the FIVES paper, Jin et al., <i>Scientific Data</i>
+# means you can trust the average on a new image, a large one means some images fail badly. **Compute**:
+# seconds of training plus inference in this session. **Scalability** is a sentence, not a number: what
+# it costs to segment the next thousand images.
+
+# %% [markdown]
+# <!-- callout: note | Assumptions behind the minutes -->
+# A scribble stroke, a click or a box takes about **2 seconds** to draw. A complete vessel
+# map of one fundus image takes **3 to 5 hours** (the FIVES paper, Jin et al., *Scientific Data*
 # 2022), so we count the midpoint, 4 hours, and a half-painted map as half of that. Both numbers come from
 # the dataset config, not from a measurement in this room; change them there and every row moves with them.
-# Training minutes are paid once; the per-image column is what every <i>new</i> image costs.
-# </font></td></tr></table>
-#
+# Training minutes are paid once; the per-image column is what every *new* image costs.
+
+# %% [markdown]
 # This helper cell collects, for every approach of sections 2 to 7, its predictions on the held-out images,
 # its numbers, its seconds and its annotation minutes, and gives each approach one sentence on how it scales.
 
@@ -114,13 +118,15 @@ print(
 
 # %% [markdown]
 # ### 8.1 Your prediction first
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction (1 min).</b>
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction (1 min) -->
 # Before the table appears, write down two guesses using the short names printed above. Which approach will
-# have the <b>highest mean IoU</b>? And which one will be the <b>steadiest</b>, the smallest spread of IoU
+# have the **highest mean IoU**? And which one will be the **steadiest**, the smallest spread of IoU
 # from image to image? You have seen most of these numbers one section at a time; the point is to see
-# whether your picture of the whole holds up when they sit side by side.</font></td></tr></table>
-#
+# whether your picture of the whole holds up when they sit side by side.
+
+# %% [markdown]
 # **Q31.** 🟡 Which approach wins on IoU, and which is the steadiest? Write your two picks in the next cell
 # and run it; the table cell further down tells you where they landed.
 #
@@ -137,13 +143,14 @@ print(f"your picks · highest IoU: {MY_WINNER or '(none)'} · steadiest: {MY_STE
 
 # %% [markdown]
 # ### 8.2 What "reliable" means here
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 2 min).</b>
-# Fill <code>my_spread</code>. In: the IoU of one approach on each held-out image, as a list of floats. Out:
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min) -->
+# Fill `my_spread`. In: the IoU of one approach on each held-out image, as a list of floats. Out:
 # their standard deviation, the population version (divide by the number of images, not by one less), as a
 # float. A small spread means the mean IoU is a fair promise for the next image; a large one means a few
 # images pull the mean up or down. The cell checks your version on four play values and continues with ours
-# if you skip it.</font></td></tr></table>
+# if you skip it.
 
 
 # %%
@@ -312,13 +319,15 @@ plt.show()
 # output. The IoU winner can win none of the three; that is the point of a table with more than one column.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">👥 <b>Pairs, 5 min: compare tables
-# with your neighbour.</b> Your sessions ran with the same seed but possibly different settings (Q17, Q23,
+
+# %% [markdown]
+# <!-- callout: question | 👥 Pairs, 5 min: compare tables with your neighbour -->
+# Your sessions ran with the same seed but possibly different settings (Q17, Q23,
 # Q27, Q28, the 🔴 parts), and on a CPU session the image counts differ from a GPU one. Put your two tables
 # side by side. Which rows moved, and which stayed put? Did you predict the same winner? Agree on one
-# approach you would try first on a new specialised task, and one sentence on why.</font></td></tr></table>
-#
+# approach you would try first on a new specialised task, and one sentence on why.
+
+# %% [markdown]
 # <details><summary>What pairs usually find</summary>
 #
 # The order of the top few rows is often less stable than it looks: a different threshold, a different
@@ -329,11 +338,12 @@ plt.show()
 # tables disagree on the winner but agree on the shape, trust the shape.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Every
-# path of this notebook added a different kind of information: a prompt, one complete example, cheap
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Every path of this notebook added a different kind of information: a prompt, one complete example, cheap
 # strokes, an honest loss about missing labels, a second model's guesses, or a person pointing at every
 # image. The table shows that none of them is free and none wins every column. Accuracy, annotation minutes,
 # reliability and compute pull in different directions, and the right row depends on how many images you
 # have, who checks the output, and what a mistake costs. Section 9 runs the cheapest rungs on your own
-# images; section 10 turns this table into rules you can take to the next problem.</font></td></tr></table>
+# images; section 10 turns this table into rules you can take to the next problem.

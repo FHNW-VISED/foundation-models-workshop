@@ -1,8 +1,6 @@
 # %% [markdown]
 # ## 4. The adaptation ladder
 #
-# **Objective:** zero-shot → one-shot → scribbles: see how predictions change at each rung.
-#
 # Welcome back. Before the break the head believed a label file that said "background" wherever nobody had
 # looked. Block 2 is about the ways out, and the first one is a ladder: give the foundation model a little
 # more task-specific information at each rung and look at what changes. Rung 0 is section 2, no training,
@@ -10,19 +8,24 @@
 # quick strokes on several images, and a loss that skips every pixel nobody labelled. Each rung costs a
 # different kind of effort, and each one fails in its own way. Higher on the ladder is not automatically
 # better, so we look at the masks, not only at the numbers.
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: what each rung tells
-# the model.</b> <b>Zero-shot</b> (section 2): SAM gets a box and nothing about the task; it returns its
-# best guess of "the object". <b>One-shot</b>: one image with a complete mask. With frozen DINOv3 features
-# the simplest use of it is a <i>prototype</i>: the mean feature of the vessel patches and the mean feature
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# zero-shot → one-shot → scribbles: see how predictions change at each rung.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: what each rung tells the model -->
+# **Zero-shot** (section 2): SAM gets a box and nothing about the task; it returns its
+# best guess of "the object". **One-shot**: one image with a complete mask. With frozen DINOv3 features
+# the simplest use of it is a *prototype*: the mean feature of the vessel patches and the mean feature
 # of the background patches; every patch of a new image goes to the nearer of the two. The same map can
 # also pick clicks for SAM, the idea behind PerSAM (Zhang et al., "Personalize Segment Anything Model with
-# One Shot", ICLR 2024). <b>Scribbles</b>: strokes on some vessels and some background in a few images,
-# everything else <i>unlabelled</i>. The section-2 head is trained with a <i>partial</i> cross-entropy
+# One Shot", ICLR 2024). **Scribbles**: strokes on some vessels and some background in a few images,
+# everything else *unlabelled*. The section-2 head is trained with a *partial* cross-entropy
 # that sums only over the labelled pixels (Tang et al., ECCV 2018), the recipe the MIT "DINOv2 + scribbles"
 # work used on frozen features, here on DINOv3. One complete mask costs hours; a scribble costs seconds.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # This helper cell defines the tools of the ladder: one colour per approach (kept for the rest of the
 # notebook), prototypes from patch features, clicks picked from a similarity map, an error map that shows
 # what each prediction found, missed and invented, and a small report of the numbers we compare.
@@ -143,16 +146,17 @@ print(
 # this rung may use (L-005): the held-out ground truth stays for scoring. From it we build the two
 # prototypes, "what a vessel patch looks like" and "what a background patch looks like", and label every
 # patch of a held-out image by the nearer one. No training: one mean per class.
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> One
-# complete example against SAM's box from rung 0. Will the prototype mark more of the fundus than SAM, or
-# less? Will it find the thin vessels, or only the thick ones? Write one guess for each.
-# </font></td></tr></table>
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell, then change which training image is the annotated one.</font></td></tr></table>
-#
+# <!-- callout: your-turn | Your prediction -->
+# One complete example against SAM's box from rung 0. Will the prototype mark more of the fundus than SAM, or
+# less? Will it find the thin vessels, or only the thick ones? Write one guess for each.
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell, then change which training image is the annotated one.
+
+# %% [markdown]
 # **Q14.** 🟡 Look at the similarity map: which parts of the held-out image look most like the annotated
 # vessels (purple), and which like the background (orange)? Then pick another annotated image: does the
 # held-out IoU move much? What does that say about relying on a single example?
@@ -297,23 +301,23 @@ show_masks(
 )
 
 # %% [markdown]
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: partial
-# cross-entropy.</b> The loss of section 2 sums a cross-entropy term over every pixel. The partial version
+# <!-- callout: theory | Theory: partial cross-entropy -->
+# The loss of section 2 sums a cross-entropy term over every pixel. The partial version
 # sums it only over the pixels a person labelled: a vessel stroke says "1", a background stroke says "0",
 # and an unlabelled pixel contributes nothing at all, neither "vessel" nor "background". In code that is a
-# target of <code>-1</code>, which <code>train_head</code> already skips (the border of the fundus has been
+# target of `-1`, which `train_head` already skips (the border of the fundus has been
 # skipped that way since section 2). The balanced weighting is computed over the labelled pixels only.
-# Compare with section 3: there the unpainted pixels were targets of <code>0</code>.</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 3 min):
-# choose which pixels to ignore.</b> Fill <code>my_scribble_targets</code>. It turns a scribble map
+# Compare with section 3: there the unpainted pixels were targets of `0`.
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 3 min): choose which pixels to ignore -->
+# Fill `my_scribble_targets`. It turns a scribble map
 # (0 unlabelled, 1 vessel stroke, 2 background stroke) into training targets: 1, 0, or −1 for "ignore".
-# Pixels outside <code>region</code> are always −1. With <code>bg_beyond_px=None</code>, every unlabelled
+# Pixels outside `region` are always −1. With `bg_beyond_px=None`, every unlabelled
 # pixel is ignored. With a number, you decide that unlabelled pixels farther than that many pixels from any
-# vessel stroke count as background (<code>ndi.distance_transform_edt(scribbles != 1)</code> gives each
+# vessel stroke count as background (`ndi.distance_transform_edt(scribbles != 1)` gives each
 # pixel's distance to the nearest vessel stroke). The cell checks your version on a 6 × 6 play map with both
 # settings and continues with ours if you skip it. You will use the second setting in 4.5.
-# </font></td></tr></table>
 
 # %%
 # ✍️ YOUR CODE
@@ -351,11 +355,13 @@ print("play example · targets with bg_beyond_px=2 (−1 = ignored):")
 print(scribble_targets(_play_scrib, _play_region, 2))
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The head
+# <!-- callout: your-turn | Your prediction -->
+# The head
 # will see labels on fewer than two pixels in a hundred, and no vessel will ever be called "background".
 # Against the one complete mask of rung 1, will it find more of the held-out vessels, or fewer? Will it
-# mark more of the fundus, or less? Write two guesses.</font></td></tr></table>
-#
+# mark more of the fundus, or less? Write two guesses.
+
+# %% [markdown]
 # This cell trains the section-2 head on the scribbles of the five training images, every unlabelled pixel
 # ignored, and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
 # `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint, trained the same way on all fit images.
@@ -490,18 +496,19 @@ show_masks(
 # Ignoring every unlabelled pixel is the safe choice, and also a wasteful one: more than 98 % of the fundus
 # says nothing. A tempting shortcut is "far from every vessel stroke, it's surely background". That is the
 # second setting of your `scribble_targets`.
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: "surely background"
-# is a guess.</b> The strokes cover only some of the vessel segments. A vessel nobody scribbled can be
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: "surely background" is a guess -->
+# The strokes cover only some of the vessel segments. A vessel nobody scribbled can be
 # far from every stroke, and the shortcut then labels it background: the section-3 mistake, back through
 # the side door. The next cell measures how much of the true vessel area your rule mislabels, on the
 # training images, using the hidden ground truth for that diagnosis only, never for training.
-# </font></td></tr></table>
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next cell,
-# then try a few distances.</font></td></tr></table>
-#
+# <!-- callout: question | Question -->
+# Run the next cell, then try a few distances.
+
+# %% [markdown]
 # **Q17.** 🟡 Set a distance and train a second scribble head with it. How many true vessel pixels did your
 # rule call background? Did recall, precision and IoU on the held-out images move, and in which direction?
 # Is there a distance that helps without hurting?
@@ -553,23 +560,25 @@ for name, v in {"ignore every unlabelled": ladder_report["scribbles"], "your dis
 # fills unlabelled pixels with a second model's guesses instead of a distance.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Three
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Three
 # rungs, three kinds of information. Zero-shot: a prompt, so SAM's idea of an object decides. One-shot: one
-# complete example, so <i>which</i> example you annotated decides, and the patch resolution limits the
+# complete example, so *which* example you annotated decides, and the patch resolution limits the
 # mask. Scribbles: many cheap, partial hints from several images, with "unknown" kept unknown. The rungs
-# differ more in <i>how</i> they fail than in a single number, and the cheapest rung in minutes is not the
+# differ more in *how* they fail than in a single number, and the cheapest rung in minutes is not the
 # worst. Keep the colours: these approaches come back in the comparison table of section 8.
-# </font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Try it on your image (optional,
-# 2 min).</b> The one-shot idea works from clicks too: a few clicks on the thing you want and a few on
+
+# %% [markdown]
+# <!-- callout: your-turn | Try it on your image (optional, 2 min) -->
+# The one-shot idea works from clicks too: a few clicks on the thing you want and a few on
 # what you do not want give two prototypes, and every similar patch of the image is marked. Upload a photo
-# with the folder icon on the left, put its path in <code>MY_IMAGE</code>, and some <code>(x, y)</code>
-# clicks in <code>MY_FG_CLICKS</code> and <code>MY_BG_CLICKS</code>. Left empty, it runs on the demo image
+# with the folder icon on the left, put its path in `MY_IMAGE`, and some `(x, y)`
+# clicks in `MY_FG_CLICKS` and `MY_BG_CLICKS`. Left empty, it runs on the demo image
 # with clicks along its scribbles. Section 9 runs the whole ladder on your own scribbles.
-# </font></td></tr></table>
-#
+
+# %% [markdown]
 # This cell computes DINOv3 features of your image (or the demo image), builds the two prototypes from the
 # patches under your clicks, and shows the similarity map and the mask: one model pass, no training.
 

@@ -1,8 +1,11 @@
 # %% [markdown]
 # ## 3. Hide the labels: the naive baseline
-#
-# **Objective:** train a head with "missing = background" and watch it fail differently.
-#
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# Train a head with "missing = background" and watch it fail differently.
+
+# %% [markdown]
 # A perfect vessel map of one fundus takes an expert 3 to 5 hours, so real label files are rarely complete.
 # Picture an annotator who traced the big vessels, ran out of time halfway through the tree, and saved the
 # file. Nothing in that file says "I stopped here": every pixel they did not paint is stored as background,
@@ -10,14 +13,17 @@
 # hiding about half of the vessels from the ground truth, train the section-2 head on it the obvious way,
 # and score it on the vessels we hid. From here on the full masks are used for scoring only.
 #
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: incomplete
-# supervision.</b> The rest of the notebook trains on cheap labels made from the full ground truth, which we
-# keep hidden for evaluation. <b>Missing labels</b> (this section and section 5): a share of the objects is
-# fully labelled, the rest is silently left out. <b>Scribbles</b> (section 4): a few strokes on some
+
+# %% [markdown]
+# <!-- callout: theory | Theory: incomplete supervision -->
+# The rest of the notebook trains on cheap labels made from the full ground truth, which we
+# keep hidden for evaluation. **Missing labels** (this section and section 5): a share of the objects is
+# fully labelled, the rest is silently left out. **Scribbles** (section 4): a few strokes on some
 # objects and some background, everything else unlabelled. Both leave pixels nobody looked at. The question
 # of this block is what a model should believe about those pixels. The obvious answer, and the one you get
-# by passing the label file straight into a loss, is "background".</font></td></tr></table>
-#
+# by passing the label file straight into a loss, is "background".
+
+# %% [markdown]
 # This helper cell defines how we hide labels, the same way `scripts/prepare_data.py` built the cached
 # files: cut the ground-truth skeleton into segments at its junctions (connected objects when the structures
 # are not thin), give every foreground pixel to its nearest segment, then hide a random share of the
@@ -122,19 +128,20 @@ show_masks(
 # </details>
 #
 # ### 3.2 A metric for the missing vessels: recall
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: recall and
-# precision.</b> <b>Recall</b> is the share of the true vessel pixels that the prediction marks: it asks
-# "of what is there, how much did you find?". <b>Precision</b> is the share of the marked pixels that are
+
+# %% [markdown]
+# <!-- callout: theory | Theory: recall and precision -->
+# **Recall** is the share of the true vessel pixels that the prediction marks: it asks
+# "of what is there, how much did you find?". **Precision** is the share of the marked pixels that are
 # true vessels: "of what you marked, how much is right?". IoU mixes the two into one number. Here we want
 # them apart, because the question is specific: of the vessels we hid, which the label file calls
 # background, how many does the trained head still find? That is recall on the hidden foreground.
-# </font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 1 min).</b>
-# Fill <code>my_hidden_recall</code>: a boolean prediction and a boolean mask of hidden pixels in, one
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 1 min) -->
+# Fill `my_hidden_recall`: a boolean prediction and a boolean mask of hidden pixels in, one
 # float out, the share of the hidden pixels the prediction marks. Return 0.0 when nothing is hidden. The
-# cell checks your version on two play masks and continues with ours if you skip it.</font></td></tr></table>
+# cell checks your version on two play masks and continues with ours if you skip it.
 
 # %%
 # ✍️ YOUR CODE
@@ -168,12 +175,15 @@ print(f"play example · recall on the hidden vessel: {hidden_recall(_play_pred, 
 # not painted as vessel is a background target, and plain binary cross-entropy counts every pixel equally.
 # Two things change from section 2.5, the labels and the loss weighting; 3.4 separates them. Everything else
 # is the same: the same five images, the same DINOv3 features, the same linear head, the same steps.
-#
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The head
+
+# %% [markdown]
+# <!-- callout: your-turn | Your prediction -->
+# The head
 # was told that half of the vessels in these five images are background. On those hidden vessels, will its
 # recall be near the section-2 head's, about half of it, or close to zero? And on new images, will it mark
-# more pixels than the section-2 head, or fewer? Write two guesses.</font></td></tr></table>
-#
+# more pixels than the section-2 head, or fewer? Write two guesses.
+
+# %% [markdown]
 # This cell trains the naive head on the incomplete labels only (the fundus border is ignored, as in 2.5)
 # and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
 # `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint, trained the same way on all fit images.
@@ -266,10 +276,12 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
+# <!-- callout: question | Question -->
+# Run the next
 # cell: it shows where the naive head looks for vessels, first on a training image, then on the held-out
-# demo image of section 2.</font></td></tr></table>
-#
+# demo image of section 2.
+
+# %% [markdown]
 # **Q11.** 🟡 On the training image, which hidden vessels did the naive head miss (orange), and which did it
 # still find (violet)? On the held-out image, compare it with the section-2 head: does it fail the same way
 # (too wide, the disc, the whole eye) or differently? Try another training image:
@@ -325,13 +337,15 @@ show_masks(
 # thing that changed is what we told it about the pixels nobody labelled.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: a precise model looks
-# trustworthy.</b> Every vessel the naive head marks is a real vessel, so a quick look at a few predictions,
-# or a precision score, says "works". The failure is in what is <i>not</i> marked, and you can only measure
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: a precise model looks trustworthy -->
+# Every vessel the naive head marks is a real vessel, so a quick look at a few predictions,
+# or a precision score, says "works". The failure is in what is *not* marked, and you can only measure
 # that against labels that are complete. On your own data, keep a small, fully labelled evaluation set, even
-# if training uses cheap labels.</font></td></tr></table>
-#
+# if training uses cheap labels.
+
+# %% [markdown]
 # ### 3.4 🔴 Optional: is it the labels, or the loss?
 #
 # Plain cross-entropy is one of the two changes from section 2.5. The heads of sections 1 and 2 used a
@@ -373,19 +387,24 @@ print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 # unknown.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Block 1
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Block 1
 # in one line each. Pets: the foundation model works out of the box. Specialised task: SAM looks for objects
 # and finds the eye; the head with perfect masks is limited by its 16 px patches. Incomplete labels, used
 # naively: the head believes the label file and learns that vessels are background. Three different
 # failures, and none of them is fixed by "a bigger model". Keep this section's recall on the hidden vessels:
-# it is the baseline every approach after the break has to beat.</font></td></tr></table>
-#
+# it is the baseline every approach after the break has to beat.
+
+# %% [markdown]
 # ### ☕ Before the break
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question for the coffee
-# break.</b> No code, just think about it over coffee.</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: question | Question for the coffee break -->
+# No code, just think about it over coffee.
+
+# %% [markdown]
 # **Q13.** 🟡 Perfect labels cost hours per image, and the cheap ones lie: the label file says "background"
 # wherever nobody looked. Without buying more labels, what could you tell the training about a pixel nobody
 # labelled? Think of at least two options before section 4.
