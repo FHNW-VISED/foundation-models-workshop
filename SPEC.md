@@ -175,22 +175,25 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 - Participants' own images never leave their Colab session.
 
 ## 8. Notebook-specific rules
-**L-001 — Callouts:** the same six kinds and the same HTML-in-`bgcolor`-table mechanism as the EDA notebook. **Inside the tables, HTML only.** Kinds, each written as bgcolor / font colour:
+**L-001 — Callouts (N-034):** a markdown cell whose first line is `<!-- callout: <kind> | <title> -->`, followed by markdown. `scripts/build.py` turns it into a hidden form code cell (`# @title`) that draws the box as HTML and saves the same HTML as the cell's output, so the box shows before anything runs. Never a `<table bgcolor>`: Colab cuts text in table cells, and the lint fails on one. Contract: `reports/callout-system.md`. Kinds, each written as background / bar and text colour:
+- 🎯 Objective `#E8F5E9` / `#1B5E20`;
+- ✅ Takeaway `#E0F2F1` / `#004D40` (a "When you see X → do Y" list, N-044);
 - 📘 Theory `#EDE7F6` / `#311B92`;
 - ✏️ Your turn `#FFE8D6` / `#7A2E00`;
-- ❓ Questions `#F3E5F5` / `#4A148C`;
+- ❓ Questions `#F3E5F5` / `#4A148C` (👥 pair moments keep this colour; the title's emoji replaces the icon);
 - 🔀 Across approaches `#E8EAF6` / `#1A237E`;
 - ⚠️ Pitfall `#FDECEA` / `#8B1A10`;
-- 🧾 Note / source `#FFF8E1` / `#5D4037`.
+- 🧾 Note / source `#FFF8E1` / `#5D4037`;
+- 🔍 Go deeper `#F5F5F5` / `#616161`: muted and collapsed by default, for secondary depth (N-048).
 
 **L-002 — Code participants write or change:** `# ✍️ YOUR CODE` / `# ✏️ YOUR TURN` headers, a signature and docstring, an `...` body, and `use(fn, reference=_ref_fn)` (N-029). **Never mandatory** (W-5).
 
 **L-003 — Theme violet → orange** (W-16): cool violet = "it works", warm orange = "it fails / we adapt".
-- Title banner: a full-width table, bgcolor `#4A148C`, white font.
+- Title banner: a `banner` callout (L-001), full width, background `#4A148C`, white text.
 - Figure palette: works `#6A1B9A`, fails `#E65100`, ground truth `#2E7D32`, scribbles `#00838F`, background overlay grey.
 - One colour per *approach*, kept identical across the ladder, the paths and the comparison table.
 
-**L-004 — Model provenance and licence:** every model load prints its source and licence in one line. The DINOv3 notice is shown once in section 00.
+**L-004 — Model provenance and licence** (shrunk 2026-10-21 for N-045; open question for Simone): every model load prints one short line, `model · source · licence`, and nothing more. No licence or attribution talk in the body text. All credits and licences, including the DINOv3 notice, sit in one collapsed 🔍 "Credits & licences" callout at the end of section 10; the repo keeps them in `README.md` / `data/ATTRIBUTION.md`.
 
 **L-005 — Ground truth is for evaluation only.** Training code may use only the incomplete supervision of the current rung. Checked in review: no test can prove it, so the morning review reads the training cells for it.
 

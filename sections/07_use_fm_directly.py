@@ -1,33 +1,44 @@
 # %% [markdown]
 # ## 7. Path 3 · Skip specialist training
 #
-# Paths 1 and 2 trained a head: the strokes on five images taught a small model, and that model then
-# segmented every new image on its own. Path 3 trains nothing. The strokes a person draws on an image
-# become SAM's prompts on <i>that same image</i>, and SAM's answer is the result. It is the difference
-# between teaching an intern once and pointing at every image yourself: no training time, no training
-# data, but the pointing never stops, because every new image needs its own strokes. Section 2 already
-# gave SAM clicks on the vessels and one big box; here we add the two things it lacked: "not here" clicks
-# from the background strokes, and many small boxes, one per stroke, instead of one box around everything.
+# Paths 1 and 2 trained a head once from strokes on five images, and that head then segmented every new image
+# on its own. Path 3 trains nothing: the strokes a person draws on an image become SAM's prompts on *that
+# same image*, and SAM's answer is the result.
+#
+# It is the difference between teaching an intern once and pointing at every image yourself: no training time
+# and no training data, but the pointing never stops.
+#
+# Section 2 gave SAM clicks on the vessels and one big box. Here we add what it lacked: "not here" clicks from
+# the background strokes, and many small boxes, one per stroke.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
-# prompt the foundation model directly with scribble points and boxes, no training.
+# Prompt the foundation model directly with scribble points and boxes, no training, and know when that beats
+# training a head.
 
 # %% [markdown]
 # <!-- callout: theory | Theory: what a SAM prompt says -->
-# SAM (Kirillov et al., ICCV 2023, [arXiv:2304.02643](https://arxiv.org/abs/2304.02643);
-# SAM 2, Ravi et al. 2024, [arXiv:2408.00714](https://arxiv.org/abs/2408.00714)) turns a prompt
-# into *one object mask*. A positive click says "the object contains this pixel", a negative click
-# "it does not contain this one", and a box "the object fills this rectangle". Every prompt set describes
-# a single object, so forty clicks scattered over a vessel tree ask for one object that contains them all.
-# A prompt can also be split into many small ones, each its own object, and the masks combined: SAM then
-# answers many local questions instead of one global one. Nothing is trained; the image encoder runs once
-# per image and every extra prompt costs only a fast decoder pass.
+# SAM turns a prompt into **one object mask**.
+#
+# - A positive click says "the object contains this pixel", a negative click "it does not", a box "the
+#   object fills this rectangle".
+# - Pets: one click on a dog gives one dog mask.
+# - Retina: forty clicks scattered over a vessel tree ask for one object that contains them all, and SAM
+#   answers with a region.
+# - The fix is to split the prompt into many small ones, each its own object, and combine the masks. SAM then
+#   answers many local questions instead of one global one.
+# - Nothing is trained. The image encoder runs once per image, and every extra prompt costs only a fast
+#   decoder pass.
 
 # %% [markdown]
-# This helper cell adds a colour for each direct approach and defines the prompts we take from the
-# strokes: the separate strokes of an image, a click at the centre of a stroke, SAM on many (box, click)
-# objects at once, the two direct recipes on a list of images, and a figure that draws boxes.
+# <!-- callout: go-deeper | SAM papers -->
+# - SAM, Kirillov et al., ICCV 2023: [arXiv:2304.02643](https://arxiv.org/abs/2304.02643)
+# - SAM 2, Ravi et al. 2024: [arXiv:2408.00714](https://arxiv.org/abs/2408.00714)
+
+# %% [markdown]
+# This helper cell adds a colour for each direct approach and defines the prompts we take from the strokes:
+# the separate strokes of an image, a click at the centre of a stroke, SAM on many (box, click) objects at
+# once, the two direct recipes on a list of images, and a figure that draws boxes.
 
 # %%
 # @title Path 3 helpers: colours, strokes, SAM on many prompts, the two recipes { display-mode: "form" }
@@ -128,26 +139,71 @@ def show_boxes(panels: list[tuple[str, np.ndarray, list | None]], width: float =
 
 
 # %% [markdown]
+# Before the first recipe, here are the two kinds of prompt we take from a person's strokes. A prompt is
+# `points (x, y, label)` with label 1 = "vessel" and 0 = "not vessel", and/or `boxes (x0, y0, x1, y1)`. This
+# cell draws both on the demo image.
+
+# %%
+# @title Prompt types made from strokes: points and boxes { display-mode: "form" }
+type_fg, type_bg = stroke_points(demo, 1, 8), stroke_points(demo, 2, 8)
+type_boxes, type_centres = [], []
+for stroke in stroke_masks(demo, 1):
+    ys, xs = np.nonzero(stroke)
+    h, w = stroke.shape
+    type_boxes.append(
+        [max(xs.min() - 4, 0), max(ys.min() - 4, 0), min(xs.max() + 4, w - 1), min(ys.max() + 4, h - 1)]
+    )
+    type_centres.append(stroke_click(stroke))
+strokes_rgb = overlay(demo["image"], demo["scribbles"] == 1, THEME["scribble"])
+strokes_rgb = overlay(strokes_rgb, demo["scribbles"] == 2, THEME["background"])
+fig, axes = plt.subplots(1, 4, figsize=(13, 3.4))
+for ax, title, img in [
+    (axes[0], "strokes: teal = vessel, grey = background", strokes_rgb),
+    (axes[1], "points: ★ label 1, ✖ label 0", demo["image"]),
+    (axes[2], "boxes: one per vessel stroke", demo["image"]),
+    (axes[3], "box + centre click: one object each", demo["image"]),
+]:
+    ax.imshow(img)
+    ax.set_title(title, fontsize=9)
+    ax.axis("off")
+for x, y in type_fg:
+    axes[1].plot(x, y, marker="*", markersize=9, color=THEME["scribble"], markeredgecolor="white")
+for x, y in type_bg:
+    axes[1].plot(x, y, marker="X", markersize=7, color=THEME["fails"], markeredgecolor="white")
+for ax in (axes[2], axes[3]):
+    for x0, y0, x1, y1 in type_boxes:
+        ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=1, color=THEME["scribble"]))
+for x, y in type_centres:
+    axes[3].plot(x, y, marker="*", markersize=7, color=THEME["scribble"], markeredgecolor="white")
+plt.tight_layout()
+plt.show()
+print(f"{len(type_boxes)} vessel strokes on the demo image = {len(type_boxes)} possible boxes")
+
+# %% [markdown]
 # ### 7.1 Clicks on the vessels, and "not here"
 #
-# The first recipe is section 6.1 without the head: twenty clicks spread along the vessel strokes and
-# twenty along the background strokes of each <i>held-out</i> image, and SAM's mask is the answer. The
-# strokes on these images are prompts a person would draw at use time, not training labels; the ground
-# truth only scores the result (L-005). The heads of sections 4 to 6 never saw a stroke on these images,
-# so keep in mind that Path 3 gets more help per image.
+# The first recipe is section 6.1 without the head:
+#
+# - Twenty clicks along the vessel strokes and twenty along the background strokes of each *held-out* image.
+# - SAM's mask is the answer.
+# - The strokes here are prompts a person would draw at use time, not training labels. The ground truth only
+#   scores the result.
+#
+# The heads of sections 4 to 6 never saw a stroke on these images, so Path 3 gets more help per image.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your prediction -->
-# In section 2, twenty vessel clicks alone gave the IoU printed below as "section 2". Adding twenty
-# "not here" clicks on the background: will SAM's mask shrink onto the vessels, stay a region, or do
-# something else? Write one guess.
+# In section 2, twenty vessel clicks alone gave a mask that grew into a region. Now we add twenty "not here"
+# clicks on the background. Will SAM's mask shrink onto the vessels, stay a region, or do something else?
+# Write one guess. The cell prints the section-2 IoU under its table, for comparison.
 
 # %% [markdown]
-# This cell prompts SAM with the stroke clicks on every evaluation image (one SAM image encoding per image:
-# seconds on a GPU, about a second per image on a CPU), scores the masks against the hidden truth and shows
-# the demo image.
+# This cell prompts SAM with the stroke clicks on every evaluation image, scores the masks against the hidden
+# truth and shows the demo image. It costs one SAM image encoding per image: seconds on a GPU, about a second
+# per image on a CPU.
 
 # %%
+# @title SAM from twenty vessel and twenty background clicks per image { display-mode: "form" }
 N_DIRECT_CLICKS = 20  # clicks per kind (vessel / background) and image, taken from the strokes
 t0 = time.monotonic()
 path3_preds = {"zero_shot": ladder_preds["zero_shot"], "scribbles": ladder_preds["scribbles"]}
@@ -171,19 +227,20 @@ show_clicks(
 )
 
 # %% [markdown]
-# In the last panel, violet = vessel found, orange = SAM marked background as vessel, green = a vessel
-# SAM missed.
+# In the last panel, violet = vessel found, orange = SAM marked background as vessel, green = a vessel SAM
+# missed.
 #
-# **Q27.** 🟡 Did the "not here" clicks pull SAM's mask onto the vessels? Change the number of clicks per
-# kind and run the next cell: does SAM do better with fewer clicks or with more? Why would that be, given
-# that every prompt set describes one object?
+# **Q27.** 🟡 Did the "not here" clicks pull SAM's mask onto the vessels? Change the number of clicks per kind
+# and run the next cell: does SAM do better with fewer clicks or with more? Why would that be, given that
+# every prompt set describes one object?
 #
 # ```python
 # N_CLICKS_TRY = 5   # try 1, 5, 50
 # ```
-#
-# This cell runs the same recipe with your number of clicks on every evaluation image and prints it under
-# the default of 20.
+
+# %% [markdown]
+# This cell runs the same recipe with your number of clicks on every evaluation image and prints it under the
+# default of 20.
 
 # %%
 # Q27 — fewer or more stroke clicks for SAM
@@ -202,41 +259,36 @@ print_path2(
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# SAM looks for one object that contains every positive click and none of the negative ones. A vessel
-# tree is one connected structure, but it is a few pixels wide and spread over the whole crop, so the
-# simplest object that contains clicks all over the tree is a large region around it, and the negative
-# clicks, which also sit all over the crop, mostly cut holes in that region rather than turning it into a
-# line. A few clicks can leave SAM a more local object to settle on; many clicks push it towards "the
-# whole fundus minus a few holes". The marked column tells you which of the two happened on your run. More
-# prompts in <i>one</i> set are not more information to SAM if they describe something it does not see as
-# one object.
+# SAM looks for one object that contains every positive click and none of the negative ones.
+#
+# - A vessel tree is one connected structure, but it is a few pixels wide and spread over the whole crop. The
+#   simplest object that contains clicks all over it is a large region around it.
+# - The negative clicks, which also sit all over the crop, mostly cut holes in that region rather than
+#   turning it into a line.
+# - A few clicks can leave SAM a more local object to settle on. Many clicks push it towards "the whole
+#   fundus minus a few holes". The marked column tells you which happened on your run.
+# - More prompts in *one* set are not more information to SAM if they describe something it does not see as
+#   one object.
 #
 # </details>
-#
-# ### 7.2 One small box per stroke
-#
-# The second recipe splits the question. Each vessel stroke gets its own box, a few pixels larger than the
-# stroke, and a click at its centre; SAM answers each box as a separate object, and the vessel map is the
-# union of all the answers. One stroke is a short piece of one vessel, so each box asks a local question
-# SAM can answer: "the thing along this line, inside this rectangle".
 
 # %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 2 min) -->
-# Fill `my_stroke_box`. In: one stroke as a boolean image (`True` on the stroke) and a
-# margin `pad` in pixels. Out: the box `[x0, y0, x1, y1]` around the stroke's pixels,
-# grown by `pad` on every side and clipped to the image (x from 0 to width − 1, y from 0 to
-# height − 1). Remember that `np.nonzero` returns rows (y) before columns (x). The cell checks
-# your version on a 6 × 8 play stroke, without and with a margin, and continues with ours if you skip it.
+# ### 7.2 One small box per stroke
+#
+# The second recipe splits the question:
+#
+# 1. Each vessel stroke gets its own box, a few pixels larger than the stroke, and a click at its centre.
+# 2. SAM answers each box as a separate object.
+# 3. The vessel map is the union of all the answers.
+#
+# One stroke is a short piece of one vessel, so each box asks a local question SAM can answer: "the thing
+# along this line, inside this rectangle".
 
+# %% [markdown]
+# This helper cell holds our solution of the next exercise. Open it only if you are stuck.
 
 # %%
-# ✍️ YOUR CODE
-def my_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
-    """The box [x0, y0, x1, y1] around the True pixels of `stroke`, grown by `pad` pixels on every side and
-    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1."""
-    ...
-
-
+# @title Reference solution (open only if stuck) { display-mode: "form" }
 def _ref_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
     """Reference: min/max of the stroke's columns and rows, padded, then clipped."""
     ys, xs = np.nonzero(stroke)
@@ -247,6 +299,27 @@ def _ref_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
         float(min(xs.max() + pad, w - 1)),
         float(min(ys.max() + pad, h - 1)),
     ]
+
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min) -->
+# Fill `my_stroke_box` in the next cell.
+#
+# - **In:** one stroke as a boolean image (`True` on the stroke) and a margin `pad` in pixels.
+# - **Out:** the box `[x0, y0, x1, y1]` around the stroke's pixels, grown by `pad` on every side and
+#   clipped to the image (x from 0 to width − 1, y from 0 to height − 1).
+# - **Careful:** `np.nonzero` returns rows (y) before columns (x).
+#
+# The cell checks your version on a 6 × 8 play stroke, without and with a margin, and continues with ours if
+# you skip it.
+
+
+# %%
+# ✍️ YOUR CODE
+def my_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
+    """The box [x0, y0, x1, y1] around the True pixels of `stroke`, grown by `pad` pixels on every side and
+    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1."""
+    ...
 
 
 _play_stroke = np.zeros((6, 8), bool)
@@ -264,17 +337,19 @@ print(
 
 # %% [markdown]
 # <!-- callout: your-turn | Your prediction -->
-# The strokes cover only some of the vessels (section 4 dropped 70 % of the segments), and each box sits
-# on a stroke. Will this recipe mark more of the fundus than the clicks of 7.1, or less? Will it beat
-# simply thickening the strokes themselves by a few pixels, with no model at all? Write two guesses.
+# The strokes cover only some of the vessels (section 4 dropped 70 % of the segments), and each box sits on a
+# stroke. Two guesses:
+#
+# - Will this recipe mark more of the fundus than the clicks of 7.1, or less?
+# - Will it beat simply thickening the strokes by a few pixels, with no model at all?
 
 # %% [markdown]
 # This cell draws a box around every vessel stroke of every evaluation image (4 px of margin on the 1024 px
-# crop), asks SAM for one object per box with a click at the stroke's centre (all boxes of an image in a
-# few decoder passes), and prints the result next to the strokes thickened by 3 px, the "no model"
-# reference.
+# crop) and asks SAM for one object per box with a click at the stroke's centre (all boxes of an image in a
+# few decoder passes). It prints the result next to the strokes thickened by 3 px, the "no model" reference.
 
 # %%
+# @title SAM with one box and one click per stroke, next to the thickened strokes { display-mode: "form" }
 BOX_PAD = 1 if SMOKE else 4  # px around each stroke (smoke thumbnails are 4× smaller)
 THICKEN = 1 if SMOKE else 3  # px: the "no model" reference, the vessel strokes thickened
 t0 = time.monotonic()
@@ -304,6 +379,27 @@ show_boxes(
 )
 
 # %% [markdown]
+# Is the demo image typical? This cell scores the box recipe on each evaluation image (IoU against the hidden
+# truth) and shows the worst, the median and the best side by side.
+
+# %%
+# @title Box recipe: worst, typical and best evaluation image { display-mode: "form" }
+box_iou = [score(p, it)["iou"] for p, it in zip(path3_preds["sam_boxes"], SPEC_EVAL, strict=True)]
+rank_box = np.argsort(box_iou)
+mid_box = rank_box[len(rank_box) // 2]
+box_picks = [("worst", rank_box[0]), ("typical (median)", mid_box), ("best", rank_box[-1])]
+show_masks(
+    [
+        (
+            f"{label} · IoU {box_iou[k]:.2f}",
+            error_map(SPEC_EVAL[k]["image"], path3_preds["sam_boxes"][k], SPEC_EVAL[k]),
+        )
+        for label, k in box_picks
+    ],
+    width=3.0,
+)
+
+# %% [markdown]
 # **Q28.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
 # moved, recall or precision? Then grow the boxes and drop the centre click in the next cell. What does a
 # larger box let SAM find, and what does it cost?
@@ -312,7 +408,8 @@ show_boxes(
 # BOX_PAD_TRY = 16      # try 0, 16, 32 (px of the 1024 px crop)
 # WITH_CLICK_TRY = True  # try False: the box alone
 # ```
-#
+
+# %% [markdown]
 # This cell runs the box recipe with your margin and click setting on every evaluation image and prints it
 # under the default.
 
@@ -337,26 +434,30 @@ print_path2(
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# Each box can only find what lies inside it, so recall is capped by how much of the tree the strokes
-# touch: about the vessels a person stroked, plus whatever branches cross their boxes. That is why the
-# box recipe marks a small share of the fundus, unlike the clicks of 7.1. A larger box reaches more
-# branches (recall can rise) but also more background that SAM may take for the object (precision
-# falls), and at some size it turns back into section 2's big box. The centre click tells SAM which thing
-# inside the box is meant, which tends to help most when the box holds more than one candidate. If the
-# thickened strokes come close to or beat SAM here, that is a real finding, not a bug: on thin structures
-# a cheap baseline built from the hints alone is the first thing to compare against.
+# - **Recall is capped.** Each box finds only what lies inside it, so recall is limited by how much of the
+#   tree the strokes touch: the vessels a person stroked, plus whatever branches cross their boxes. That is
+#   why the box recipe marks a small share of the fundus, unlike the clicks of 7.1.
+# - **A larger box** reaches more branches (recall can rise) but also more background that SAM may take for
+#   the object (precision falls). At some size it turns back into section 2's big box.
+# - **The centre click** tells SAM which thing inside the box is meant. It helps most when the box holds more
+#   than one candidate.
+# - **The baseline:** if the thickened strokes come close to or beat SAM here, that is a real finding, not a
+#   bug. On thin structures a cheap baseline built from the hints alone is the first thing to compare against.
 #
 # </details>
-#
+
+# %% [markdown]
 # ### 7.3 Path 3, side by side
 #
 # This cell puts the two direct recipes next to the section-2 box, the scribble head of section 4 and the
-# SAM pseudo-label head of section 6, with the "no model" and "everything" references, then a bar chart and
-# the error maps on the demo image. It also writes the numbers section 8 compares: no training time, but
-# annotation on <i>every</i> image you segment, counted as 2 s per stroke (a click or a box is taken from
-# a stroke, so the strokes are the cost).
+# SAM pseudo-label head of section 6, with the "no model" and "everything" references. It shows a bar chart
+# and the error maps on the demo image.
+#
+# It also writes the numbers section 8 compares: no training time, but annotation on *every* image you
+# segment, counted as 2 s per stroke (a click or a box is taken from a stroke, so the strokes are the cost).
 
 # %%
+# @title Path 3 side by side: table, annotation cost, bars and error maps { display-mode: "form" }
 path3_preds["sam_pseudo"] = path2_preds["sam_pseudo"]
 path3_report["sam_pseudo"] = path2_report["sam_pseudo"]
 eval_meta = SPECIALISED["eval"]
@@ -435,37 +536,45 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q29.** 🟡 Path 3 trains nothing, but its annotation never stops. Suppose you must segment 1,000 new
-# fundus images next month. Using the effort line above and the table, when would you prompt SAM directly,
-# and when would you rather train a head once? Is there a way to combine the two?
+# **Q29.** 🟡 Path 3 trains nothing, but its annotation never stops. Suppose you must segment 1,000 new fundus
+# images next month. Using the annotation lines above (minutes per image for clicks and for boxes) and the
+# table, when would you prompt SAM directly, and when would you rather train a head once? Is there a way to
+# combine the two?
 #
 # <details><summary>A possible answer</summary>
 #
-# The heads pay their strokes once, on a few training images, and then segment any number of new images
-# for free; Path 3 pays per image, so at 1,000 images it costs a thousand times the per-image line, hours
-# or days of clicking. Direct prompting wins when there are few images, when each one matters (a case to
-# review, an image nobody will see again), or when the task changes too often to retrain. A head wins when
-# the images keep coming. The two combine naturally: prompt SAM on a handful of images, correct its masks
-# by hand, and train the head on those (Path 2, with a person in the loop), or let the head propose and a
-# person fix only the worst images. Whatever you pick, compare it with the cheapest baseline built from the
-# same hints, such as the thickened strokes here.
+# - **Cost:** the heads pay their strokes once, on a few training images, and then segment any number of new
+#   images for free. Path 3 pays per image: at 1,000 images it costs a thousand times the per-image line,
+#   hours or days of clicking.
+# - **Direct prompting wins** when there are few images, when each one matters (a case to review, an image
+#   nobody will see again), or when the task changes too often to retrain.
+# - **A head wins** when the images keep coming.
+# - **Combine them:** prompt SAM on a handful of images, correct its masks by hand, and train the head on
+#   those (Path 2, with a person in the loop). Or let the head propose and a person fix only the worst images.
+# - **Always** compare with the cheapest baseline built from the same hints, such as the thickened strokes.
 #
 # </details>
 
 # %% [markdown]
 # <!-- callout: pitfall | Pitfall: over-trusting SAM's confident masks -->
-# A mask from your own clicks feels like your own work: it has crisp edges and sits
-# where you pointed. SAM still decides what "the object" is, and on structures it was not trained on that
-# decision can be a region where you wanted a line, or a piece where you wanted the whole. Score a few
-# directly prompted images against a careful manual mask before you trust the recipe on the rest.
+# A mask from your own clicks feels like your own work: crisp edges, right where you pointed.
+#
+# 1. SAM decides what "the object" is. **Consequence:** on structures it was not trained on, that can be a
+#    region where you wanted a line, or a piece where you wanted the whole.
+# 2. You see a clean mask and stop looking. **Consequence:** the error goes unnoticed on the next hundred
+#    images.
+#
+# Score a few directly prompted images against a careful manual mask before you trust the recipe on the rest.
 
 # %% [markdown]
 # ### 7.4 🔴 Optional: SAM 3 from a word
 #
-# SAM 3 (Meta, 2025) adds <i>concept</i> prompts: type a short noun phrase and it segments every instance
-# of it, with no click at all. It is gated on Hugging Face (Meta approves access per account), so the
-# workshop never requires it: <code>setup_check.ipynb</code> caches it only if your account has access. If
-# it is not in your cache, the next cell says so and stops; nothing later depends on it.
+# SAM 3 (Meta, 2025) adds *concept* prompts: type a short noun phrase and it segments every instance of it,
+# with no click at all.
+#
+# - It is gated on Hugging Face: accept the terms on its model page with your account to use it.
+# - The workshop never requires it. `setup_check.ipynb` caches it only if your account has access.
+# - If it is not in your cache, the next cell says so and stops. Nothing later depends on it.
 
 # %% [markdown]
 # <!-- callout: question | Question (optional) -->
@@ -478,9 +587,10 @@ show_masks(
 # ```python
 # SAM3_TEXT = "blood vessel"   # try "vessel", "artery", "dark line", "retina"
 # ```
-#
-# This cell loads SAM 3 from your cache only (never from the internet), in fp16 on a GPU, runs it with
-# your phrase on every evaluation image and keeps the union of the instances it finds.
+
+# %% [markdown]
+# This cell loads SAM 3 from your cache only (never from the internet), in fp16 on a GPU, runs it with your
+# phrase on every evaluation image and keeps the union of the instances it finds.
 
 # %%
 # Q30 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache)
@@ -494,8 +604,9 @@ try:
     from transformers import Sam3Model, Sam3Processor
 
     sam3_dtype = torch.float16 if DEVICE == "cuda" else torch.float32  # fp16 on a T4, never bf16 (SPEC §5)
-    sam3_proc = Sam3Processor.from_pretrained(SAM3_ID, local_files_only=True)
-    sam3 = Sam3Model.from_pretrained(SAM3_ID, local_files_only=True, dtype=sam3_dtype).eval().to(DEVICE)
+    sam3_src = str(model_folder(SAM3_ID) or SAM3_ID)  # plain files on Drive (setup_check), else the hub id
+    sam3_proc = Sam3Processor.from_pretrained(sam3_src, local_files_only=True)
+    sam3 = Sam3Model.from_pretrained(sam3_src, local_files_only=True, dtype=sam3_dtype).eval().to(DEVICE)
     print(f"SAM 3 · source {SAM3_ID} · licence {SAM3_LICENCE} · {str(sam3_dtype).split('.')[-1]} on {DEVICE}")
 except Exception as err:  # noqa: BLE001 - not cached, no access, an older transformers: all mean "skip"
     RESULTS["sam3_note"] = f"SAM 3 not available in this session ({type(err).__name__}); it is optional"
@@ -542,23 +653,26 @@ if sam3 is not None:
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# A concept prompt only works for concepts SAM 3 met in training, named the way its captions named them.
-# "Blood vessel" in a fundus photograph is a rare, specialist phrase next to "dog" or "car", so expect it
-# to find thick vessels, a blob, or nothing, and to change a lot with the wording. Generic words like
-# "dark line" sometimes do better than the correct medical term, which is a hint that the model matches
-# appearance more than meaning. Whatever you see, a word costs no annotation at all, so even a weak result
-# is a free starting point for the strokes of 7.2.
+# - **Only known concepts work.** A concept prompt works for concepts SAM 3 met in training, named the way
+#   its captions named them. "Blood vessel" in a fundus photograph is a rare, specialist phrase next to "dog"
+#   or "car", so expect thick vessels, a blob, or nothing, and a lot of change with the wording.
+# - **Appearance beats meaning.** Generic words like "dark line" sometimes do better than the correct medical
+#   term, which hints that the model matches appearance more than meaning.
+# - **It is free.** A word costs no annotation, so even a weak result is a free starting point for the
+#   strokes of 7.2.
 #
 # </details>
 
 # %% [markdown]
 # <!-- callout: your-turn | Try it on your image (optional, 2 min) -->
-# Direct prompting needs no training, so it is the quickest thing to try on a photo of your
-# own. Upload one with the folder icon on the left, put its path in `MY_IMAGE`, and add
-# `(x, y)` clicks on the thing (`MY_FG_CLICKS`), clicks on what you do not want
-# (`MY_BG_CLICKS`) and/or small boxes `(x0, y0, x1, y1)`, one per piece of the thing
-# (`MY_BOXES`). Left empty, it runs on the demo image with prompts from its strokes. Section 9
-# lets you draw the strokes yourself.
+# Direct prompting needs no training, so it is the quickest thing to try on a photo of your own.
+#
+# - Upload one with the folder icon on the left and put its path in `MY_IMAGE`.
+# - Add `(x, y)` clicks on the thing (`MY_FG_CLICKS`) and on what you do not want (`MY_BG_CLICKS`).
+# - Add small boxes `(x0, y0, x1, y1)`, one per piece of the thing (`MY_BOXES`).
+#
+# Left empty, it runs on the demo image with prompts from its strokes. Section 9 lets you draw the strokes
+# yourself.
 
 # %% [markdown]
 # This cell asks SAM for one mask from all your clicks together and one mask from your boxes, each box its
@@ -607,10 +721,25 @@ if my_boxes:
 show_boxes([(MY_IMAGE or f"demo · {demo['name']}", my_img, None)] + panels, width=3.0)
 
 # %% [markdown]
+# <!-- callout: takeaway | Takeaway: Path 3 -->
+# - **Your structure is thin and spread over the image** → split the prompt: one small box (and a centre
+#   click) per stroke, not one global prompt.
+# - **More clicks make the mask a bigger region, not a thinner one** → SAM is solving for one object. Use
+#   fewer, local prompts.
+# - **Few images, or each one matters** → prompt SAM directly and review every mask.
+# - **Images keep coming** → train a head once (Path 1 or 2). Direct prompting pays strokes on every image.
+# - **SAM gives a clean-looking mask** → compare it with the cheapest model-free baseline (the thickened
+#   strokes) and with a careful manual mask on a few images.
+
+# %% [markdown]
 # <!-- callout: across | Across approaches -->
-# Path 1 changed the loss, Path 2 filled in the labels with a second model, Path 3 skipped training and
-# asked the foundation model on every image. The first two pay annotation once and reuse a head; the
-# third pays on every image and needs no training at all. On thin structures, how you split the prompt
-# (one global object or many local ones) mattered as much as how many hints you gave, and a model-free
-# baseline built from the same hints is the fair yardstick. Section 8 puts every approach of the notebook
-# in one table: accuracy, annotation, reliability and compute side by side.
+# Path 1 changed the loss. Path 2 filled in the labels with a second model. Path 3 skipped training and asked
+# the foundation model on every image.
+#
+# - The first two pay annotation once and reuse a head.
+# - The third pays on every image and needs no training at all.
+# - On thin structures, how you split the prompt (one global object or many local ones) mattered as much as
+#   how many hints you gave. A model-free baseline built from the same hints is the fair yardstick.
+#
+# Section 8 puts every approach of the notebook in one table: accuracy, annotation, reliability and compute
+# side by side.

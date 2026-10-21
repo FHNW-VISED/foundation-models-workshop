@@ -1,12 +1,12 @@
 # %% [markdown]
 # ## 8. Compare everything
 #
-# Every section since 2 ended with a small table of its own, each against a slightly different neighbour.
-# This section puts all of them in one table, scored on the same held-out images and the same hidden
-# ground truth, so that the question becomes the one you face on a real project: not "which approach has
-# the highest number" but "which approach would I pay for". A recipe that wins on accuracy can lose on
-# annotation hours, or win on average and fail badly on one image in five. The table has one row per
-# approach and five things to read in each row; the plot underneath shows the trade-off at a glance.
+# Every section since 2 ended with its own small table, each against a different neighbour. Here they all
+# sit in one table, scored on the same held-out images against the same hidden ground truth.
+#
+# The question becomes the one you face on a real project: not "which approach has the highest number" but
+# "which approach would I pay for". A recipe can win on accuracy and lose on annotation hours, or win on
+# average and fail badly on one image in five.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
@@ -14,25 +14,33 @@
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the five columns -->
-# **Accuracy**: the mean IoU over the held-out images, plus clDice for thin structures (does the mask
-# follow the centre lines?). **Annotation effort**: what a person had to draw, turned into minutes:
-# strokes and boxes at a few seconds each, complete or half-complete masks at hours each. **Reliability**:
-# how much the IoU varies from one held-out image to the next (the standard deviation); a small spread
-# means you can trust the average on a new image, a large one means some images fail badly. **Compute**:
-# seconds of training plus inference in this session. **Scalability** is a sentence, not a number: what
-# it costs to segment the next thousand images.
+# Each row of the table is read through five columns:
+#
+# - **Accuracy**: mean IoU over the held-out images (0 = no overlap with the truth, 1 = perfect), plus
+#   clDice (does the mask follow the vessel centre lines?).
+# - **Annotation effort**: what a person had to draw, in minutes. A stroke or a box is seconds, a complete
+#   vessel map is hours.
+# - **Reliability, or spread**: the standard deviation of the per-image IoU, i.e. how far a typical image
+#   sits from the average. IoUs of 0.60, 0.62, 0.58 give a spread of 0.02: trust the average. IoUs of
+#   0.90, 0.30, 0.60 have the same average but a spread of 0.25: some images fail badly.
+# - **Compute**: seconds of training plus inference in this session.
+# - **Scalability**: a sentence, not a number. What does the next 1,000 images cost?
+#
+# The table also shows **recall** (the share of the true vessel pixels the mask finds) and **worst** (the
+# lowest IoU on any single image).
 
 # %% [markdown]
 # <!-- callout: note | Assumptions behind the minutes -->
-# A scribble stroke, a click or a box takes about **2 seconds** to draw. A complete vessel
-# map of one fundus image takes **3 to 5 hours** (the FIVES paper, Jin et al., *Scientific Data*
-# 2022), so we count the midpoint, 4 hours, and a half-painted map as half of that. Both numbers come from
-# the dataset config, not from a measurement in this room; change them there and every row moves with them.
-# Training minutes are paid once; the per-image column is what every *new* image costs.
+# - A scribble stroke, a click or a box takes about **2 seconds**.
+# - A complete vessel map of one fundus image takes **3 to 5 hours** (FIVES paper, 2022). We count the
+#   midpoint, 4 hours, and a half-painted map as half of that.
+# - Both numbers come from the dataset config, not from a measurement in this room. Change them there and
+#   every row moves.
+# - Training minutes are paid once. The per-image column is what every *new* image costs.
 
 # %% [markdown]
-# This helper cell collects, for every approach of sections 2 to 7, its predictions on the held-out images,
-# its numbers, its seconds and its annotation minutes, and gives each approach one sentence on how it scales.
+# This helper cell collects each approach's held-out predictions, numbers, seconds and annotation minutes,
+# and gives each one a sentence on how it scales.
 
 # %%
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
@@ -117,20 +125,49 @@ print(
 )
 
 # %% [markdown]
-# ### 8.1 Your prediction first
+# ### 8.1 Look first, then predict
+#
+# This cell shows all twelve approaches on the same held-out image, next to the image and its hidden
+# ground truth (green). Look for who finds the thin vessels, who paints blobs, and who misses most.
+
+# %%
+# @title All twelve approaches on one held-out image { display-mode: "form" }
+k_show = 0  # which held-out image to look at
+it_show = SPEC_EVAL[k_show]
+gallery = [
+    (f"{it_show['name']} · image", it_show["image"]),
+    ("ground truth (scoring only)", overlay(it_show["image"], it_show["mask"], THEME["truth"])),
+]
+for k in COMPARE_ORDER:
+    pred = COMPARE_REPORTS[k]["held_preds"][k_show] & region(it_show)
+    gallery.append((k, overlay(it_show["image"], pred, APPROACH_COLOURS[k])))
+g_cols = 5
+g_rows = -(-len(gallery) // g_cols)
+fig, axes = plt.subplots(g_rows, g_cols, figsize=(2.6 * g_cols, 2.6 * g_rows))
+for ax in np.ravel(axes):
+    ax.axis("off")
+for ax, (title, img) in zip(np.ravel(axes), gallery, strict=False):
+    ax.imshow(img)
+    ax.set_title(title, fontsize=8)
+plt.tight_layout()
+plt.show()
 
 # %% [markdown]
 # <!-- callout: your-turn | Your prediction (1 min) -->
-# Before the table appears, write down two guesses using the short names printed above. Which approach will
-# have the **highest mean IoU**? And which one will be the **steadiest**, the smallest spread of IoU
-# from image to image? You have seen most of these numbers one section at a time; the point is to see
-# whether your picture of the whole holds up when they sit side by side.
+# Before the table appears, write down two guesses, using the short names above.
+#
+# - Which approach will have the **highest mean IoU**?
+# - Which will be the **steadiest**, with the smallest spread of IoU from image to image?
+#
+# You have seen these numbers one section at a time. Does your picture of the whole hold up when they sit
+# side by side?
 
 # %% [markdown]
-# **Q31.** 🟡 Which approach wins on IoU, and which is the steadiest? Write your two picks in the next cell
-# and run it; the table cell further down tells you where they landed.
+# **Q31.** 🟡 Which approach wins on IoU, and which is the steadiest?
 #
-# This cell only checks that your picks are names from the list, so that the comparison below can find them.
+# - Write your two picks in the next cell and run it.
+# - The table cell further down tells you where they landed.
+# - The cell only checks that your picks are names from the list.
 
 # %%
 # Q31 — your two predictions (short names from the list above, or leave "" to skip)
@@ -146,11 +183,19 @@ print(f"your picks · highest IoU: {MY_WINNER or '(none)'} · steadiest: {MY_STE
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 2 min) -->
-# Fill `my_spread`. In: the IoU of one approach on each held-out image, as a list of floats. Out:
-# their standard deviation, the population version (divide by the number of images, not by one less), as a
-# float. A small spread means the mean IoU is a fair promise for the next image; a large one means a few
-# images pull the mean up or down. The cell checks your version on four play values and continues with ours
-# if you skip it.
+# Fill `my_spread`.
+#
+# - **In:** the IoU of one approach on each held-out image, a list of floats.
+# - **Out:** their standard deviation (divide by the number of images, not by one less), a float.
+# - **Example:** `[0.1, 0.3, 0.2, 0.6]` has mean 0.3 and spread 0.19.
+#
+# The cell checks your version on those four play values and continues with ours if you skip it.
+
+# %%
+# @title Reference solution (open only if stuck) { display-mode: "form" }
+def _ref_spread(per_image_iou: list[float]) -> float:
+    """Reference: numpy's standard deviation, which divides by n by default."""
+    return float(np.std(np.asarray(per_image_iou, dtype=float)))
 
 
 # %%
@@ -160,11 +205,6 @@ def my_spread(per_image_iou: list[float]) -> float:
     ...
 
 
-def _ref_spread(per_image_iou: list[float]) -> float:
-    """Reference: numpy's standard deviation, which divides by n by default."""
-    return float(np.std(np.asarray(per_image_iou, dtype=float)))
-
-
 _play_ious = [0.1, 0.3, 0.2, 0.6]  # four images: three middling, one much better
 spread = use(my_spread, reference=_ref_spread, check=lambda f: round(float(f(_play_ious)), 4), name="spread")
 print("play IoUs", _play_ious, "· spread", round(spread(_play_ious), 4))
@@ -172,16 +212,18 @@ print("play IoUs", _play_ious, "· spread", round(spread(_play_ious), 4))
 # %% [markdown]
 # ### 8.3 The table
 #
-# This cell scores every approach's held-out masks image by image against the hidden ground truth, fills
-# one row per approach (IoU, clDice, minutes of annotation, spread, seconds, and how it scales), prints the
-# table sorted by IoU, and tells you where your two predictions landed.
+# This cell scores every approach's held-out masks image by image against the hidden ground truth and fills
+# one row per approach. It prints the table sorted by IoU and tells you where your two predictions landed.
 
 # %%
+# @title Score every approach and print the table { display-mode: "form" }
 comparison = []
+PER_IMAGE_IOU = {}  # approach -> its IoU on each held-out image (drawn as violins below)
 for k in COMPARE_ORDER:
     rep = COMPARE_REPORTS[k]
     pairs = zip(rep["held_preds"], SPEC_EVAL, strict=True)
     per_image = [iou(p & region(it), it["mask"] & region(it)) for p, it in pairs]
+    PER_IMAGE_IOU[k] = per_image
     comparison.append(
         {
             "approach": k,
@@ -207,19 +249,22 @@ RESULTS["comparison_assumptions"] = dict(SPECIALISED["annotation_effort"]) | {
 ranked = sorted(comparison, key=lambda r: r["iou"], reverse=True)
 extra = f"{'clDice':>8}" if WITH_CLDICE else ""
 print(
-    f"{'approach':<46}{'IoU':>6}{extra}{'± spread':>10}{'worst':>7}{'effort min':>12}{'/new img':>10}"
-    f"{'sec':>7}"
+    f"{'approach':<46}{'IoU':>6}{extra}{'recall':>8}{'± spread':>10}{'worst':>7}{'effort min':>12}"
+    f"{'/new img':>10}{'sec':>7}"
 )
 for r in ranked:
     cl = f"{r['cldice']:>8.3f}" if WITH_CLDICE else ""
     print(
-        f"{r['name']:<46}{r['iou']:>6.3f}{cl}{r['reliability']:>10.3f}{r['worst_iou']:>7.3f}"
-        f"{r['effort_min']:>12.1f}{r['effort_min_per_new_image']:>10.2f}{r['seconds']:>7.1f}"
+        f"{r['name']:<46}{r['iou']:>6.3f}{cl}{r['recall']:>8.3f}{r['reliability']:>10.3f}"
+        f"{r['worst_iou']:>7.3f}{r['effort_min']:>12.1f}{r['effort_min_per_new_image']:>10.2f}"
+        f"{r['seconds']:>7.1f}"
     )
 print(
     f"{'no model: strokes thickened (section 7)':<46}{RESULTS['sam_direct_strokes_alone']['iou']:>6.3f}\n"
     f"{'everything is foreground':<46}{RESULTS['specialised_everything_iou']:>6.3f}\n"
 )
+print("recall = share of true vessel pixels found · ± spread = std of the per-image IoU · worst = lowest")
+print("per-image IoU · effort min = annotation minutes once · /new img = annotation minutes per new image\n")
 print("how each one scales:")
 for r in ranked:
     print(f"  {r['approach']:<16}{r['scalability']}")
@@ -238,13 +283,57 @@ if not (MY_WINNER or MY_STEADIEST):
     print("no prediction written in Q31; fine, but next time guess first: it is the cheapest lesson here")
 
 # %% [markdown]
-# ### 8.4 The trade-off in one picture
-#
-# This cell draws the table: on the left, IoU against annotation minutes (log scale, because a box and a
-# complete mask differ by a factor of thousands), with a bar for each approach's spread over the images; on
-# the right, the seconds of compute. One colour per approach, the same as in every earlier figure.
+# The spread column hides the shape. This cell draws, for each approach, one dot per held-out image and a
+# violin around the dots: a wide violin means the IoU varies a lot from image to image. The short bar is the
+# median image.
 
 # %%
+# @title Violin plot: each approach's IoU over the held-out images { display-mode: "form" }
+fig, ax = plt.subplots(figsize=(10, 3.8))
+for x, r in enumerate(ranked):
+    vals = np.asarray(PER_IMAGE_IOU[r["approach"]], float)
+    colour = APPROACH_COLOURS[r["approach"]]
+    if len(vals) >= 2 and np.ptp(vals) > 1e-9:  # a violin needs some spread to draw
+        body = ax.violinplot(vals, positions=[x], widths=0.8, showextrema=False)["bodies"][0]
+        body.set_facecolor(colour)
+        body.set_edgecolor(colour)
+        body.set_alpha(0.3)
+    ax.scatter(np.full(len(vals), x), vals, s=12, color=colour, zorder=3)
+    ax.plot([x - 0.3, x + 0.3], [np.median(vals)] * 2, color=colour, lw=2.5, zorder=4)
+line_all = RESULTS["specialised_everything_iou"]
+ax.axhline(line_all, color=THEME["background"], ls="--", label='mean IoU of "everything"')
+ax.set_xticks(range(len(ranked)), [r["approach"] for r in ranked], rotation=45, ha="right", fontsize=7)
+ax.set_ylabel("IoU on one held-out image")
+ax.set_title("Per-image IoU, best mean on the left (dot = one image, bar = median)")
+ax.legend(fontsize=7, frameon=False, loc="upper right")
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
+# The same idea on real images. This cell takes the approach with the highest mean IoU and shows its
+# **worst**, **typical** (median) and **best** held-out image. Violet = vessels found, orange = false
+# alarms, green = vessels missed.
+
+# %%
+# @title Worst, typical and best image of the IoU winner { display-mode: "form" }
+w_iou = np.asarray(PER_IMAGE_IOU[winner], float)
+w_order = np.argsort(w_iou)
+panels = []
+w_picks = (("worst", w_order[0]), ("typical (median)", w_order[len(w_order) // 2]), ("best", w_order[-1]))
+for tag, n in w_picks:
+    it_n, pred_n = SPEC_EVAL[n], COMPARE_REPORTS[winner]["held_preds"][n]
+    panels.append((f"{winner} · {tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
+show_masks(panels, width=3.4)
+
+# %% [markdown]
+# ### 8.4 The trade-off in one picture
+#
+# This cell draws the table. On the left, IoU against annotation minutes (log scale, because a box and a
+# complete mask differ by a factor of thousands), with a bar for each approach's spread. On the right, the
+# seconds of compute. One colour per approach, as in every earlier figure.
+
+# %%
+# @title Trade-off plot: accuracy against annotation, and compute { display-mode: "form" }
 fig, (ax, bx) = plt.subplots(1, 2, figsize=(10, 4.2), gridspec_kw={"width_ratios": [1.25, 1]})
 top = min(1.0, 1.25 * max(r["iou"] + r["reliability"] for r in comparison) + 0.05)
 gap = 0.045 * top  # labels of approaches with about the same effort are stacked at least this far apart
@@ -290,60 +379,69 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# <details><summary>What to look for</summary>
+# <!-- callout: go-deeper | How to read the trade-off plot -->
+# - **Top-left** would be the dream: accurate and nearly free. On thin structures nobody is there.
+# - **Bottom-left** is cheap and weak, often the prompt-only approaches.
+# - **Far right** is the complete-mask head. Its minutes are hours, and the log axis hides how far away it is.
+# - **Same x position** is the fairest comparison: same annotation, different use of it (the scribble head,
+#   the two pseudo-label heads and the direct SAM recipes all start from the same kind of strokes).
+# - **Vertical bars**: a slightly lower mean with a much smaller spread can be the safer choice.
+# - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
+
+# %% [markdown]
+# **Q32.** 🟡 Pick one approach for each situation and name the column that decided it.
 #
-# Read the left panel by corners. Top-left would be the dream: accurate and nearly free; usually nobody is
-# there on thin structures. Bottom-left is cheap and weak, often the prompt-only approaches. Far right is the
-# complete-mask head: whatever its IoU, its minutes are hours, and the log axis hides how far away it is.
-# The most interesting comparisons are between approaches at the same x position, because they used the
-# same annotation and differ only in what was done with it (the scribble head, the two pseudo-label heads,
-# and the direct SAM recipes all start from the same kind of strokes). Then look at the vertical bars: an
-# approach with a slightly lower mean but a much smaller spread can be the safer choice. The right panel
-# usually matters least for the heads (seconds) and most for anything that runs SAM on every image.
+# - (a) A screening study of 1,000 new images next month.
+# - (b) One difficult image a clinician needs today.
+# - (c) A project where a missed vessel is much worse than a false alarm.
 #
-# </details>
-#
-# **Q32.** 🟡 Pick one approach for each situation and name the column that decided it: (a) a screening
-# study of 1,000 new images next month, (b) one difficult image a clinician needs today, (c) a project
-# where a missed structure is much worse than a false alarm. Did the IoU winner win any of them?
+# Columns you can use: IoU, recall, spread, worst, effort min, /new img. Did the IoU winner win any of them?
 #
 # <details><summary>A possible answer</summary>
 #
-# (a) A thousand images make the per-image column decisive: anything that needs strokes or a box on every
-# image multiplies its minutes by a thousand, while a trained head pays its annotation once and then costs a
-# feature pass per image; among the heads, pick by IoU and spread. (b) For one image today, the per-image
-# rows are the natural candidates: no training, a minute of strokes, and you look at the result yourself
-# (compare them with the thickened strokes line before trusting SAM's share of the work). (c) When misses
-# cost more than false alarms, IoU is the wrong column: look at recall (in <code>RESULTS</code>, or the
-# tables of sections 4–7) and at the worst image, and accept a head that over-marks if a person checks its
-# output. The IoU winner can win none of the three; that is the point of a table with more than one column.
+# - (a) A thousand images make the **/new img** column decisive. Strokes or a box on every image multiply
+#   their minutes by a thousand; a trained head pays its annotation once and then costs a feature pass per
+#   image. Among the heads, pick by IoU and spread.
+# - (b) For one image today the per-image rows are the natural candidates: no training, a minute of
+#   strokes, and you check the result yourself. Compare them with the thickened-strokes line before
+#   trusting SAM's share of the work.
+# - (c) When misses cost more than false alarms, IoU is the wrong column. Look at **recall** and at
+#   **worst**, and accept a head that over-marks if a person checks its output.
+#
+# The IoU winner can win none of the three. That is the point of a table with more than one column.
 #
 # </details>
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 5 min: compare tables with your neighbour -->
-# Your sessions ran with the same seed but possibly different settings (Q17, Q23,
-# Q27, Q28, the 🔴 parts), and on a CPU session the image counts differ from a GPU one. Put your two tables
-# side by side. Which rows moved, and which stayed put? Did you predict the same winner? Agree on one
-# approach you would try first on a new specialised task, and one sentence on why.
+# Your sessions ran with the same seed but possibly different settings (Q17, Q23, Q27, Q28, the 🔴 parts),
+# and a CPU session has different image counts from a GPU one. Put your two tables side by side.
+#
+# - Which rows moved, and which stayed put?
+# - Did you predict the same winner?
+# - Agree on one approach you would try first on a new specialised task, and one sentence on why.
 
 # %% [markdown]
 # <details><summary>What pairs usually find</summary>
 #
-# The order of the top few rows is often less stable than it looks: a different threshold, a different
-# number of clicks or a different set of evaluation images can swap neighbours whose IoUs differ by a few
-# hundredths, and the spread column tells you those differences are inside the noise. What rarely moves is
-# the shape of the plot: the prompt-only rows stay cheap per image but weak or unsteady, the complete-mask
-# head stays hours away on the effort axis, and the stroke-based heads sit together in the middle. When two
-# tables disagree on the winner but agree on the shape, trust the shape.
+# - The order of the top few rows is less stable than it looks. A different threshold, number of clicks or
+#   set of evaluation images can swap neighbours whose IoUs differ by a few hundredths. The spread column
+#   says those differences are inside the noise.
+# - The shape of the plot rarely moves: prompt-only rows stay cheap per image but weak or unsteady, the
+#   complete-mask head stays hours away on the effort axis, and the stroke-based heads sit together in the
+#   middle.
+# - When two tables disagree on the winner but agree on the shape, trust the shape.
 #
 # </details>
 
 # %% [markdown]
-# <!-- callout: across | Across approaches -->
-# Every path of this notebook added a different kind of information: a prompt, one complete example, cheap
-# strokes, an honest loss about missing labels, a second model's guesses, or a person pointing at every
-# image. The table shows that none of them is free and none wins every column. Accuracy, annotation minutes,
-# reliability and compute pull in different directions, and the right row depends on how many images you
-# have, who checks the output, and what a mistake costs. Section 9 runs the cheapest rungs on your own
-# images; section 10 turns this table into rules you can take to the next problem.
+# <!-- callout: takeaway | When you see X, do Y: choosing an approach -->
+# - **When** two approaches differ by less than their spread **→** call it a tie and pick the cheaper one.
+# - **When** the best approach needs strokes or a box on every new image and you have thousands of images
+#   **→** compare the /new img column first; a trained head pays its annotation once.
+# - **When** a missed structure costs more than a false alarm **→** rank by recall and worst image, not by
+#   mean IoU.
+# - **When** the IoU winner is also the most expensive row **→** ask what the next-cheapest row loses
+#   before you pay for it.
+#
+# Section 9 runs the cheapest rungs on your own images; section 10 turns this table into rules.

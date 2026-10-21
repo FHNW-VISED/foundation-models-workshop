@@ -1,54 +1,64 @@
 # %% [markdown]
 # # When Foundation Models Fall Short: From Off-the-Shelf AI to Problem-Specific Adaptation
+
+# %% [markdown]
+# <!-- callout: banner | When Foundation Models Fall Short -->
+# **From Off-the-Shelf AI to Problem-Specific Adaptation**
 #
-# <table width="100%" bgcolor="#4A148C"><tr><td>
-# <font color="white" size="6"><b>When Foundation Models Fall Short</b></font><br>
-# <font color="white" size="4">From Off-the-Shelf AI to Problem-Specific Adaptation</font><br>
-# <font color="white">AMLD 2027 · EPFL, 11 March 2027 &nbsp;·&nbsp; SDS 2027 · Zurich, 1 June 2027</font>
-# <br><br>
-# <font color="white"><b>The question:</b> what can modern AI solve out of the box, when do its limitations
-# start to matter, and what should we do next?</font>
-# <br><br>
-# <font color="white"><b>At the end of this notebook you will be able to:</b></font>
-# <ol>
-# <li><font color="white">Judge when a vision foundation model is good enough out of the box, and recognise
-# the signs that it is not.</font></li>
-# <li><font color="white">Adapt it with cheap, incomplete supervision (scribbles, missing labels,
-# pseudo-labels, explanations, prompts), and explain what each approach uses and assumes.</font></li>
-# <li><font color="white">Compare approaches on accuracy, annotation effort, reliability and compute, and
-# decide what to do next on a new problem, including your own images.</font></li>
-# </ol>
-# <font color="white">Levels: 🟢 beginner · 🟡 intermediate (the default path) · 🔴 advanced, optional.
-# &nbsp; ✍️ = you write a few lines &nbsp; 🖍️ = you draw &nbsp; 👥 = compare with your neighbour.</font>
-# <br><br>
-# <font color="white"><b>Run <code>setup_check.ipynb</code> first.</b> It was shared with you the week
+# AMLD 2027 · EPFL, 11 March 2027 &nbsp;·&nbsp; SDS 2027 · Zurich, 1 June 2027
+#
+# **The question:** what can modern AI solve out of the box, when do its limitations
+# start to matter, and what should we do next?
+#
+# **At the end of this notebook you will be able to:**
+#
+# 1. Judge when a vision foundation model is good enough out of the box, and recognise
+#    the signs that it is not.
+# 2. Adapt it with cheap, incomplete supervision (scribbles, missing labels,
+#    pseudo-labels, explanations, prompts), and explain what each approach uses and assumes.
+# 3. Compare approaches on accuracy, annotation effort, reliability and compute, and
+#    decide what to do next on a new problem, including your own images.
+#
+# Levels: 🟢 beginner · 🟡 intermediate (the default path) · 🔴 advanced, optional.
+# &nbsp; ✍️ = you write a few lines &nbsp; 🖍️ = you draw &nbsp; 👥 = compare with your neighbour.
+#
+# **Run `setup_check.ipynb` first.** It was shared with you the week
 # before: it puts the models, images and precomputed files in your Google Drive, so nothing is downloaded
-# in the room. If you have not run it, do it now (about 5 minutes), then come back here.</font>
-# </td></tr></table>
+# in the room. If you have not run it, do it now (about 5 minutes), then come back here.
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# Load the cached models and data; see the question and outcomes.
+
+# %% [markdown]
+# **What you need**
 #
-# **Objective:** load the cached models and data; see the question and outcomes.
+# - Basic ML: training, validation, objectives, evaluation. Some Python.
+# - This notebook open in Google Colab with **Runtime → Change runtime type → T4 GPU**.
+# - No computer-vision background. Every step also runs on a CPU, just slower, and each training cell offers a
+#   precomputed checkpoint.
+
+# %% [markdown]
+# **The plan**
 #
-# **What you need:** basic ML (training, validation, objectives, evaluation), some Python, this notebook open
-# in Google Colab with **Runtime → Change runtime type → T4 GPU**. No computer-vision background is needed.
-# Every step also runs on a CPU, just slower, and each training cell offers a precomputed checkpoint.
-#
-# **The plan.** Block 1 (sections 1–3): a foundation model segments pets almost perfectly, then meets a
-# specialised task and falls short. Block 2 (sections 4–10): the ways out, from scribbles to prompting the
-# model directly, all compared on the same hidden ground truth, then on your own images.
-#
-# <table width="100%" bgcolor="#FFF8E1"><tr><td><font color="#5D4037">🧾 <b>Recipe and sources.</b>
-# The feature extractor is <b>DINOv3</b> ViT-S/16 (Meta, 2025, via <code>timm</code>) and the promptable
-# segmenter is <b>SAM 2.1</b> hiera-small (Meta, Apache-2.0). The scribble idea follows the MIT
-# "DINOv2 + scribbles" recipe: a tiny head on frozen patch features, trained with a loss that ignores
-# unlabelled pixels. Datasets and licences are listed in section 10 and in <code>data/ATTRIBUTION.md</code>.
-# </font></td></tr></table>
+# - **Block 1 (sections 1–3):** a foundation model segments pets almost perfectly, then meets a specialised
+#   task and falls short.
+# - **Block 2 (sections 4–10):** the ways out, from scribbles to prompting the model directly, all compared
+#   on the same hidden ground truth, then on your own images.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Recipe and sources -->
+# - Feature extractor: **DINOv3** ViT-S/16 (Meta, 2025, via `timm`).
+# - Promptable segmenter: **SAM 2.1** hiera-small (Meta).
+# - Scribble idea: train a tiny classifier on frozen DINO patch features, using only the pixels a person
+#   marked (follows the MIT "DINOv2 + scribbles" recipe).
 
 # %% [markdown]
 # ## 0. Setup & the question
 #
 # The next cell detects where you are (Colab or not, GPU or not), fixes the random seed, creates the
-# `RESULTS` dictionary every section writes into, and defines `use()`, the helper that lets you write your
-# own code without ever blocking the notebook. Run it once.
+# `RESULTS` dictionary every section writes into, and defines `use()`, which lets you write your own code
+# without ever blocking the notebook. Run it once.
 
 # %%
 # @title Setup (run me first) { display-mode: "form" }
@@ -82,8 +92,7 @@ if IN_COLAB and not SMOKE:
             "⚠️ Google Drive is not mounted or the cache folder is missing. Run this cell again and click "
             "'Allow' in the pop-up. If the folder is still missing, run setup_check.ipynb first (5 minutes)."
         )
-    if (CACHE_DIR / "hf").is_dir():
-        os.environ["HF_HUB_CACHE"] = str(CACHE_DIR / "hf")  # model weights, before torch/timm are imported
+    if (CACHE_DIR / "models").is_dir():
         os.environ["HF_HUB_OFFLINE"] = "1"  # nothing is downloaded in the room (N-030)
     DATA_DIR, PRECOMPUTED = CACHE_DIR / "data", CACHE_DIR / "precomputed"
     SPECIALISED_JSON = CACHE_DIR / "specialised.json"
@@ -92,6 +101,25 @@ else:
     DATA_DIR = CACHE_DIR if SMOKE else CACHE_DIR / "workshop"
     PRECOMPUTED = CACHE_DIR / "precomputed"
     SPECIALISED_JSON = Path("data/specialised.json")
+
+# Model weights: plain files in <cache>/models/<org>--<name>/, written by setup_check.ipynb (no symlinks,
+# so they survive Drive). `.fm-complete.json` is written last, once the folder is verified. No folder
+# (smoke run, local checkout): the models load from the Hugging Face hub id instead.
+MODELS_DIR = CACHE_DIR / "models"
+MODEL_DONE = ".fm-complete.json"
+
+
+def model_folder(repo_id: str) -> Path | None:
+    """The cached plain-file folder of a Hugging Face model, or None when setup_check has not made one."""
+    folder = MODELS_DIR / repo_id.replace("/", "--")
+    return folder if (folder / MODEL_DONE).is_file() else None
+
+
+def weights_file(folder: Path) -> Path:
+    """The weight file inside a model folder (timm: model.safetensors)."""
+    default = folder / "model.safetensors"
+    return default if default.is_file() else sorted(folder.glob("*.safetensors"))[0]
+
 
 if IN_COLAB:
     try:
@@ -201,12 +229,15 @@ print(f"Colab: {IN_COLAB} · smoke mode: {SMOKE} · device: {DEVICE} · seed: {S
 print(f"cache: {CACHE_DIR} · specialised task: {SPECIALISED['name']} ({SPECIALISED['task']})")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: how <code>use()</code>
-# works.</b> Several cells later ask you to fill a function whose body is <code>...</code>. The line after
-# it, <code>fn = use(my_fn, reference=_ref_fn, check=...)</code>, runs both versions on a small play
-# example and prints ✅ <i>matches</i> or ❌ <i>yours vs reference</i>. Either way the notebook continues:
-# with your version if it matches, with ours if the stub is untouched or wrong. Writing the code yourself is
-# where the learning happens; skipping it never breaks anything.</font></td></tr></table>
+# <!-- callout: theory | Theory: how use() works -->
+# Some cells ask you to fill a function whose body is `...` (the first is `my_iou` in section 1). The line
+# after it, `iou = use(my_iou, reference=_ref_iou, ...)`, runs your version and ours on a small play example:
+#
+# - Stub untouched: the notebook continues with ours.
+# - ✅ Yours matches: it continues with yours.
+# - ❌ Yours differs or crashes: it prints both results and continues with ours.
+#
+# Writing the code is where the learning happens; skipping it never breaks anything.
 
 # %% [markdown]
 # ### The theme
@@ -287,58 +318,56 @@ def load_index(dataset: dict) -> dict:
 # ### The data
 #
 # This cell reads the two datasets from the cache, the simple task (pets) and the specialised one, and
-# shows one image of each with its ground truth in green. The ground truth is for evaluation only: from
-# section 3 on, training sees only incomplete labels.
+# shows two images of each with the ground truth in green. The title gives the share of pixels the target
+# covers. The ground truth is for evaluation only: from section 3 on, training sees only incomplete labels.
 
 # %%
+# @title Load both datasets and show two examples of each { display-mode: "form" }
 for ds in (PETS, SPECIALISED):
     idx = load_index(ds)
     print(
         f"{ds['name']}: {len(ds['items'])} images ({len(ds['fit'])} fit, {len(ds['held'])} held-out) · "
-        f"{idx['task']} · licence {idx['licence']}"
+        f"{idx['task']}"
     )
 PRECOMPUTED_HEADS = json.loads((PRECOMPUTED / "heads" / "index.json").read_text())["heads"]
 print(f"precomputed: {len(PRECOMPUTED_HEADS)} head checkpoints in {PRECOMPUTED}")
 
-fig, axes = plt.subplots(1, 4, figsize=(12, 3.2))
+fig, axes = plt.subplots(2, 4, figsize=(12, 6.4))
 for k, ds in enumerate((PETS, SPECIALISED)):
-    it = load_item(ds, ds["fit"][0])
-    axes[2 * k].imshow(it["image"])
-    axes[2 * k].set_title(f"{ds['name']}: {it['name']}")
-    axes[2 * k + 1].imshow(overlay(it["image"], it["mask"]))
-    axes[2 * k + 1].set_title(f"ground truth: {ds['index']['task']}")
-for ax in axes:
+    for j, item in enumerate(ds["fit"][:2]):
+        it = load_item(ds, item)
+        axes[k, 2 * j].imshow(it["image"])
+        axes[k, 2 * j].set_title(f"{ds['name']}: {it['name']}")
+        axes[k, 2 * j + 1].imshow(overlay(it["image"], it["mask"]))
+        axes[k, 2 * j + 1].set_title(f"ground truth · {it['mask'].mean():.0%} of the pixels")
+for ax in axes.ravel():
     ax.axis("off")
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> Look at the
-# two images above. Which task do you expect the foundation model to solve out of the box, and which one
-# will give it trouble? Write one reason, then keep it: section 2 will tell you whether you were right.
-# </font></td></tr></table>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Answer in your
-# head or in a note; a worked answer is folded below.</font></td></tr></table>
+# <!-- callout: question | 🤔 Your prediction -->
+# Look at the images above. Which task do you expect the foundation model to solve out of the box, and which
+# one will give it trouble? Write one reason, then keep it: section 2 will tell you whether you were right.
 #
 # **Q1.** 🟢 What is different about the specialised task that could matter for a model trained on everyday
-# photos? Think about what the objects look like (size, shape, contrast), not about the domain name.
+# photos? Look at the size, shape and contrast of the objects, not the domain name. Answer in your head or in
+# a note.
 #
 # <details><summary>One possible answer</summary>
 #
-# Everyday photos show compact objects with clear boundaries, exactly what pets are. The specialised task
-# has structures that are thin, branching and low-contrast, and they cover a small fraction of the image.
-# A model that learnt "objects" from the web has seen few of those, and its patch features (16 px squares)
-# are coarser than the structures themselves. Whether that matters is what the next two sections measure.
+# Pets are big, compact shapes with clear edges; the specialised targets are thin, faint and cover a small
+# share of the image.
 #
 # </details>
 
 # %% [markdown]
 # ### The models
 #
-# This cell loads the two foundation models from the cache and prints where each one comes from and under
-# which licence, then wraps them in two small helpers: `dino.features(image, long_side)` gives patch
-# features, `sam.probability(image, points, labels)` gives a foreground map from point prompts.
+# This cell defines two small wrappers around the foundation models:
+#
+# - `dino.features(image, long_side)` gives patch features.
+# - `sam.probability(image, points, labels)` gives a foreground map from point prompts.
 
 # %%
 # @title Model loaders { display-mode: "form" }
@@ -347,7 +376,7 @@ import torch.nn.functional as F
 
 DINO_ID = "vit_small_patch16_dinov3.lvd1689m"
 DINO_SOURCE = "timm/vit_small_patch16_dinov3.lvd1689m"
-DINO_LICENCE = "DINOv3 License (Meta), see the notice below"
+DINO_LICENCE = "DINOv3 License (Meta)"
 SAM_ID = "facebook/sam2.1-hiera-small"  # SPEC §5: SAM 2.1 hiera-small, Apache-2.0, no account needed
 SAM_LICENCE = "Apache-2.0"
 
@@ -358,7 +387,9 @@ class Dino:
     def __init__(self, device: str = DEVICE):
         t = time.monotonic()
         self.device = device
-        model = timm.create_model(DINO_ID, pretrained=True, num_classes=0, dynamic_img_size=True)
+        folder = model_folder(DINO_SOURCE)  # plain files on Drive, else the hub id
+        extra = {"pretrained_cfg_overlay": {"file": str(weights_file(folder))}} if folder else {}
+        model = timm.create_model(DINO_ID, pretrained=True, num_classes=0, dynamic_img_size=True, **extra)
         self.model = model.eval().to(device)
         cfg = timm.data.resolve_data_config({}, model=self.model)
         self.mean = torch.tensor(cfg["mean"]).view(1, 3, 1, 1).to(device)
@@ -366,7 +397,7 @@ class Dino:
         self.n_prefix = self.model.num_prefix_tokens
         self.dim = self.model.num_features
         dt = time.monotonic() - t
-        print(f"DINOv3 ViT-S/16 · source {DINO_SOURCE} · licence {DINO_LICENCE} · {dt:.0f} s")
+        print(f"DINOv3 ViT-S/16 · {DINO_SOURCE} · {DINO_LICENCE} · {dt:.0f} s")
 
     @torch.no_grad()
     def features(self, image: np.ndarray, long_side: int) -> torch.Tensor:
@@ -389,10 +420,11 @@ class Sam:
 
         t = time.monotonic()
         self.device = device
-        self.proc = Sam2Processor.from_pretrained(SAM_ID)
-        self.model = Sam2Model.from_pretrained(SAM_ID).eval().to(device)
+        src = str(model_folder(SAM_ID) or SAM_ID)  # plain files on Drive, else the hub id
+        self.proc = Sam2Processor.from_pretrained(src)
+        self.model = Sam2Model.from_pretrained(src).eval().to(device)
         self._cache: tuple[np.ndarray, torch.Tensor] | None = None  # (the last image, its embeddings)
-        print(f"SAM 2.1 hiera-small · source {SAM_ID} · licence {SAM_LICENCE} · {time.monotonic() - t:.0f} s")
+        print(f"SAM 2.1 hiera-small · {SAM_ID} · {SAM_LICENCE} · {time.monotonic() - t:.0f} s")
 
     @torch.no_grad()
     def probability(
@@ -423,21 +455,23 @@ class Sam:
         return torch.sigmoid(logits[0, 0]).numpy()
 
 
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: the first slow step -->
+# The first time a model sees a new image size, PyTorch compiles kernels for it. The first call of the next
+# section is slower than the ones after; on a CPU the first SAM call on a 1024 px image takes ~20 s.
+
+# %% [markdown]
+# This cell loads DINOv3 and SAM from the cache and prints one line each: name · source · licence · load time.
+
 # %%
+# @title Load DINOv3 and SAM { display-mode: "form" }
 dino = Dino()
 sam = Sam()
 RESULTS["models"] = {"dino": DINO_SOURCE, "sam": SAM_ID, "device": DEVICE}
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFF8E1"><tr><td><font color="#5D4037">🧾 <b>DINOv3 licence notice.</b>
-# DINOv3 is licensed under the <a href="https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m">DINOv3
-# License</a>, Copyright © Meta Platforms, Inc. All Rights Reserved. It allows research and commercial use
-# under Meta's conditions and acceptable-use policy; keep this notice if you redistribute the weights or
-# anything derived from them. The <code>timm</code> re-host used here is open to everyone, no account needed.
-# SAM 2.1 is Apache-2.0. Both are re-checked about four weeks before each event, since Meta can change the
-# terms.</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: the first slow step.</b>
-# The first time a model sees a new image size, PyTorch compiles kernels for it: the first call of the next
-# section is slower than the ones after. On the CPU the first SAM call on a 1024 px image takes ~20 s.
-# </font></td></tr></table>
+# <!-- callout: note | If something goes wrong -->
+# - "Google Drive is not mounted" → run the setup cell again and click Allow; if the folder is still missing,
+#   run `setup_check.ipynb` first.
+# - "No GPU in this session" → Runtime → Change runtime type → T4 GPU, then run the setup cell again.
+# - A cell with a `...` stub → fill it or skip it; `use()` picks yours or ours and the notebook goes on.

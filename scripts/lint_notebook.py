@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import jupytext
+
 from build import CALLOUT_KINDS, parse_marker
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -109,8 +110,8 @@ def main() -> int:
         cells = nb.cells
         if not cells or cells[0].cell_type != "markdown" or not cells[0].source.lstrip().startswith("#"):
             fail(rel, "first cell must be a markdown heading (N-003)")
-        elif "**Objective:**" not in cells[0].source:
-            fail(rel, "first markdown cell needs an '**Objective:**' line (N-003)")
+        elif not has_objective(cells):
+            fail(rel, "needs '**Objective:**' in the heading cell or an objective callout after it (N-003)")
 
         for i, cell in enumerate(cells):
             where = f"{rel} cell {i}"
@@ -131,8 +132,9 @@ def main() -> int:
                         f"helper-only cell ({n_lines} lines) needs '# @title ...' to collapse (N-008)",
                     )
                 continue
-            if re.search(r"\bstyle\s*=", src):
-                fail(where, "markdown uses style= — Colab strips it; use a bgcolor table + <font> (N-025)")
+            is_callout = check_callouts(where, src)
+            if not is_callout and re.search(r"\bstyle\s*=", src):  # the build owns callout HTML
+                fail(where, "markdown uses style= — Colab strips it; use a callout marker (N-025, N-034)")
             for line in src.splitlines():
                 for m in Q_RE.finditer(line):
                     q = int(m.group(1))
@@ -148,6 +150,11 @@ def main() -> int:
                                 where,
                                 f"Q{q} shows code: next code cell must start with '# Q{q}' (N-007)",
                             )
+
+    if SETUP_SRC.exists():
+        for i, cell in enumerate(jupytext.read(SETUP_SRC, fmt="py:percent").cells):
+            if cell.cell_type == "markdown":
+                check_callouts(f"setup_check.py cell {i}", cell.source)
 
     if files and not smoke_defined:
         fail("sections", "no cell defines SMOKE = ... (N-014)")
