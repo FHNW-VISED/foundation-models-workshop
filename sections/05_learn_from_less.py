@@ -1,14 +1,16 @@
 # %% [markdown]
 # ## 5. Path 1 · Learn from less
 #
-# Back to the half-finished label file of section 3. The naive head failed because the loss got the file
-# as it was, and the file calls every unpainted pixel "background". Path 1 keeps the same file, features
-# and head. It changes only what the loss is told about the unpainted pixels:
+# Same trick as 4.3 ("unlabelled = ignored"), now measured on the half-painted label file of section 3. The
+# naive head failed because the loss got that file as it was, and the file calls every unpainted pixel
+# "background". Path 1 keeps the same file, features and head, and changes only what the loss is told about
+# the unpainted pixels:
 #
 # - **Masked:** "unknown". The loss skips them; the only background it hears about is a few strokes on
 #   clear background.
-# - **🔴 PU:** "unlabelled, and about this share of them is vessel". The loss uses every pixel and corrects
-#   for the vessels hiding among them.
+# - **🔴 PU** (positive-unlabelled: you know some positives, everything else is unknown): "unlabelled, and
+#   about this share of them is vessel". The loss uses every pixel and corrects for the vessels hiding
+#   among them.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
@@ -16,21 +18,18 @@
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the masked loss -->
-# A **masked loss** is any loss with a mask that removes pixels from it. Let S be the pixels that carry a
-# label. An ignored pixel is not in S: it adds nothing to the loss and sends no gradient.
-#
-# `L = −(1/|S|) · Σ_{i∈S} [ y_i·log p_i + (1−y_i)·log(1−p_i) ]`
+# A **masked loss** is the partial cross-entropy of 4.3: only the pixels S that carry a label count, and an
+# ignored pixel adds nothing and sends no gradient. Here you write it yourself.
 #
 # - **Example, a thin vessel nobody painted.** Naive (section 3): its pixels are in S with y = 0, so the
 #   loss punishes the head for calling them vessel. Masked: they are not in S, so nothing punishes it.
 # - **Catch:** if S holds almost only vessel, "everything is vessel" scores a perfect zero. Some known
 #   background must stay in S.
-# - The partial cross-entropy of section 4 is the same idea; here you write it yourself.
 
 # %% [markdown]
-# This helper cell defines a training loop that takes the loss as an argument (the same linear head,
-# features and steps as every head so far), a report with the numbers of section 3 plus the held-out ones
-# of section 4, a view of what the loss hears, and one colour for each head of this path.
+# The next cell defines a training loop that takes the loss as an argument (same linear head, features and
+# steps as every head so far), a report of the section-3 and section-4 numbers, a view of what the loss
+# hears, and one colour for each head of this path.
 
 # %%
 # @title Path 1 helpers: train with any loss, score a head, view the loss mask { display-mode: "form" }
@@ -136,11 +135,15 @@ def loss_view(item: dict, labels: np.ndarray, show_bg: bool = True) -> np.ndarra
 # visible vessels are the same every time; the rest differs:
 #
 # - **Naive:** every unpainted pixel is a background target.
-# - **Masked:** unpainted pixels are ignored, except the 3–5 background strokes of section 4 on the same
-#   images (seconds of work per image): the loss needs some known background.
+# - **Masked:** unpainted pixels are ignored, except 3–5 background strokes per image (the annotator also
+#   drew a few strokes on clear background, as in section 4): the loss needs some known background.
 # - **PU:** every unpainted pixel counts, as "unlabelled".
 #
 # No ground truth goes in: only the visible vessels, the strokes and the fundus border.
+
+# %% [markdown]
+# Colour key for the figure: teal = painted vessel, grey = a background target, dark = ignored by the loss,
+# bright with no colour = counted as "unlabelled" (PU only).
 
 # %%
 # @title What each recipe tells the loss { display-mode: "form" }
@@ -175,9 +178,6 @@ show_masks(
 )
 
 # %% [markdown]
-# Teal = painted vessel, grey = a background target, dark = ignored by the loss, bright with no colour =
-# counted as "unlabelled" (PU only).
-#
 # **Q18.** 🟡 Look at the third panel. The masked recipe tells the loss about few pixels, almost all vessel:
 #
 # - Which pixels may the head call vessel without any penalty?
@@ -190,11 +190,11 @@ show_masks(
 # between the strokes, including the background right next to every vessel. The strokes sit on clear
 # background away from the vessels, so they say little about where a vessel ends.
 #
-# Without them the loss only ever hears "vessel", and a head that calls every pixel vessel scores a perfect
-# zero: the trivial solution. A masked loss is only as good as the known background left in it.
+# Without them the loss only hears "vessel": the trivial solution of the Theory, shown with a fake head below.
 #
 # </details>
-#
+
+# %% [markdown]
 # ### 5.2 Write the masked loss
 
 # %% [markdown]
@@ -250,7 +250,7 @@ _with, _without = (
 print(f"play example · loss {_with:.4f} with two pixels unknown, {_without:.4f} with none")
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # Same label file as the naive head (you saw its hidden-vessel recall in section 3), but the unpainted pixels
 # are now unknown. Write two guesses:
 #
@@ -259,10 +259,11 @@ print(f"play example · loss {_with:.4f} with two pixels unknown, {_without:.4f}
 # - On new images, will it mark more of the fundus than the naive head, or less?
 
 # %% [markdown]
-# This cell trains the head with your masked loss (or ours) on the masked labels of 5.1 and prints the
-# seconds it took. Not done in a minute, or on a CPU and in a hurry? Set `TRAIN_YOURSELF = False` and run it
-# again: it loads our "masked" checkpoint, which was trained with a stricter rule (the text it prints says
-# how).
+# The next cell trains the head with your masked loss (or ours) on the masked labels of 5.1.
+# With `TRAIN_YOURSELF = False` it loads our "masked" checkpoint instead, which was made with a **stricter
+# rule**: it was told exactly which pixels next to the hidden vessels are unknown and that the rest is
+# background. That rule needs the hidden truth, so its numbers are an upper bound for this path, not what
+# you can do from the half-painted file.
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed "masked" head instead of training
@@ -286,16 +287,20 @@ if masked_sec > 60:
     print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
 
 # %% [markdown]
-# This cell scores the masked head next to the heads of sections 2 and 3, on the same groups as in 3.3
-# (hidden and visible vessels of the training images) and on the held-out images, then plots the
-# recalls and precision.
+# The next cell scores the masked head next to the heads of sections 2 and 3, on the hidden and visible
+# vessels of the training images (as in 3.3) and on the held-out images, and plots recalls and precision.
 
 # %%
 # @title Score the masked head next to the earlier heads { display-mode: "form" }
 t0 = time.monotonic()
 path_reports = {APPROACH_NAMES["masked"]: path_report(masked_head)}
 masked_infer = round(time.monotonic() - t0, 1)
-for key, tensors in (("naive", naive_head), ("naive_balanced", balanced_head)):
+earlier_heads = {"naive": naive_head}
+if "balanced_head" in globals():  # made by the 🔴 Q12 cell of section 3; skipped there = no such row here
+    earlier_heads["naive_balanced"] = balanced_head
+else:
+    print("ℹ️ No balanced naive head (the 🔴 Q12 cell of section 3 was skipped): its row is left out.")
+for key, tensors in earlier_heads.items():
     path_reports[APPROACH_NAMES[key]] = path_report(tensors)
 path_reports["full masks (section 2)"] = path_report(full_head)
 masked = path_reports[APPROACH_NAMES["masked"]]
@@ -313,9 +318,7 @@ RESULTS["masked_head"] = public(masked) | {
 print_reports(path_reports)
 print(f"section 3 recorded for the naive head · hidden-vessel recall {RESULTS['naive_recall_hidden_fg']:.3f}")
 
-PATH_COLOURS = {
-    APPROACH_NAMES["naive"]: APPROACH_COLOURS["naive"],
-    APPROACH_NAMES["naive_balanced"]: APPROACH_COLOURS["naive_balanced"],
+PATH_COLOURS = {APPROACH_NAMES[k]: APPROACH_COLOURS[k] for k in earlier_heads} | {
     APPROACH_NAMES["masked"]: APPROACH_COLOURS["masked"],
     "full masks (section 2)": THEME["works"],
 }
@@ -345,10 +348,9 @@ path_chart(list(PATH_COLOURS))
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn: compare the heads on one image -->
-# - Run the next cell. It shows the hidden vessels each head found on a training image, then the error maps
-#   of section 4 on the held-out demo image (violet found, orange invented, green missed).
+# - Run the next cell: the hidden vessels each head found on a training image, then the error maps of
+#   section 4 on the held-out demo image (violet found, orange false alarm, green missed). No new training.
 # - Then set `LOOK_IMAGE` to 1, 2, … and run it again, to answer Q19.
-# - No new training and no model calls: it draws from the predictions you already have.
 
 # %%
 # Q19 — hidden vessels found on a training image, then error maps on the held-out demo image
@@ -405,12 +407,8 @@ show_masks(
 
 # %% [markdown]
 # <!-- callout: pitfall | Pitfall: "ignore" is not free -->
-# 1. The loss ignores most pixels, and the few it keeps are almost all vessel.
-# 2. A head that answers "vessel" everywhere gets a near-perfect loss on them.
-# 3. The training loss looks great while the mask covers the whole eye.
-#
-# Watch the share of the image the model marks, and give the loss some background close to the objects,
-# not only easy background far away. The next cell shows the trick with a fake head.
+# The trivial solution of 5.1 (the Theory's "Catch"): the training loss can look great while the mask covers
+# the whole eye. Watch the "marked" share. The next cell shows it with a fake head.
 
 # %%
 # @title A fake head that always answers "vessel" { display-mode: "form" }
@@ -433,10 +431,11 @@ print(
 # vessels was painted, you know roughly how much vessel hides in that mix, and you can subtract it.
 
 # %% [markdown]
-# <!-- callout: theory | Theory: the PU trick in three steps -->
-# The **prior** π is the share of fundus pixels that are vessel. We estimate it as (painted share of the
-# fundus) ÷ (share of the vessels that was painted). The second number comes from the annotator ("I did
-# about half"; here the dataset config). Example: painted 1.5 % of the fundus, annotator did half → π = 3 %.
+# The idea in one line: **count everything as background, then subtract the vessels you know hide in
+# there.** The **prior** π is the share of fundus pixels that are vessel. We estimate it as (painted share
+# of the fundus) ÷ (share of the vessels that was painted). The second number comes from the annotator ("I
+# did about half"; here the dataset config). Example: painted 1.5 % of the fundus, annotator did half →
+# π = 3 %.
 #
 # 1. Vessel loss on the painted pixels, target "vessel": `L_v = mean_painted(−log p)`.
 # 2. Background loss. Calling every pixel "background" mixes π vessels with (1−π) background, so subtract
@@ -541,12 +540,37 @@ path_chart([APPROACH_NAMES["naive"], APPROACH_NAMES["masked"], APPROACH_NAMES["p
 # </details>
 
 # %% [markdown]
-# This cell writes the annotation effort of the three Path 1 heads for the comparison table of section 8,
-# with the assumptions of section 4: the painted half of each vessel map, plus seconds per background stroke.
+# **Q21.** 🟡 The masked head rests on one assumption: the hidden vessels look like the painted ones, because
+# we hid segments at random. Name a real annotation habit that breaks it. What would the masked head learn
+# then?
+
+# %% [markdown]
+# <details><summary>A possible answer</summary>
+#
+# Annotators skip what is hard or tedious: the thinnest capillaries, the low-contrast periphery, the
+# vessels inside a bleeding. Then the painted vessels are thick and clear, and the unpainted ones are thin
+# and faint.
+#
+# - **Masked head:** never hears "background" on the thin vessels, but never hears "vessel" either. It learns
+#   "vessel = thick and clear" and still misses most of them.
+# - **PU head (🔴, if you ran 5.3):** worse off. Its correction assumes the hidden vessels look like the
+#   painted ones, so it pushes the thin ones towards background. The PU literature calls this a violation of
+#   the "selected completely at random" assumption.
+#
+# The practical fix is the one of the ⚠️ in section 3: keep a small fully labelled set and check the recall
+# on the kind of structure your annotators skip.
+#
+# </details>
+
+# %% [markdown]
+# The last cell of the section writes the annotation effort of the three Path 1 heads for the comparison
+# table of section 8: the painted half of each vessel map, plus seconds per background stroke.
 
 # %%
 # @title Annotation effort of the Path 1 heads { display-mode: "form" }
-painted_masks = len(miss_train) * LABELLED_SHARE
+# LABELLED_SHARE is set in the 🔴 PU cell (5.3); if it was skipped, use the annotator's share from the config
+_share = LABELLED_SHARE if "LABELLED_SHARE" in globals() else 1 - MISSING["hidden_fraction"]
+painted_masks = len(miss_train) * _share
 RESULTS["path1_effort_min"] = {
     "naive": round(effort_minutes(n_full_masks=painted_masks), 2),
     "masked": round(effort_minutes(n_strokes=n_bg_strokes, n_full_masks=painted_masks), 2),
@@ -559,38 +583,12 @@ print(
 )
 
 # %% [markdown]
-# **Q21.** 🟡 Both fixes rest on one assumption: the hidden vessels look like the painted ones, because we
-# hid segments at random. Name a real annotation habit that breaks it. What would the masked head and the
-# PU head learn then?
-
-# %% [markdown]
-# <details><summary>A possible answer</summary>
-#
-# Annotators skip what is hard or tedious: the thinnest capillaries, the low-contrast periphery, the
-# vessels inside a bleeding. Then the painted vessels are thick and clear, and the unpainted ones are thin
-# and faint.
-#
-# - **Masked head:** never hears "background" on the thin vessels, but never hears "vessel" either. It learns
-#   "vessel = thick and clear" and still misses most of them.
-# - **PU head:** worse off. Its correction assumes the hidden vessels look like the painted ones, so it
-#   pushes the thin ones towards background. The PU literature calls this a violation of the "selected
-#   completely at random" assumption.
-#
-# The practical fix is the one of the ⚠️ in section 3: keep a small fully labelled set and check the recall
-# on the kind of structure your annotators skip.
-#
-# </details>
-
-# %% [markdown]
 # <!-- callout: takeaway | Takeaway -->
 # - **A label file where unpainted = background** → mark the unpainted pixels "ignore" (−1), so the hidden
 #   vessels stop being punished.
-# - **The loss ignores almost everything and a head says "vessel" everywhere** → keep some known background
-#   close to the objects, and watch the "marked" share, not the training loss.
-# - **Hidden vessels come back but the orange area grows** → that is the price of missing background;
-#   compare precision and "marked", not IoU alone.
+# - **The loss ignores almost everything** → keep some known background close to the objects, and watch the
+#   "marked" share, not the training loss: hidden vessels come back, but the orange area grows.
 # - **Only positives are labelled and you can estimate their share** → try the PU loss, and sweep
 #   `LABELLED_SHARE` to see how much a wrong guess moves recall.
-# - **Annotators skip the thin or faint cases** → neither fix works; keep a small fully labelled check set.
-# - **None of this adds information about the hidden vessels** → to recover them, try a second model
-#   (section 6).
+# - **Annotators skip the thin or faint cases** → neither fix works and none adds information about the
+#   hidden vessels: keep a small fully labelled check set, or try a second model (section 6).

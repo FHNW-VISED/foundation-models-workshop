@@ -114,20 +114,32 @@ def own_item(name: str, image: np.ndarray, source: str, auto=None, mask=None) ->
     }
 
 
+def shrink_strokes(strokes: np.ndarray, max_side: int) -> np.ndarray:
+    """Like `shrink` for strokes, but thin strokes survive: a pixel keeps a stroke if its block has one"""
+    if max(strokes.shape) <= max_side:
+        return strokes
+    out = np.zeros(shrink(strokes, max_side).shape, np.uint8)
+    for v in (2, 1):  # the thing wins over the background where they meet
+        layer = Image.fromarray(((strokes == v) * 255).astype(np.uint8))
+        out[np.array(layer.resize((out.shape[1], out.shape[0]), Image.BOX)) > 0] = v
+    return out
+
+
 def example_items(max_side: int) -> list[dict]:
-    """Our example: two held-out pets, with the strokes our scribble generator drew from their masks."""
+    """Our example: two held-out pets (compact) and one held-out retina image (thin vessels), with the strokes
+    our scribble generator drew from their masks."""
     out = []
-    for meta in PETS["held"][:2]:
-        it = load_item(PETS, meta)
-        out.append(
-            own_item(
-                it["name"],
-                shrink(it["image"], max_side),
-                "example",
-                auto=shrink(it["scribbles"], max_side),
-                mask=shrink(it["mask"], max_side),
-            )
+    for it in [load_item(PETS, meta) for meta in PETS["held"][:2]] + [SPEC_EVAL[0]]:
+        item = own_item(
+            it["name"],
+            shrink(it["image"], max_side),
+            "example",
+            auto=shrink_strokes(it["scribbles"], max_side),
+            mask=shrink(it["mask"], max_side),
         )
+        if it.get("fov") is not None:  # the retina's black border is not scored
+            item["fov"] = shrink(it["fov"], max_side)
+        out.append(item)
     return out
 
 
@@ -207,8 +219,8 @@ if IN_COLAB:
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 2 min): choose your images -->
-# By default the next cell uses our example: two held-out pets with strokes drawn by our scribble generator.
-# To use your own images:
+# By default the next cell uses our example: two held-out pets and one retina image, with strokes drawn by
+# our scribble generator. To use your own images:
 #
 # 1. Tick `ASK_UPLOAD` in the next cell and run it.
 # 2. Pick one to three JPEG or PNG files in the upload button that appears (press Cancel to keep the example).
@@ -263,7 +275,7 @@ for p in own_paths if not USE_EXAMPLE else []:
         print(f"⚠️ {p.name}: could not read it as an image ({type(err).__name__}), skipped. JPEG or PNG work.")
 if not OWN:
     OWN = example_items(OWN_MAX_SIDE)
-    print("ℹ️ Using our example: two held-out pets with generated strokes.")
+    print("ℹ️ Using our example: two held-out pets and one retina image, with generated strokes.")
 sizes = ", ".join(f"{it['name']} {it['image'].shape[1]}×{it['image'].shape[0]}" for it in OWN)
 print(f"{len(OWN)} image(s) · {sizes} · {OWN[0]['source']}")
 show_masks([(it["name"], it["image"]) for it in OWN], width=3.0)
@@ -279,13 +291,13 @@ show_masks([(it["name"], it["image"]) for it in OWN], width=3.0)
 #    different parts of it.
 # 2. With the **background** pen (grey), draw two to five strokes on what you do not want, especially near
 #    the boundary and on anything that looks similar.
-# 3. Press **💾 save strokes** under each canvas, then run the cell after the next text.
+# 3. Press **💾 save strokes** under each canvas, then run the "collect strokes" cell further down.
 #
 # Strokes, not outlines: a few seconds per image, the annotation budget of section 4. On the example,
 # drawing is optional: an image you do not save keeps its generated strokes.
 
 # %% [markdown]
-# This cell draws one canvas per image. The save button sends your strokes, a small PNG, to this Colab
+# This cell draws one canvas per image; the save button sends your strokes, as a small PNG, to this Colab
 # kernel, where they become a stroke map.
 
 # %%
@@ -306,8 +318,8 @@ if not IN_COLAB:
 #    in the order above (`""` skips one). Any size works.
 
 # %% [markdown]
-# This cell collects the strokes of every image (your PNGs first, then the canvas, then, for the example
-# only, the generated strokes), checks there is something to learn from, counts the strokes and shows them.
+# This "collect strokes" cell gathers the strokes of every image (your PNGs, then the canvas, then the
+# generated strokes for the example), counts them and shows them.
 
 # %%
 MY_STROKE_PNGS = []  # fallback, e.g. ["/content/leaf1_strokes.png", ""]: one path (or "") per image, in order
@@ -363,16 +375,6 @@ show_strokes(LADDER_OWN)
 #   one SAM prompt per image (Path 3, section 7.1).
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
-# Look at your images and strokes above. Is your thing an "object" in SAM's sense (compact, a clear inside
-# and outside), or more like the vessels (thin, scattered, a texture)?
-#
-# - Which of the three rungs do you expect to give the cleanest mask on your images?
-# - Which one the worst?
-#
-# Write both down.
-
-# %% [markdown]
 # This helper cell defines the three rungs on a list of images, plus the only check we have without a ground
 # truth: how much of your thing strokes a mask covers, and how much of your background strokes it spares.
 
@@ -423,25 +425,20 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 
 
 # %% [markdown]
-# <!-- callout: question | Question -->
-# Run the next cell and look at each row of masks.
-
-# %% [markdown]
-# **Q33.** 🟡 Which rung gave the mask you would keep, image by image? Compare with your prediction.
+# <!-- callout: question | 🤔 Your prediction (1 min) -->
+# Look at your images and strokes above. Is your thing an "object" in SAM's sense (compact, a clear inside
+# and outside), or more like the vessels (thin, scattered, a texture)?
 #
+# - Write down which of the three rungs you expect to give the cleanest mask, and which the worst.
+# - Then run the next cell (seconds on a T4, much slower on CPU): it shows each image with the three masks
+#   in the approach colours of sections 4 and 7, and the IoU on the example.
+#
+# **Q33.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
 # Where a rung failed, was it:
 #
 # - SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too much)?
 # - the 16 px patches of the head (blocky edges, small parts lost)?
 # - your strokes (a part of the thing you never touched)?
-#
-# The next cell runs the three rungs on your images (on a CPU: about 10–20 s per image for SAM, the head in
-# seconds) and shows each image with the three masks in the approach colours of sections 4 and 7. On the
-# example, which has a ground truth, it also prints the IoU.
-#
-# The table it prints has two stroke checks, the only scores available without a ground truth:
-# **thing ✓** is the share of your thing-stroke pixels inside the mask, **bg ✓** the share of your
-# background-stroke pixels outside it. A mask that respects every stroke scores 100 % on both.
 
 # %%
 # Q33 — the ladder on your images: zero-shot SAM, your scribble head, SAM from your strokes
@@ -472,17 +469,21 @@ for k in OWN_APPROACHES:
     }
     if has_truth:  # the example only: its ground truth scores, it never trains (L-005)
         pairs = zip(own_preds[k], LADDER_OWN, strict=True)
-        own_report[k]["iou"] = float(np.mean([iou(p, it["mask"]) for p, it in pairs]))
+        own_report[k]["iou"] = float(
+            np.mean([iou(p & region(it), it["mask"] & region(it)) for p, it in pairs])
+        )
     v = own_report[k]
     print(
         f"{APPROACH_NAMES[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
         f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
     )
-print("thing ✓ = share of your thing strokes inside the mask · bg ✓ = share of your bg strokes outside it")
+print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
+print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
 for n, it in enumerate(LADDER_OWN):
     panels = [(f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9))]
     for k in OWN_APPROACHES:
-        tag = f" · IoU {iou(own_preds[k][n], it['mask']):.2f}" if has_truth else ""
+        r_n = region(it)
+        tag = f" · IoU {iou(own_preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
         title = f"{APPROACH_NAMES[k].split(':')[0]}{tag}"
         panels.append((title, overlay(it["image"], own_preds[k][n], APPROACH_COLOURS[k])))
     if has_truth:
@@ -591,7 +592,8 @@ show_masks(panels, width=2.8)
 # - On whole parts of it?
 # - On something in the background that looks similar?
 #
-# If you could add only two more strokes per image, where would you put them, and with which pen?
+# If you could add only two more strokes per image, where would you put them, and with which pen? On the
+# example, compare the retina's orange with the pets'.
 #
 # <details><summary>What to look for</summary>
 #

@@ -3,35 +3,81 @@
 #
 # Welcome back. Before the break the head believed a label file that said "background" wherever nobody
 # had looked. Block 2 is about ways out, and the first is a ladder: give the foundation model a little
-# more task information at each rung, and look at what changes.
-#
-# - **Rung 0 · zero-shot** (section 2): no training, just a prompt.
-# - **Rung 1 · one-shot**: one fully annotated image.
-# - **Rung 2 · scribbles**: a few quick strokes on several images, and a loss that skips unlabelled pixels.
-#
-# Higher is not automatically better, and each rung fails in its own way. So we look at the masks, not
-# only at the numbers.
+# more task information at each rung, and look at what changes. Higher is not automatically better, and
+# each rung fails in its own way, so we look at the masks, not only at the numbers.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
 # zero-shot → one-shot → scribbles: see how predictions change at each rung.
 
 # %% [markdown]
+# The next cell draws what the model receives at each rung, with its annotation cost: the input is the only
+# thing that changes.
+
+# %%
+# @title What each rung receives { display-mode: "form" }
+def effort_minutes(n_strokes: int = 0, n_full_masks: int = 0) -> float:
+    """Annotation minutes under the dataset's stated assumptions (seconds per stroke, hours per full mask)."""
+    cost = SPECIALISED["annotation_effort"]
+    return n_strokes * cost["seconds_per_stroke"] / 60 + n_full_masks * 60 * float(
+        np.mean(cost["hours_per_full_mask"])
+    )
+
+
+_shot0 = load_item(SPECIALISED, SPECIALISED["fit"][0])
+_scribs = [load_item(SPECIALISED, m) for m in SPECIALISED["fit"][:N_TRAIN_SPEC]]
+_n_str = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in SPECIALISED["fit"][:N_TRAIN_SPEC])
+
+
+def _cost(minutes: float) -> str:
+    if minutes < 1:
+        return f"{minutes * 60:.0f} s"
+    return f"{minutes:.0f} min" if minutes < 90 else f"{minutes / 60:.0f} h"
+
+
+_ex = _scribs[0]
+_thick = {v: ndi.binary_dilation(_ex["scribbles"] == v, iterations=2) for v in (1, 2)}
+_strokes = overlay(_ex["image"], _thick[2], THEME["background"], 0.9)
+_strokes = overlay(_strokes, _thick[1], THEME["scribble"], 0.9)
+_x0, _y0, _x1, _y1 = box_prompt(demo)
+_box = mpl.patches.Rectangle((_x0, _y0), _x1 - _x0, _y1 - _y0, fill=False, lw=2, ec=THEME["scribble"])
+_c0, _c1 = _cost(effort_minutes(n_strokes=1)), _cost(effort_minutes(n_full_masks=1))
+_c2 = _cost(effort_minutes(n_strokes=_n_str))
+fig, axes = plt.subplots(1, 3, figsize=(10, 3.6))
+axes[0].imshow(demo["image"])
+axes[0].add_patch(_box)
+axes[0].set_title(f"Rung 0 · zero-shot\n1 image + 1 box · ≈ {_c0}")
+axes[1].imshow(overlay(_shot0["image"], _shot0["mask"], THEME["truth"]))
+axes[1].set_title(f"Rung 1 · one-shot\n1 image + its complete mask · ≈ {_c1}")
+axes[2].imshow(_strokes)
+axes[2].set_title(f"Rung 2 · scribbles\n{len(_scribs)} images + {_n_str} strokes · ≈ {_c2}")
+for ax in axes:
+    ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
 # <!-- callout: theory | Theory: what each rung tells the model -->
-# - **Zero-shot:** SAM gets the image and one box, and nothing about the task. It returns its best guess of
-#   "the object". On the retina that is the eye, or one thick vessel (section 2).
-# - **One-shot:** one image with a complete vessel mask. On frozen DINOv3 features it becomes a
+# - **Rung 0 · zero-shot** (section 2): SAM gets the image and one box, and nothing about the task. It
+#   returns its best guess of "the object": on the retina, the eye or one thick vessel.
+# - **Rung 1 · one-shot:** one image with a complete vessel mask. On frozen DINOv3 features it becomes a
 #   *prototype*: the mean feature of its vessel patches and of its background patches. Every patch of a new
-#   image goes to the nearer one. The same map can pick clicks for SAM (PerSAM, Zhang et al., ICLR 2024).
-# - **Scribbles:** strokes on some vessels and some background in a few images; everything else is
-#   *unlabelled*. The section-2 head is trained with a loss that only counts the labelled pixels (partial
-#   cross-entropy, Tang et al., ECCV 2018; the recipe of the MIT "DINOv2 + scribbles" work, here on DINOv3).
+#   image goes to the nearer one. This rung has **two variants**: the prototype mask itself, and the same
+#   similarity map choosing clicks for SAM. That is why the table in 4.4 has four rows for three rungs.
+# - **Rung 2 · scribbles:** strokes on some vessels and some background in a few images; everything else is
+#   *unlabelled*. The section-2 head is trained with a loss that counts only the labelled pixels (4.3).
 # - **Cost:** one complete mask takes hours, one scribble seconds.
 
 # %% [markdown]
+# <!-- callout: go-deeper | Go deeper: where the rungs come from -->
+# - Clicks from a similarity map: PerSAM, Zhang et al., ICLR 2024.
+# - Partial cross-entropy on scribbles: Tang et al., ECCV 2018.
+# - The recipe of the MIT "DINOv2 + scribbles" work, here on DINOv3.
+
+# %% [markdown]
 # This helper cell defines the tools of the ladder: one colour per approach (kept for the rest of the
-# notebook), prototypes, clicks picked from a similarity map, error and difference maps, and a report of
-# the numbers we compare.
+# notebook), prototypes, clicks from a similarity map, error and difference maps, and a report of the
+# numbers we compare.
 
 # %%
 # @title Ladder helpers: colours, prototypes, clicks, error and difference maps { display-mode: "form" }
@@ -162,57 +208,11 @@ def show_extremes(preds: list[np.ndarray]) -> None:
     )
 
 
-def effort_minutes(n_strokes: int = 0, n_full_masks: int = 0) -> float:
-    """Annotation minutes under the dataset's stated assumptions (seconds per stroke, hours per full mask)."""
-    cost = SPECIALISED["annotation_effort"]
-    return n_strokes * cost["seconds_per_stroke"] / 60 + n_full_masks * 60 * float(
-        np.mean(cost["hours_per_full_mask"])
-    )
-
-
-# %% [markdown]
-# This cell draws what the model receives at each rung, with the annotation cost in the titles. The input
-# is the only thing that changes from rung to rung.
-
-# %%
-# @title What each rung receives { display-mode: "form" }
-_shot0 = load_item(SPECIALISED, SPECIALISED["fit"][0])
-_scribs = [load_item(SPECIALISED, m) for m in SPECIALISED["fit"][:N_TRAIN_SPEC]]
-_n_str = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in SPECIALISED["fit"][:N_TRAIN_SPEC])
-
-
-def _cost(minutes: float) -> str:
-    if minutes < 1:
-        return f"{minutes * 60:.0f} s"
-    return f"{minutes:.0f} min" if minutes < 90 else f"{minutes / 60:.0f} h"
-
-
-_ex = _scribs[0]
-_thick = {v: ndi.binary_dilation(_ex["scribbles"] == v, iterations=2) for v in (1, 2)}
-_strokes = overlay(_ex["image"], _thick[2], THEME["background"], 0.9)
-_strokes = overlay(_strokes, _thick[1], THEME["scribble"], 0.9)
-_x0, _y0, _x1, _y1 = box_prompt(demo)
-_box = mpl.patches.Rectangle((_x0, _y0), _x1 - _x0, _y1 - _y0, fill=False, lw=2, ec=THEME["scribble"])
-_c0, _c1 = _cost(effort_minutes(n_strokes=1)), _cost(effort_minutes(n_full_masks=1))
-_c2 = _cost(effort_minutes(n_strokes=_n_str))
-fig, axes = plt.subplots(1, 3, figsize=(10, 3.6))
-axes[0].imshow(demo["image"])
-axes[0].add_patch(_box)
-axes[0].set_title(f"Rung 0 · zero-shot\n1 image + 1 box · ≈ {_c0}")
-axes[1].imshow(overlay(_shot0["image"], _shot0["mask"], THEME["truth"]))
-axes[1].set_title(f"Rung 1 · one-shot\n1 image + its complete mask · ≈ {_c1}")
-axes[2].imshow(_strokes)
-axes[2].set_title(f"Rung 2 · scribbles\n{len(_scribs)} images + {_n_str} strokes · ≈ {_c2}")
-for ax in axes:
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
-
 # %% [markdown]
 # ### 4.1 Rung 0: zero-shot, from section 2
 #
-# Nothing new to run: SAM with one box on every evaluation image, the section-2 headline. The next cell
-# picks up those masks and measures them with the numbers every rung is compared on.
+# Nothing new to run: the next cell measures section 2's SAM-with-one-box masks with the numbers every rung
+# is compared on.
 
 # %% [markdown]
 # - **IoU, clDice:** as before: overlap, and overlap along the centre line.
@@ -245,7 +245,7 @@ show_extremes(sam_box_masks)
 # 4. Upsample the scores to pixels and mark those above 0.
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # You saw SAM's box on the three images above (its "marked" share and its error maps). Before running the
 # prototype, write one guess for each:
 #
@@ -254,9 +254,8 @@ show_extremes(sam_box_masks)
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn: swap the annotated image -->
-# - Run the next cell. It builds the two prototypes from one annotated image, scores every evaluation image
-#   against them (one DINOv3 feature grid each: seconds), and shows the annotated image, the similarity map
-#   on the demo image and the mask.
+# - Run the next cell: it builds the two prototypes from one annotated image, scores every evaluation image
+#   (seconds), and shows the similarity map and the mask on the demo image.
 # - Then set `ONE_SHOT_IMAGE` to 1, 2, … and run it again, to answer Q14.
 
 # %%
@@ -319,7 +318,8 @@ show_masks(
 # </details>
 
 # %% [markdown]
-# The same similarity map can also point SAM at the right places. On every evaluation image:
+# The same similarity map can also point SAM at the right places (rung 1, second variant). On every
+# evaluation image:
 #
 # 1. The five patches most like a vessel become positive clicks.
 # 2. The five most like background become negative clicks.
@@ -381,8 +381,18 @@ show_clicks(
 #
 # The annotator from section 3 again, with a new instruction: "don't trace everything; draw a few strokes
 # along some vessels and a few on clear background, in each of five images, then stop". Every other pixel
-# is unlabelled, and this time the file says so (value 0), so the loss can skip it.
+# is *unlabelled*, and this time the stroke map says so, so the loss can skip it.
+
+# %% [markdown]
+# Three label encodings meet here, and the number 0 means something different in each:
 #
+# | | 0 | 1 | 2 | −1 |
+# |---|---|---|---|---|
+# | Section-3 file | background (or just unpainted) | vessel | – | – |
+# | Stroke map (this rung) | unlabelled | vessel stroke | background stroke | – |
+# | Training targets | background | vessel | – | ignore this pixel |
+
+# %% [markdown]
 # The next cell shows the strokes on one training image (vessel in teal, background in grey, thickened for
 # the figure only) and, in the last panel, what the loss will actually see.
 
@@ -420,9 +430,8 @@ show_masks(
 # `L = −(1/|S|) · Σ_{i∈S} [ y_i·log p_i + (1−y_i)·log(1−p_i) ]`
 #
 # - A vessel stroke says y = 1, a background stroke says y = 0.
-# - An unlabelled pixel is not in S: it adds nothing, neither "vessel" nor "background". In code that is a
-#   target of `-1`, which `train_head` already skips (it has skipped the fundus border that way since
-#   section 2).
+# - An unlabelled pixel is not in S: it adds nothing. In code it is a target of `-1`, which `train_head`
+#   already skips (it has skipped the fundus border that way since section 2).
 # - In section 3 the unpainted pixels were targets of `0`: a thin vessel nobody painted counted as a
 #   "background" error.
 
@@ -444,17 +453,17 @@ def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_p
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 3 min): choose which pixels to ignore -->
-# Fill `my_scribble_targets`: it turns a scribble map into training targets.
+# Fill `my_scribble_targets`: it turns a stroke map into training targets (rows 2 and 3 of the table above).
 #
 # - In: 0 unlabelled, 1 vessel stroke, 2 background stroke. Out: 1, 0, or −1 for "ignore".
 # - Pixels outside `region` are always −1.
-# - `bg_beyond_px=None`: every unlabelled pixel is ignored.
-# - `bg_beyond_px=40` (a number): unlabelled pixels farther than that from every vessel stroke count as
-#   background. `ndi.distance_transform_edt(scribbles != 1)` gives each pixel's distance to the nearest
-#   vessel stroke.
+# - Start with the default, `bg_beyond_px=None`: every unlabelled pixel is ignored.
+# - **Ignore the number setting of `bg_beyond_px` until 4.5.** There, unlabelled pixels farther than that
+#   from every vessel stroke count as background; `ndi.distance_transform_edt(scribbles != 1)` gives each
+#   pixel's distance to the nearest vessel stroke.
 #
 # The cell checks your version on a 6 × 6 play map with both settings and continues with ours if you skip
-# it. You use the second setting in 4.5.
+# it or leave the number setting out.
 
 # %%
 # ✍️ YOUR CODE
@@ -481,7 +490,7 @@ print("play example · targets with bg_beyond_px=2 (−1 = ignored):")
 print(scribble_targets(_play_scrib, _play_region, 2))
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # The head will see labels on fewer than two pixels in a hundred (see the printout above), and no vessel
 # will ever be called "background". Against the one complete mask of rung 1, write two guesses:
 #
@@ -489,9 +498,9 @@ print(scribble_targets(_play_scrib, _play_region, 2))
 # - Will it mark more of the fundus, or less?
 
 # %% [markdown]
-# This cell trains the section-2 head on the scribbles of the five training images, every unlabelled pixel
-# ignored, and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
-# `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint, trained the same way on all fit images.
+# The next cell trains the section-2 head on the scribbles of the five training images, every unlabelled
+# pixel ignored; with `TRAIN_YOURSELF = False` it loads our checkpoint, trained the same way on all fit
+# images.
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed "scribbles" head instead of training
@@ -532,9 +541,9 @@ print(
 # %% [markdown]
 # ### 4.4 The ladder, side by side
 #
-# The next cell puts the rungs next to each other: a table with the five numbers and the annotation each
-# rung needed, a bar chart (one colour per approach, kept for the rest of the notebook), and the demo
-# image's error maps (violet = vessel found, orange = false alarm, green = vessel missed).
+# The next cell puts the four rows (three rungs: rung 1 has two variants) side by side: a table with the
+# five numbers and the annotation each needed, a bar chart, and the demo image's error maps (violet =
+# vessel found, orange = false alarm, green = vessel missed).
 
 # %%
 # @title Table, bar chart and error maps of all rungs { display-mode: "form" }
@@ -602,8 +611,8 @@ show_masks(
 )
 
 # %% [markdown]
-# Several of those error maps look alike. The next cell shows only what changes from one rung to the next
-# on the demo image: grey = both rungs mark it, a colour = only that rung marks it.
+# Several of those error maps look alike, so the next cell shows only what changes from one rung to the next
+# on the demo image (grey = both mark it, a colour = only that one).
 
 # %%
 # @title Difference maps: what changes from one rung to the next { display-mode: "form" }
@@ -668,15 +677,14 @@ plt.show()
 # 2. B is more than 40 px from every stroke, so the rule calls it "background".
 # 3. The loss now pushes the head to call B-like pixels background: the section-3 mistake, back through the
 #    side door.
-#
-# The next cell measures how much true vessel your rule mislabels on the training images. It uses the
-# hidden ground truth for that diagnosis only, never for training.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn: choose a distance -->
 # - Set `BG_BEYOND_PX` (try 20, 80, `None` = ignore every unlabelled pixel) and run the next cell.
 # - It turns the scribbles into targets with your distance, trains the same head on them (seconds), and
 #   prints its numbers next to the scribble head of 4.3, which ignored every unlabelled pixel.
+# - It also measures how much true vessel your rule mislabels (the hidden ground truth is used for that
+#   diagnosis only, never for training).
 # - Try a few distances before you answer Q17.
 
 # %%
@@ -749,19 +757,24 @@ show_masks(
 # </details>
 
 # %% [markdown]
-# <!-- callout: your-turn | Try it on your image (optional, 2 min) -->
+# Optional: the cell below (collapsed) runs the one-shot prototype on your own photo. Section 9 runs the
+# whole ladder on your own scribbles.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Try it on your image (optional, 2 min) -->
 # The one-shot idea works from clicks too: a few clicks on the thing you want and a few on what you do not
 # want give two prototypes, and every similar patch is marked.
 #
-# - Upload a photo with the folder icon on the left and put its path in `MY_IMAGE`.
+# - Open the cell below ("Try the prototype on your own image"), upload a photo with the folder icon on the
+#   left and put its path in `MY_IMAGE`.
 # - Put some `(x, y)` clicks in `MY_FG_CLICKS` and `MY_BG_CLICKS`.
 # - Left empty, it runs on the demo image with clicks along its scribbles.
-# - Section 9 runs the whole ladder on your own scribbles.
 #
 # The cell computes DINOv3 features of your image, builds the prototypes from the patches under your
 # clicks, and shows the similarity map and the mask: one model pass, no training.
 
 # %%
+# @title Try the prototype on your own image (optional) { display-mode: "form" }
 MY_IMAGE = ""  # e.g. "/content/my_photo.jpg"; empty = the demo image
 MY_FG_CLICKS = []  # e.g. [(120, 80), (300, 210)] on the thing you want
 MY_BG_CLICKS = []  # e.g. [(20, 20)] on what you do not want; empty = every other patch
@@ -808,9 +821,7 @@ show_clicks(
 #   map, not only IoU.
 # - **You have one complete mask** → expect patch-wide vessels, and swap the annotated image to see how
 #   much the result depends on your choice.
-# - **You have cheap scribbles** → train with a loss that ignores unlabelled pixels, and check its recall
-#   against the naive head of section 3.
-# - **A rule fills the gaps ("far from a stroke = background")** → first measure how many true vessels it
-#   mislabels (4.5).
+# - **You have cheap scribbles** → train with a loss that ignores unlabelled pixels, and measure what any
+#   "far from a stroke = background" rule mislabels before you use it (4.5).
 # - **Two rungs score alike** → compare their difference maps and the minutes of annotation: they differ more
 #   in how they fail than in one number. Keep the rung colours; they return in section 8.

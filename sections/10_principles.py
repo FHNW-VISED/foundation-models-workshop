@@ -53,8 +53,8 @@ plt.show()
 # %% [markdown]
 # ### 10.1 The principles, from your numbers
 #
-# The next cell writes six rules from the numbers above: a sentence of advice, then the evidence from this
-# session. If a lesson did not hold in your run, the sentence says so.
+# The next cell writes six rules as cards, each with the evidence from your session (a rule with your own
+# number attached tells you how strongly to believe it), and says so where a lesson did not hold in your run.
 
 # %%
 # @title Principles from this run { display-mode: "form" }
@@ -84,7 +84,8 @@ def p_resolution() -> str:
         rule = "Check the resolution first: a patch feature describes a 16 px block, not a pixel."
     fact = (
         f"The same head on complete masks scored IoU {a['iou']:.2f} at {lo} px and {b['iou']:.2f} at {hi} px "
-        f"(clDice {a['cldice']:.2f} → {b['cldice']:.2f}), against {RESULTS['pets_head_iou']:.2f} on pets."
+        f"(clDice {a['cldice']:.2f} → {b['cldice']:.2f}); on pets the same kind of head scored "
+        f"{RESULTS['pets_head_iou']:.2f}."
     )
     if b["iou"] - a["iou"] < 0.05:
         return f"{rule} {fact} More pixels helped little, so the limit is the patch: plan for cheap labels."
@@ -175,40 +176,40 @@ PRINCIPLES = [
     p_minutes_before_hours(),
 ]
 RESULTS["principles"] = PRINCIPLES
-print(f"Principles from this session ({SPECIALISED['name']}, {len(SPEC_EVAL)} held-out images, {DEVICE}):\n")
-for n, text in enumerate(PRINCIPLES, start=1):
-    print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
+headline = f"Principles from this session ({SPECIALISED['name']}, {len(SPEC_EVAL)} held-out images, {DEVICE})"
+try:
+    from html import escape
 
-# %% [markdown]
-# <!-- callout: theory | Theory: why the principles are generated, not written -->
-# A rule copied from a slide ("SAM is great", "always fine-tune") tends to be true on the slide's data. A
-# rule with your own number attached tells you how strongly to believe it and what to measure next time.
-#
-# The same six questions carry over to any task:
-#
-# - Is the out-of-the-box result above the "everything" line?
-# - Is the structure smaller than a 16 px patch?
-# - What do the gaps in the labels mean?
-# - Does the model beat the hints alone?
-# - Which mistake costs most?
-# - How many minutes does every new image cost?
+    from IPython.display import HTML, display
+
+    cards = ""
+    for n, text in enumerate(PRINCIPLES, start=1):
+        rule, _, evidence = text.partition(". ")  # the rule is the first sentence, the rest is the evidence
+        cards += (
+            f'<div style="flex:1 1 300px;background:#EDE7F6;border-left:6px solid {THEME["works"]};'
+            'border-radius:6px;padding:10px 12px;color:#311B92;line-height:1.45">'
+            f'<div style="font-weight:bold;font-size:15px">{n}. {escape(rule.rstrip("."))}.</div>'
+            f'<div style="font-size:12px;margin-top:5px;color:#4527A0">{escape(evidence)}</div></div>'
+        )
+    display(
+        HTML(
+            f'<div style="font-weight:bold;color:#311B92;margin:4px 0">{escape(headline)}</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:8px">{cards}</div>'
+        )
+    )
+except ImportError:  # no IPython: plain text
+    print(headline + ":\n")
+    for n, text in enumerate(PRINCIPLES, start=1):
+        print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (2 min) -->
-# Think of one segmentation or detection problem of your own: at work, in your research, or the images you
-# used in section 9.
+# **Q36.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
+# section 9). Which of the principles above would have changed what you did first, and what number would you
+# measure to check it?
 #
-# - Write it in one line.
-# - Write the first thing you would do on Monday, as a rule with a number you would measure.
-#
-# The cell only prints it back; nothing is checked.
-
-# %% [markdown]
-# **Q36.** 🟢 Which of the principles above would have changed what you did first on your own problem, and
-# what number would you measure to check it?
-#
-# - Write the problem and your first step in the next cell.
-# - It prints them next to the principle you picked, so you leave with one line you can act on.
+# - Write the problem and your first step on Monday, as a rule with a number, in the next cell.
+# - The cell prints them next to the principle you picked and checks nothing.
 
 # %%
 # Q36 — your problem and your first step (leave "" to skip)
@@ -262,36 +263,40 @@ else:
 
 # %% [markdown]
 # <!-- callout: takeaway | When you see X, do Y: the whole workshop -->
-# - **When** one box scores about the same as "mark everything" **→** the foundation model is not doing the
-#   job yet; compare with the "everything" line before you trust any score (sections 1 and 2).
-# - **When** the zero-shot masks miss thin structures **→** measure with a topology-aware metric (clDice)
-#   before trusting IoU, and check the input resolution: a patch feature describes a 16 px block (section 2).
-# - **When** labels are partly missing **→** treat an unlabelled pixel as unknown, not as background, and
-#   tell the loss so (sections 3 and 5).
-# - **When** you only have strokes **→** turn them into pseudo-labels (SAM, Grad-CAM) or prompt SAM with
-#   them, and compare with the strokes thickened alone to see what the model added (sections 6 and 7).
-# - **When** two approaches differ by less than their spread **→** call it a tie and choose by annotation
-#   minutes (section 8).
-# - **When** a method needs strokes on every new image and you have thousands **→** train a head once
-#   instead (section 8).
+# - **When** one box scores about the same as "mark everything", or the structure is thinner than a 16 px
+#   patch **→** compare with the "everything" line, trust clDice over IoU, and try a larger input
+#   (sections 1 and 2).
+# - **When** labels are partly missing, or you only have strokes **→** treat an unlabelled pixel as unknown,
+#   turn strokes into pseudo-labels or SAM prompts, and compare with the thickened strokes alone
+#   (sections 3 and 5 to 7).
+# - **When** two approaches differ by less than their spread, or a method needs strokes on every one of
+#   thousands of new images **→** call it a tie and choose by annotation minutes; train a head once
+#   (section 8).
 # - **When** there is no ground truth **→** look where the approaches disagree, add a stroke there, and
 #   label a small test set before deciding (section 9).
+#
+# The same six questions carry over to any task:
+#
+# - Is the out-of-the-box result above the "everything" line?
+# - Is the structure smaller than a 16 px patch?
+# - What do the gaps in the labels mean?
+# - Does the model beat the hints alone?
+# - Which mistake costs most?
+# - How many minutes does every new image cost?
 
 # %% [markdown]
 # ### 10.3 Where to go next
 #
-# - **Label a small test set first.** A few completely annotated images of your own problem turn every
-#   later decision into a measurement, as the hidden ground truth did here.
-# - **Let the model choose the next stroke.** Section 9's disagreement map is the simplest form of
-#   interactive annotation and active learning: draw where the approaches disagree, retrain, repeat.
-# - **A light decoder instead of a linear head.** The heads here saw one 16 px patch at a time; a small
-#   upsampling decoder on the same frozen features is the next step before any fine-tuning.
-# - **The 🔴 parts you skipped.** The PU loss (section 5), Grad-CAM peaks as SAM clicks (section 6), SAM 3
-#   from a word (section 7) and adding strokes where the rungs disagree (section 9).
-# - **The original sources**, each with examples worth an afternoon:
-#   - [DINOv3](https://github.com/facebookresearch/dinov3)
-#   - [SAM 2](https://github.com/facebookresearch/sam2)
-#   - [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)
+# - **Label a small test set first**: a few fully annotated images turn every later decision into a
+#   measurement, as the hidden ground truth did here.
+# - **Let the model choose the next stroke**: draw where the approaches disagree (section 9), retrain, repeat.
+# - **A light decoder instead of a linear head**: a small upsampling decoder on the same frozen features
+#   comes before any fine-tuning.
+# - **The 🔴 parts you skipped**: PU loss (5), Grad-CAM peaks as clicks (6), SAM 3 from a word (7), extra
+#   strokes (9).
+# - **Sources**: [DINOv3](https://github.com/facebookresearch/dinov3) ·
+#   [SAM 2](https://github.com/facebookresearch/sam2) ·
+#   [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)
 
 # %% [markdown]
 # <!-- callout: across | Across approaches, one last time -->

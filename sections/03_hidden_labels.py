@@ -18,20 +18,16 @@
 
 # %% [markdown]
 # <!-- callout: theory | Theory: incomplete supervision -->
-# The rest of the notebook trains on cheap labels made from the full ground truth, which we keep hidden for
-# evaluation. Two kinds, both leaving pixels nobody looked at:
+# The cheap labels of the rest of the notebook are of two kinds, both leaving pixels nobody looked at:
+# **missing labels** (this section and section 5) and **scribbles** (section 4).
 #
-# - **Missing labels** (this section and section 5): a share of the vessels is fully labelled, the rest is
-#   silently left out. Example: the annotator above.
-# - **Scribbles** (section 4): a few strokes on some vessels and some background, everything else unlabelled.
-#
-# The question of this block is what a model should believe about those pixels. The obvious answer, and the
-# one you get by passing the label file straight into a loss, is "background".
+# What should a model believe about those pixels? The obvious answer, and what a plain loss does, is
+# "background".
 
 # %% [markdown]
 # This helper cell defines how we hide labels, the same way `scripts/prepare_data.py` built the cached files:
-# cut the ground-truth skeleton into segments at its junctions (connected objects when the structures are not
-# thin), give every foreground pixel to its nearest segment, then hide a random share of the segments.
+# cut the ground-truth skeleton into segments at its junctions, give every foreground pixel to its nearest
+# segment, then hide a random share of the segments.
 
 # %%
 # @title Missing labels: cut into segments, hide a share { display-mode: "form" }
@@ -78,20 +74,19 @@ def part_recall(preds: list[np.ndarray], items: list[dict], part: str) -> float:
     return float(np.mean([hidden_recall(p, it[part] & region(it)) for p, it in pairs]))
 
 
-def two_colour(image: np.ndarray, good: np.ndarray, bad: np.ndarray) -> np.ndarray:
-    """Overlay `good` in violet ("works") and `bad` in orange ("fails") on one image."""
-    return overlay(overlay(image, good, THEME["works"]), bad, THEME["fails"])
+def two_colour(
+    image: np.ndarray, good: np.ndarray, bad: np.ndarray, bad_colour: str = THEME["fails"]
+) -> np.ndarray:
+    """Overlay `good` in violet ("works") and `bad` in `bad_colour` (default orange, "fails") on one image."""
+    return overlay(overlay(image, good, THEME["works"]), bad, bad_colour)
 
 
 # %% [markdown]
 # ### 3.1 Make a half-finished label file
 #
-# This cell takes the five retina training images of section 2.5 and hides about half of each image's
-# vessel segments (the share comes from the dataset config). It shows one of them in three panels:
-#
-# - the full truth, which we keep for scoring;
-# - the labels training may use;
-# - what the label file now wrongly calls background.
+# This cell hides about half of the vessel segments (the share comes from the dataset config) of the five
+# retina training images of section 2.5 and shows one of them: the full truth we keep for scoring, the labels
+# training may use, and what the label file now wrongly calls background.
 
 # %%
 # @title Hide half of the vessel segments and look at the result { display-mode: "form" }
@@ -143,13 +138,11 @@ show_masks(
 
 # %% [markdown]
 # <!-- callout: theory | Theory: recall and precision -->
-# - **Recall** = found ÷ there. "Of the true vessel pixels, how many did the prediction mark?" Example: 400
-#   hidden vessel pixels, the prediction marks 120 of them: recall 120 ÷ 400 = 30%.
-# - **Precision** = right ÷ marked. "Of the pixels the prediction marked, how many are true vessels?" Example:
-#   it marked 150 pixels and 120 are vessels: precision 120 ÷ 150 = 80%.
-# - IoU mixes the two into one number. Here we want them apart, because the question is specific: of the
-#   vessels we hid (the file calls them background), how many does the trained head still find? That is
-#   recall on the hidden vessels.
+# **Recall** = found ÷ there, **precision** = right ÷ marked; IoU mixes them, and here we want them apart
+# (our question is recall on the hidden vessels).
+#
+# - Recall: 400 hidden vessel pixels, the prediction marks 120 of them: 120 ÷ 400 = 30%.
+# - Precision: it marked 150 pixels and 120 are vessels: 120 ÷ 150 = 80%.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 1 min) -->
@@ -195,8 +188,9 @@ print(f"play example · recall on the hidden vessel: {hidden_recall(_play_pred, 
 # The naive recipe is what you get by passing the label file straight into the textbook loss: every pixel not
 # painted as vessel is a background target, and plain binary cross-entropy counts every pixel equally.
 #
-# Two things change from section 2.5, the labels and the loss weighting; 3.4 separates them. Everything else
-# is the same: the same five images, DINOv3 features, linear head and steps.
+# Two things change from section 2.5, the labels and the loss weighting. The hidden labels cause the gap in
+# the chart below; the plain loss only makes the head believe them more strictly, and 3.4 separates the two.
+# Everything else is the same: the same five images, DINOv3 features, linear head and steps.
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the linear head in one line -->
@@ -211,8 +205,8 @@ print(f"play example · recall on the hidden vessel: {hidden_recall(_play_pred, 
 # - The per-patch map is upsampled to the image, and p > 0.5 means "vessel".
 
 # %% [markdown]
-# This cell runs the section-2 head on one training image and shows each step: the image cut into patches,
-# one probability per patch, the upsampled map, and the final mask. It also works through one patch by hand.
+# This cell runs the section-2 head on one training image and shows each step (patches, one probability per
+# patch, the upsampled map, the final mask), then works through one patch by hand.
 
 # %%
 # @title The linear head step by step on one image { display-mode: "form" }
@@ -257,8 +251,8 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# A playful extreme first, to have a scale. This cell scores a fake model that believes the label file
-# perfectly: its prediction is the file itself. Real heads land somewhere between this and the section-2 head.
+# A playful extreme first, to have a scale: this cell scores a fake model that believes the label file
+# perfectly (its prediction is the file itself), and it comes back as the grey bars in the chart below.
 
 # %%
 # @title Playful test: a model that believes the label file perfectly { display-mode: "form" }
@@ -274,7 +268,7 @@ print(
 )
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # The head was told that about half of the vessels in these five images are background. Write two guesses.
 #
 # - On those hidden vessels, will its recall be near the section-2 head's, about half of it, or close to
@@ -282,9 +276,9 @@ print(
 # - On new images, will it mark more pixels than the section-2 head, or fewer?
 
 # %% [markdown]
-# This cell trains the naive head on the incomplete labels only (the fundus border is ignored, as in 2.5)
-# and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
-# `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint, trained the same way on all fit images.
+# This cell trains the naive head on the incomplete labels only (the fundus border is ignored, as in 2.5) and
+# prints the seconds it took; if it is slow, set `TRAIN_YOURSELF = False` and run it again to load our
+# checkpoint, trained the same way on all fit images.
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed "hidden_bg" head instead of training
@@ -307,9 +301,8 @@ if naive_sec > 60:
     print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
 
 # %% [markdown]
-# This cell scores the naive head and the section-2 head (full masks) on three groups of vessel pixels: the
-# ones we hid in the training images, the ones training saw, and every vessel of the held-out images. It
-# prints recall per group plus IoU, clDice and precision on the held-out images, and plots the recalls.
+# This cell scores the naive head and the section-2 head (full masks) on the vessel pixels we hid, the ones
+# training saw, and every vessel of the held-out images, and plots the recalls next to the believer's.
 
 # %%
 # @title Score both heads on hidden, visible and held-out vessels { display-mode: "form" }
@@ -364,20 +357,26 @@ for name, r in naive_report.items():
 
 x = np.arange(len(GROUPS))
 fig, ax = plt.subplots(figsize=(6.4, 3))
-for shift, name, colour in zip((-0.2, 0.2), HEADS, (THEME["works"], THEME["fails"]), strict=True):
-    ax.bar(x + shift, [naive_report[name][g] for g in GROUPS], 0.4, color=colour, label=name)
+# the believer (its prediction is the file) only exists on the training images: no bar for the held-out group
+believer_bars = {0: b_rec_hidden, 1: b_rec_visible}
+ax.bar(
+    [x[i] - 0.27 for i in believer_bars], list(believer_bars.values()), 0.26, color=THEME["background"],
+    label="believer: the file itself",
+)
+for shift, name, colour in zip((0.0, 0.27), HEADS, (THEME["works"], THEME["fails"]), strict=True):
+    ax.bar(x + shift, [naive_report[name][g] for g in GROUPS], 0.26, color=colour, label=name)
 ax.set_xticks(x, list(GROUPS.values()), fontsize=8)
 ax.set_ylabel("recall (share of vessel pixels found)")
-ax.set_ylim(0, 1)
+ax.set_ylim(0, 1.3)
+ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
 ax.set_title("Which vessels does each head still find?")
-ax.legend(fontsize=8, frameon=False, loc="upper right")
+ax.legend(fontsize=8, frameon=False, loc="upper right", ncol=1)
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# Recall on real images, from the worst to the best training image. This cell shows the naive head's worst,
-# typical (median) and best image by recall on the hidden vessels: violet is a hidden vessel pixel it still
-# found, orange one it missed.
+# This cell shows the naive head's worst, typical (median) and best training image by recall on the hidden
+# vessels: violet is a hidden vessel pixel it still found, green one it missed.
 
 # %%
 # @title Worst, typical and best training image by hidden recall { display-mode: "form" }
@@ -390,18 +389,17 @@ for label, k in (("worst", rank[0]), ("typical (median)", rank[len(rank) // 2]),
     panels.append(
         (
             f"{label} · found {int(found.sum())} of {int(it['hidden'].sum())} hidden px = {per_image[k]:.0%}",
-            two_colour(it["image"], found, missed),
+            two_colour(it["image"], found, missed, THEME["truth"]),
         )
     )
 show_masks(panels, width=3.4)
 
 # %% [markdown]
 # <!-- callout: question | Question -->
-# Run the next cell: it shows where the naive head looks for vessels, first on a training image, then on the
-# held-out demo image of section 2.
-
-# %% [markdown]
-# **Q11.** 🟡 On the training image, which hidden vessels did the naive head miss (orange), and which did it
+# Run the next cell: it draws the naive head's failures on a training image, then on the held-out demo image
+# of section 2, from predictions you already have (no new training, no model calls).
+#
+# **Q11.** 🟡 On the training image, which hidden vessels did the naive head miss (green), and which did it
 # still find (violet)? Use the "found X%" in the title. On the held-out image, compare it with the section-2
 # head: does it fail the same way (too wide, the disc, the whole eye) or differently? Try another training
 # image:
@@ -409,8 +407,6 @@ show_masks(panels, width=3.4)
 # ```python
 # FAIL_IMAGE = 0   # try 1, 2, ...
 # ```
-#
-# This cell draws the failure figure from the predictions you already have: no new training, no model calls.
 
 # %%
 # Q11 — where the naive head fails: a training image, then the held-out demo image
@@ -425,7 +421,7 @@ show_masks(
         ("naive head", overlay(it["image"], pred, THEME["fails"])),
         (
             f"hidden vessels · found {hidden_recall(pred, it['hidden']):.0%}",
-            two_colour(it["image"], found, missed),
+            two_colour(it["image"], found, missed, THEME["truth"]),
         ),
     ],
     width=3.0,
@@ -442,6 +438,55 @@ show_masks(
     + [("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"]))],
     width=3.0,
 )
+
+# %% [markdown]
+# This cell shows two look-alike patches from a training image, one the annotator painted (target 1) and one
+# they never reached (target 0), which is all the head sees of the problem.
+
+# %%
+# @title Picture: two look-alike patches, two targets { display-mode: "form" }
+pic_side = int(2 * 16 * max(miss_train[0]["mask"].shape) / SPECIALISED["feat_side"])  # 2 × 2 patches, in px
+pic_half = pic_side // 2
+pic_pair = None
+for pic_item in miss_train:
+    pic_gray = pic_item["image"].astype(float).mean(axis=2)
+    pic_h, pic_w = pic_gray.shape
+    cands = []
+    for pic_part in ("hidden", "visible"):
+        pys, pxs = np.nonzero(skeleton(pic_item[pic_part]))
+        inside = (pys >= pic_half) & (pys < pic_h - pic_half) & (pxs >= pic_half) & (pxs < pic_w - pic_half)
+        cands.append(np.stack([pys[inside], pxs[inside]], 1))
+    if len(cands[0]) and len(cands[1]):
+        pic_pair = (pic_item, cands)
+        break
+if pic_pair is None:
+    print("no hidden and visible vessel segment far enough from the border to draw the picture")
+else:
+    pic_item, (pic_hid, pic_vis) = pic_pair
+    pic_gray = pic_item["image"].astype(float).mean(axis=2)
+
+    def pic_crop(arr: np.ndarray, centre: np.ndarray) -> np.ndarray:
+        return arr[centre[0] - pic_half : centre[0] + pic_half, centre[1] - pic_half : centre[1] + pic_half]
+
+    hid_centre = pic_hid[len(pic_hid) // 2]
+    vis_pool = pic_vis[:: max(1, len(pic_vis) // 300)]
+    gaps = [float(np.abs(pic_crop(pic_gray, c) - pic_crop(pic_gray, hid_centre)).mean()) for c in vis_pool]
+    vis_centre = vis_pool[int(np.argmin(gaps))]  # the visible patch that looks most like the hidden one
+    fig, axes = plt.subplots(1, 2, figsize=(4.4, 2.4))
+    for ax, centre, title, colour in (
+        (axes[0], vis_centre, "target 1: painted", THEME["scribble"]),
+        (axes[1], hid_centre, "target 0: never reached", THEME["background"]),
+    ):
+        ax.imshow(pic_crop(pic_item["image"], centre))
+        ax.set_title(title, fontsize=9, color=colour)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_edgecolor(colour)
+            spine.set_linewidth(3)
+    fig.suptitle("same features, two targets: the head can only say p ≈ 0.5", fontsize=9)
+    plt.tight_layout()
+    plt.show()
 
 # %% [markdown]
 # <!-- callout: theory | Theory: why missing = background fails, step by step -->
@@ -470,7 +515,7 @@ show_masks(
 # </details>
 
 # %% [markdown]
-# <!-- callout: pitfall | Pitfall: a precise model looks trustworthy -->
+# <!-- callout: go-deeper | Pitfall: a precise model looks trustworthy -->
 # Every vessel the naive head marks is a real vessel, so a quick look at a few predictions, or a precision
 # score, says "works". The failure is in what is *not* marked, and you can only measure that against labels
 # that are complete.
@@ -480,8 +525,8 @@ show_masks(
 # %% [markdown]
 # ### 3.4 🔴 Optional: is it the labels, or the loss?
 #
-# Plain cross-entropy is one of the two changes from section 2.5. The heads of sections 1 and 2 used a
-# *balanced* loss, which gives the vessel pixels as much total weight as the background pixels.
+# Plain cross-entropy is one of the two changes from section 2.5: the heads of sections 1 and 2 used the
+# balanced loss.
 
 # %% [markdown]
 # **Q12.** 🔴 Train the same naive labels with the balanced loss of section 2.5 and compare its recall on the
@@ -491,8 +536,8 @@ show_masks(
 # head, sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=True)
 # ```
 #
-# This cell trains that balanced variant on the same incomplete labels (seconds) and prints its recall on the
-# three groups next to the plain head's.
+# This cell trains that balanced variant on the same incomplete labels (seconds) and prints its recall next
+# to the plain head's.
 
 # %%
 # Q12 — the same "missing = background" labels with the balanced loss of section 2.5
@@ -508,8 +553,7 @@ print(f"{'plain':<12}{naive['recall_hidden_fit']:>15.3f}{naive['recall_visible_f
 print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 
 # %% [markdown]
-# <details><summary>What to look for</summary>
-#
+# <!-- callout: go-deeper | Q12: what to look for -->
 # - Reweighting usually recovers a lot of the hidden vessels. It does not fix the labels, it fixes the
 #   *proportion*: missing = background told the head that vessels are about half as common as they are, and
 #   the balanced loss stops caring about proportions.
@@ -518,21 +562,18 @@ print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 # - If annotators systematically skip the thin capillaries, the head learns "thin = background", and no class
 #   weight undoes that.
 # - Section 5 fixes the cause instead: tell the loss which pixels are unknown.
-#
-# </details>
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway -->
 # - **A label file with only vessel and background** → ask how it was made: an unpainted pixel may mean
 #   "unknown", not "background".
-# - **A head trained with "missing = background"** → expect a stingy model: precision stays high, recall on
-#   what was left out collapses.
-# - **A good precision or IoU alone** → also measure recall on a small, fully labelled set.
+# - **A head trained with "missing = background"** → expect a stingy model (precision stays high, recall on
+#   what was left out collapses), so also measure recall on a small, fully labelled set.
 # - **A balanced loss that wins the recall back** → do not trust it for systematic gaps: it works when the
 #   gaps are random, not when thin vessels are skipped.
 # - **Three failures so far** (SAM finds the eye, the head is limited by its 16 px patches, naive training
-#   believes the file) → none is fixed by a bigger model. Keep this section's recall on the hidden vessels as
-#   the baseline every approach after the break has to beat.
+#   believes the file) → none of these is a model-size problem we have tested; each needs different
+#   supervision. This section's recall on the hidden vessels is the baseline to beat; Q13 asks how.
 
 # %% [markdown]
 # ### ☕ Before the break
@@ -540,8 +581,7 @@ print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 # %% [markdown]
 # <!-- callout: question | Question for the coffee break -->
 # No code, just think about it over coffee.
-
-# %% [markdown]
+#
 # **Q13.** 🟡 You have 50 fundus images and a 4-hour annotation budget. Perfect labels cost 3 to 5 hours per
 # image, and the cheap ones lie: the label file says "background" wherever nobody looked. Without buying more
 # labels, what could you tell the training about a pixel nobody labelled? Think of at least two options before

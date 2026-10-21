@@ -31,34 +31,19 @@
 # Load the cached models and data; see the question and outcomes.
 
 # %% [markdown]
-# **What you need**
+# **You need** basic ML (training, validation, evaluation) and some Python, no computer-vision background, and
+# this notebook in Colab with **Runtime → Change runtime type → T4 GPU**. Every step also runs on a CPU, just
+# slower, and each training cell offers a precomputed checkpoint.
 #
-# - Basic ML: training, validation, objectives, evaluation. Some Python.
-# - This notebook open in Google Colab with **Runtime → Change runtime type → T4 GPU**.
-# - No computer-vision background. Every step also runs on a CPU, just slower, and each training cell offers a
-#   precomputed checkpoint.
-
-# %% [markdown]
-# **The plan**
-#
-# - **Block 1 (sections 1–3):** a foundation model segments pets almost perfectly, then meets a specialised
-#   task and falls short.
-# - **Block 2 (sections 4–10):** the ways out, from scribbles to prompting the model directly, all compared
-#   on the same hidden ground truth, then on your own images.
-
-# %% [markdown]
-# <!-- callout: go-deeper | Recipe and sources -->
-# - Feature extractor: **DINOv3** ViT-S/16 (Meta, 2025, via `timm`).
-# - Promptable segmenter: **SAM 2.1** hiera-small (Meta).
-# - Scribble idea: train a tiny classifier on frozen DINO patch features, using only the pixels a person
-#   marked (follows the MIT "DINOv2 + scribbles" recipe).
+# **The plan.** Block 1 (sections 1–3): a foundation model segments pets almost perfectly, then meets a
+# specialised task and falls short. Block 2 (sections 4–10): the ways out, from scribbles to prompting the
+# model directly, all compared on the same hidden ground truth, then on your own images.
 
 # %% [markdown]
 # ## 0. Setup & the question
 #
-# The next cell detects where you are (Colab or not, GPU or not), fixes the random seed, creates the
-# `RESULTS` dictionary every section writes into, and defines `use()`, which lets you write your own code
-# without ever blocking the notebook. Run it once.
+# This cell detects Colab and the GPU, fixes the seed, creates the `RESULTS` dictionary every section writes
+# into, and defines `use()`, so your own code never blocks the notebook. Run it once.
 
 # %%
 # @title Setup (run me first) { display-mode: "form" }
@@ -242,9 +227,8 @@ print(f"cache: {CACHE_DIR} · specialised task: {SPECIALISED['name']} ({SPECIALI
 # %% [markdown]
 # ### The theme
 #
-# This cell sets the colours used in every figure: cool violet means "it works", warm orange means "it
-# fails, we adapt", green is the hidden ground truth and teal marks scribbles. A colour means the same
-# thing in every plot, so you can read a figure without its legend.
+# This cell sets the colours used in every figure: violet means "it works", orange "it fails, we adapt",
+# green is the hidden ground truth and teal marks scribbles, the same in every plot.
 
 # %%
 # @title Theme and image helpers { display-mode: "form" }
@@ -317,9 +301,8 @@ def load_index(dataset: dict) -> dict:
 # %% [markdown]
 # ### The data
 #
-# This cell reads the two datasets from the cache, the simple task (pets) and the specialised one, and
-# shows two images of each with the ground truth in green. The title gives the share of pixels the target
-# covers. The ground truth is for evaluation only: from section 3 on, training sees only incomplete labels.
+# This cell reads the two datasets (pets, and the specialised task) and shows two images of each with the
+# ground truth in green and its share of the pixels in the title; the ground truth is for evaluation only.
 
 # %%
 # @title Load both datasets and show two examples of each { display-mode: "form" }
@@ -348,26 +331,22 @@ plt.show()
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # Look at the images above. Which task do you expect the foundation model to solve out of the box, and which
-# one will give it trouble? Write one reason, then keep it: section 2 will tell you whether you were right.
+# one will give it trouble? Write one reason; section 2 will tell you whether you were right.
 #
 # **Q1.** 🟢 What is different about the specialised task that could matter for a model trained on everyday
-# photos? Look at the size, shape and contrast of the objects, not the domain name. Answer in your head or in
-# a note.
+# photos? Look at the size, shape and contrast of the objects, not the domain name.
 #
 # <details><summary>One possible answer</summary>
 #
-# Pets are big, compact shapes with clear edges; the specialised targets are thin, faint and cover a small
-# share of the image.
+# Pets are big and clear; the specialised targets are thin, faint and small.
 #
 # </details>
 
 # %% [markdown]
 # ### The models
 #
-# This cell defines two small wrappers around the foundation models:
-#
-# - `dino.features(image, long_side)` gives patch features.
-# - `sam.probability(image, points, labels)` gives a foreground map from point prompts.
+# This cell defines two wrappers: `dino.features(image, long_side)` gives a grid of image features and
+# `sam.probability(image, points, labels)` gives a foreground map from point prompts.
 
 # %%
 # @title Model loaders { display-mode: "form" }
@@ -457,8 +436,8 @@ class Sam:
 
 # %% [markdown]
 # <!-- callout: pitfall | Pitfall: the first slow step -->
-# The first time a model sees a new image size, PyTorch compiles kernels for it. The first call of the next
-# section is slower than the ones after; on a CPU the first SAM call on a 1024 px image takes ~20 s.
+# Loading and the first call of a model are the slow steps: PyTorch compiles kernels the first time a model
+# sees a new image size. On a T4 this takes seconds; on a CPU it is much slower. Later calls are faster.
 
 # %% [markdown]
 # This cell loads DINOv3 and SAM from the cache and prints one line each: name · source · licence · load time.
@@ -471,7 +450,23 @@ RESULTS["models"] = {"dino": DINO_SOURCE, "sam": SAM_ID, "device": DEVICE}
 
 # %% [markdown]
 # <!-- callout: note | If something goes wrong -->
-# - "Google Drive is not mounted" → run the setup cell again and click Allow; if the folder is still missing,
-#   run `setup_check.ipynb` first.
+# - "Google Drive is not mounted" or "... is missing" → run the setup cell again and click Allow; if the
+#   folder is still missing, run `setup_check.ipynb` first.
 # - "No GPU in this session" → Runtime → Change runtime type → T4 GPU, then run the setup cell again.
+# - A cell is slow on a CPU → normal; training cells have `TRAIN_YOURSELF = False` to load our checkpoint.
 # - A cell with a `...` stub → fill it or skip it; `use()` picks yours or ours and the notebook goes on.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Recipe and sources -->
+# - Feature extractor: **DINOv3** ViT-S/16 (Meta, 2025, via `timm`).
+# - Promptable segmenter: **SAM 2.1** hiera-small (Meta).
+# - Scribble idea: train a tiny classifier on frozen DINO patch features, using only the pixels a person
+#   marked.
+
+# %% [markdown]
+# <!-- callout: takeaway | Takeaway -->
+# - When a cell needs data → `PETS` and `SPECIALISED` are loaded from the cache, with ground truth for
+#   evaluation only.
+# - When a cell needs a model → `dino` and `sam` are already loaded, nothing is downloaded.
+# - When you skip or fail a `...` stub → `use()` continues with our version, nothing breaks.
+# - When you read a figure → violet works, orange falls short, green is ground truth, teal is a scribble.

@@ -9,8 +9,9 @@
 # Same three tools, same cells, new task. Section 1 gave you three numbers on pets: SAM with one click,
 # SAM with one box, and a linear head on five full masks.
 #
-# Here they meet retina images, where the objects are thin, branching and low-contrast. Then we push SAM
-# with more and more prompts, and give DINOv3 twice the resolution, to see which of the two limits the result.
+# Here they meet retina images (a *fundus* is a photo of the back of the eye), where the objects are thin,
+# branching and low-contrast. Then we push SAM with more and more prompts, and give DINOv3 twice the
+# resolution, to see whether the limit is the prompt or the patch size.
 
 # %% [markdown]
 # This helper cell defines what this section measures with: the evaluation region (the fundus, not the
@@ -70,8 +71,9 @@ def show_clicks(panels: list[tuple[str, np.ndarray, list | None]], width: float 
 
 
 # %% [markdown]
-# This cell loads the held-out retina images, the evaluation set for the rest of the notebook, and prints
-# how much of the fundus the vessels cover. Keep that number: it comes back as a baseline.
+# This cell loads the held-out retina images (1024 px crops of a 3504 × 2336 fundus), the evaluation set for
+# the rest of the notebook, and prints how much of the fundus the vessels cover; keep that number, it comes
+# back as a baseline.
 
 # %%
 # @title Load the held-out retina images { display-mode: "form" }
@@ -85,8 +87,8 @@ print(
 )
 
 # %% [markdown]
-# Before any theory, look at the images. This cell shows one retina photo, its vessels, and a zoom with the
-# 16 px grid DINOv3 sees. It also measures how wide a vessel is next to one patch.
+# Before any theory, look at the images: this cell shows one retina photo, its vessels, and a zoom with the
+# 16 px grid DINOv3 sees, and measures how wide a vessel is next to one patch.
 
 # %%
 # @title Meet the retina images: vessels next to the DINOv3 patch grid { display-mode: "form" }
@@ -135,28 +137,21 @@ print(
 # ### 2.1 SAM: one click, one box, again
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
-# The next cell is the section-1 cell on a retina image: one click on a vessel (a pixel of a person's
-# scribble), then a box around all of them.
+# <!-- callout: question | 🤔 Your prediction -->
+# Before you run the next cell (the section-1 cell on a retina image: one click on a vessel, then a box
+# around all of them), guess: what will SAM segment from one click on a thin line? And what is "the object"
+# inside a box that covers the whole fundus?
 #
-# Before you run it: what will SAM segment from one click on a thin line? And what is "the object" inside a
-# box that covers the whole fundus?
-
-# %% [markdown]
-# <!-- callout: question | Question -->
-# Run the next cell and compare the panels with the pets in section 1.
-
-# %% [markdown]
+# Then run it and compare the panels with the pets in section 1.
+#
 # **Q5.** 🟡 What did SAM segment from the click, and from the box: a vessel, part of the tree, a blob, the
 # whole fundus? Use the printed shares: the true vessels cover a small share of the fundus, so a mask that
-# marks far more is not tracing vessels. Try two other images by changing the index (a CPU session has 12).
+# marks far more is not tracing vessels. Try two other images by changing the index (on a CPU session there
+# are 12 held-out images).
 #
 # ```python
 # demo = SPEC_EVAL[0]   # try 1, 2, ...
 # ```
-#
-# This cell runs SAM with the click and with the box on one held-out image and shows both masks in orange
-# next to the ground truth.
 
 # %%
 # Q5 — SAM with one click and with one box on a held-out specialised image
@@ -188,13 +183,17 @@ show_masks(
 # - Draw every vessel twice as wide as it is: nothing is missed, yet IoU drops to about 0.5.
 # - Miss all the capillaries: they hold few pixels, so IoU barely moves.
 #
-# **clDice** (Shit et al., CVPR 2021) compares *centre lines* instead. In one line: the share of the
-# prediction's centre line that lies inside the true vessels, combined with the share of the true centre line
-# that lies inside the prediction, by their harmonic mean.
+# **clDice** compares *centre lines* instead: `tprec` (how much of what you drew is real vessel) and `tsens`
+# (how much of the real vessel you drew), combined by harmonic mean.
 #
 # 1. `tprec` = prediction centre line inside the truth ÷ prediction centre line (invented branches lower it).
 # 2. `tsens` = true centre line inside the prediction ÷ true centre line (missed branches lower it).
 # 3. clDice = 2 · tprec · tsens ÷ (tprec + tsens). Example: tprec 1.0 and tsens 0.25 give 0.40.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Where clDice comes from -->
+# clDice is from Shit et al., "clDice: a novel topology-preserving loss function for tubular structure
+# segmentation", CVPR 2021.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 3 min) -->
@@ -246,9 +245,9 @@ print(
 )
 
 # %% [markdown]
-# Now the same two numbers on a real retina image, with four fake predictions. A fake model that paints only
-# the thick trunk is the playful one: it hides every branch, and we can watch what IoU and clDice say.
-# Violet marks the true centre line the prediction covers, orange the part it misses, grey is the prediction.
+# Now the same two numbers on a real retina image, with three fake predictions next to the truth, the playful
+# one being a model that paints only the thick trunk: violet marks the true centre line the prediction covers,
+# green the part it misses, grey is the prediction.
 
 # %%
 # @title Playful test: what if the model paints only the thick trunk? { display-mode: "form" }
@@ -269,10 +268,10 @@ fat = max(1, max(sim_truth.shape) // 400)  # draw the 1 px centre line a few px 
 
 
 def trace_panel(pred: np.ndarray) -> np.ndarray:
-    """The prediction in grey; the true centre line violet where covered, orange where missed."""
+    """The prediction in grey; the true centre line violet where covered, green where missed."""
     img = overlay(sim["image"], pred, THEME["background"])
     img = overlay(img, ndi.binary_dilation(sim_line & pred, iterations=fat), THEME["works"], alpha=1.0)
-    return overlay(img, ndi.binary_dilation(sim_line & ~pred, iterations=fat), THEME["fails"], alpha=1.0)
+    return overlay(img, ndi.binary_dilation(sim_line & ~pred, iterations=fat), THEME["truth"], alpha=1.0)
 
 
 panels = [
@@ -308,8 +307,8 @@ show_masks(panels, width=3.0)
 # 4. **box**: a box around the whole fundus says "everything in here".
 
 # %% [markdown]
-# This cell draws the four prompts on the demo image, spread along the scribbles a person drew. Nothing runs
-# on SAM yet.
+# This cell draws the four prompts on the demo image, spread along the scribbles a person drew, before
+# anything runs on SAM.
 
 # %%
 # @title Preview: the four prompts on one image { display-mode: "form" }
@@ -331,7 +330,7 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # Write down three guesses before you run the ladder.
 #
 # - Will IoU rise steadily from 1 to 20 clicks, jump at some point, or stay flat?
@@ -340,9 +339,9 @@ plt.show()
 #   of the fundus, overlap 12% ÷ union 100% gives IoU 0.12. The share printed above is yours.
 
 # %% [markdown]
-# This cell runs the ladder on every evaluation image (one SAM image encoding, then four cheap prompt
-# decodings). It keeps the mean IoU, clDice and the share of the fundus SAM marks per setting. A result near
-# the "everything" line means the prompt taught SAM nothing about vessels.
+# This cell runs the ladder on every evaluation image (one SAM image encoding, four cheap prompt decodings)
+# and prints mean IoU, clDice and the share of the fundus marked per setting, where a result near the
+# "everything" line means the prompt taught SAM nothing about vessels.
 
 # %%
 # @title Run the SAM prompt ladder on every evaluation image { display-mode: "form" }
@@ -403,8 +402,8 @@ show_clicks(
 )
 
 # %% [markdown]
-# The masks alone look alike. This cell draws a difference map instead: the pixels the 20 clicks added to the
-# 1-click mask, split into real vessel (violet) and not vessel (orange).
+# Secondary visual: this cell draws the pixels the 20 clicks added to the 1-click mask, split into real vessel
+# (violet) and not vessel (orange).
 
 # %%
 # @title Difference map: what did 20 clicks add to 1 click? { display-mode: "form" }
@@ -427,11 +426,10 @@ print(f"the 20 clicks added {int(added.sum())} pixels, of which {int(added_good.
 
 # %% [markdown]
 # **Q6.** 🟡 Compare the ladder with your prediction. Read the table row by row: IoU, clDice, and *marked*
-# (the share of the fundus SAM marked).
+# (the share of the fundus SAM marked). How to read a row: IoU 0.30 with 70% marked, against a grey line at
+# 0.29, is a big mask that is barely better than marking everything.
 #
 # - Which rows beat the grey line by more than 0.05 IoU?
-# - How to read a row: IoU 0.30 with 70% marked, against a grey line at 0.29, is a big mask that is barely
-#   better than marking everything.
 # - Did more clicks bring the masks closer to the vessels, or just make them bigger?
 # - What does that say about what SAM thinks an object is?
 #
@@ -458,11 +456,9 @@ print(f"the 20 clicks added {int(added.sum())} pixels, of which {int(added_good.
 # %% [markdown]
 # ### 2.4 What DINOv3 sees here
 #
-# Same 3-colour view as section 1.3: each patch has 384 numbers, a PCA keeps the 3 directions along which
-# patches differ most and paints them red, green and blue. Patches with a similar colour are described alike.
-#
-# This cell shows it on retina images, so you can see whether the features separate vessels from
-# background before any training.
+# Same 3-colour view as section 1.3 (a PCA of the 384 numbers per patch, painted red, green and blue); this
+# cell shows it on retina images, to see whether the features separate vessels from background before any
+# training.
 
 # %%
 # @title DINOv3 PCA colours on three retina images { display-mode: "form" }
@@ -475,9 +471,9 @@ for it in fig_items:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# **Q7.** 🟡 For each of the three images, name the colour of: the optic disc (bright round patch), the dark
-# border, and the thick vessels. Which of the three stands out most from its surroundings? Compare with the
-# pets, where one direction separated animal from floor.
+# **Q7.** 🟡 Do the thick vessels share a colour at all, across the three images? Which of the optic disc
+# (bright round patch), the dark border and the vessels stands out most from its surroundings? Compare with
+# the pets, where one direction separated animal from floor.
 #
 # <details><summary>What to look for</summary>
 #
@@ -493,11 +489,12 @@ show_masks(panels, width=2.6)
 # ### 2.5 The linear head, and the resolution it looks at
 #
 # The head from section 1.4, trained the same way on the full masks of five retina images (the last time
-# training sees a full mask). We train it twice, on DINOv3 features at two resolutions:
+# training sees a full mask: a perfect vessel map costs an expert 3 to 5 hours per fundus). We train it
+# twice, on DINOv3 features at two resolutions:
 #
 # - **512 px long side**: each 16 px patch covers 32 × 32 pixels of the 1024 px crop.
-# - **1024 px long side**: each patch covers 16 × 16 pixels. Four times the patches, roughly four to sixteen
-#   times the compute.
+# - **1024 px long side**: each patch covers 16 × 16 pixels. Four times the patches, about 16 times the
+#   attention cost (see the go-deeper below the chart).
 
 # %% [markdown]
 # <!-- callout: go-deeper | Why 512 and not 518? -->
@@ -505,16 +502,16 @@ show_masks(panels, width=2.6)
 # same idea.
 
 # %% [markdown]
-# <!-- callout: your-turn | Your prediction -->
+# <!-- callout: question | 🤔 Your prediction -->
 # With *perfect* labels, write two guesses.
 #
 # - Will the head beat SAM's one-box IoU from the 2.3 table?
 # - Will doubling the resolution add more than 0.05 to IoU, to clDice, to both or to neither?
 
 # %% [markdown]
-# This cell trains one head per resolution on the five fit images and prints the seconds it took. Not done
-# in a minute, or on a CPU and in a hurry? Set `TRAIN_YOURSELF = False` and run it again: it loads our
-# checkpoints (trained the same way on all fit images).
+# This cell trains one head per resolution on the five fit images and prints the seconds it took; if it is
+# slow, set `TRAIN_YOURSELF = False` and run it again to load our checkpoints (trained the same way on all
+# fit images).
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed "full" heads instead of training
@@ -541,8 +538,8 @@ if sum(sec for _, sec in spec_heads.values()) > 60:
     print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoints next time.")
 
 # %% [markdown]
-# This cell scores both heads on the evaluation images with IoU and clDice, and zooms into the centre of the
-# demo image so you can compare the two resolutions on the thinnest vessels.
+# This cell scores both heads on the evaluation images with IoU and clDice and zooms into the centre of the
+# demo image to compare the two resolutions on the thinnest vessels.
 
 # %%
 # @title Score both heads and zoom into the thinnest vessels { display-mode: "form" }
@@ -584,30 +581,63 @@ show_masks(
 )
 
 # %% [markdown]
+# This cell puts the section-1 numbers next to this section's, the same three tools on both tasks, so the gap
+# is one picture.
+
+# %%
+# @title Pets vs the specialised task, side by side { display-mode: "form" }
+rows = {
+    "SAM, one click": (RESULTS["pets_zero_shot_point_iou"], RESULTS["specialised_zero_shot_point_iou"]),
+    "SAM, one box": (RESULTS["pets_zero_shot_box_iou"], RESULTS["specialised_zero_shot_box_iou"]),
+    "linear head": (RESULTS["pets_head_iou"], RESULTS["specialised_head_iou"]),
+}
+print(f"{'tool':<16}{'pets IoU':>10}{'specialised IoU':>17}")
+for name, (p, s) in rows.items():
+    print(f"{name:<16}{p:>10.3f}{s:>17.3f}")
+print(f"{'everything':<16}{'':>10}{RESULTS['specialised_everything_iou']:>17.3f}")
+
+x = np.arange(len(rows))
+fig, ax = plt.subplots(figsize=(6.4, 3))
+ax.bar(x - 0.2, [v[0] for v in rows.values()], 0.4, color=THEME["works"], label=PETS["name"])
+ax.bar(x + 0.2, [v[1] for v in rows.values()], 0.4, color=THEME["fails"], label=SPECIALISED["name"])
+ax.axhline(RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--",
+           label='specialised, "everything is foreground"')
+ax.set_xticks(x, list(rows))
+ax.set_ylabel("mean IoU on held-out images")
+ax.set_ylim(0, 1)
+ax.set_title("Same tools, two tasks")
+ax.legend(fontsize=8, frameon=False)
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
 # <!-- callout: pitfall | Pitfall: resolution is not free -->
+# Four times the patches costs about 16 times the attention, so when the structure is thinner than a patch,
+# check the resolution before anything else.
+
+# %% [markdown]
+# <!-- callout: go-deeper | The attention arithmetic -->
 # Self-attention compares every patch with every other, so the cost grows with the *square* of the patches.
 #
 # 1. 512 px side: 32 × 32 = 1 024 patches, about 1 million patch pairs.
-# 2. 1024 px side: 64 × 64 = 4 096 patches, about 17 million pairs: 4× the patches, 16× the cost.
-# 3. The whole 3504 px fundus: about 48 000 patches, about 2.3 billion pairs. That is why we work on crops and
-#    precompute the features.
-#
-# When the structure is thinner than a patch, check the resolution before anything else.
+# 2. 1024 px side: 64 × 64 = 4 096 patches, about 17 million pairs: 4× the patches, about 16× the attention
+#    cost.
+# 3. The whole 3504 × 2336 fundus at 16 px: about 219 × 146 = 32 000 patches, about 1 billion pairs. That is
+#    why we work on crops and precompute the features.
 
 # %% [markdown]
 # ### 2.6 The failure gallery
 #
 # Numbers average the failures away; the gallery shows them. The next cell sorts the evaluation images from
 # worst to best (by the head's IoU at the higher resolution) and shows three at a time: the image, SAM with a
-# box, the head, and the ground truth.
-#
-# The last row puts the same models on the whole fundus, shrunk to 1024 px: vessels are only 1–3 px wide.
+# box, the head, and the ground truth, with a last row on the whole fundus shrunk to 1024 px (vessels only
+# 1–3 px wide).
 
 # %% [markdown]
 # <!-- callout: question | Question -->
-# Run the next cell, then page through the gallery.
-
-# %% [markdown]
+# Run the next cell: it draws the failure gallery from the predictions you already have (new model calls only
+# for the last row), with each image's IoU and clDice in the titles.
+#
 # **Q8.** 🟡 Read the IoU and clDice in each title. For the worst image, is the failure the same kind for SAM
 # and for the head? Pick from: missed thin vessels, vessels drawn too wide, the optic disc or the border
 # marked as vessel, whole regions marked. Page with the start index:
@@ -615,9 +645,6 @@ show_masks(
 # ```python
 # GALLERY_START = 0   # 0 = the three worst; try 3, 6, ...
 # ```
-#
-# This cell draws the failure gallery from the predictions you already have (new model calls only for the
-# last row) and prints each image's IoU and clDice in the titles.
 
 # %%
 # Q8 — the failure gallery, worst images first
@@ -670,8 +697,8 @@ show_masks(
 RESULTS["specialised_full_view"] = full_s
 
 # %% [markdown]
-# For contrast, this cell shows the typical (median) and the best image of the same ranking, so you can see
-# what an IoU of, say, 0.3 versus 0.7 looks like next to the worst ones.
+# Secondary visual: this cell shows the typical (median) and the best image of the same ranking, to see what
+# an IoU of, say, 0.3 versus 0.7 looks like next to the worst ones.
 
 # %%
 # @title For contrast: the typical and the best image of the ranking { display-mode: "form" }
@@ -695,7 +722,8 @@ for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 5 min: whose image fails worst? -->
-# Each of you picks a different `GALLERY_START` or `demo` index and finds the worst mask you can.
+# Each of you picks a different `GALLERY_START` (change that value only, not `demo`) and finds the worst
+# mask you can.
 #
 # - Show it to your neighbour and name the failure in three words ("misses thin vessels", "marks the disc",
 #   "the whole eye").
@@ -711,39 +739,11 @@ for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1
 #
 # </details>
 #
-# ### 2.7 Pets vs the specialised task
-#
-# This cell puts the section-1 numbers next to this section's, the same three tools on both tasks, so the gap
-# is one picture.
-
-# %%
-# @title Pets vs the specialised task, side by side { display-mode: "form" }
-rows = {
-    "SAM, one click": (RESULTS["pets_zero_shot_point_iou"], RESULTS["specialised_zero_shot_point_iou"]),
-    "SAM, one box": (RESULTS["pets_zero_shot_box_iou"], RESULTS["specialised_zero_shot_box_iou"]),
-    "linear head": (RESULTS["pets_head_iou"], RESULTS["specialised_head_iou"]),
-}
-print(f"{'tool':<16}{'pets IoU':>10}{'specialised IoU':>17}")
-for name, (p, s) in rows.items():
-    print(f"{name:<16}{p:>10.3f}{s:>17.3f}")
-print(f"{'everything':<16}{'':>10}{RESULTS['specialised_everything_iou']:>17.3f}")
-
-x = np.arange(len(rows))
-fig, ax = plt.subplots(figsize=(6.4, 3))
-ax.bar(x - 0.2, [v[0] for v in rows.values()], 0.4, color=THEME["works"], label=PETS["name"])
-ax.bar(x + 0.2, [v[1] for v in rows.values()], 0.4, color=THEME["fails"], label=SPECIALISED["name"])
-ax.axhline(RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--",
-           label='specialised, "everything is foreground"')
-ax.set_xticks(x, list(rows))
-ax.set_ylabel("mean IoU on held-out images")
-ax.set_ylim(0, 1)
-ax.set_title("Same tools, two tasks")
-ax.legend(fontsize=8, frameon=False)
-plt.tight_layout()
-plt.show()
+# ### 2.7 A checklist for a new problem
 
 # %% [markdown]
-# **Q9.** 🟡 You now have a checklist for a new problem. A colleague segments cracks in concrete and reports:
+# **Q9.** 🟡 Use what is on screen as a checklist: the "everything is foreground" line in the ladder, the
+# 512 versus 1024 px chart, and IoU next to clDice. A colleague segments cracks in concrete and reports:
 #
 # - SAM with one box: IoU 0.31.
 # - "Everything is foreground": IoU 0.28.
@@ -764,18 +764,21 @@ plt.show()
 # </details>
 
 # %% [markdown]
-# <!-- callout: your-turn | Try it on your image (optional, 2 min) -->
-# Got a photo of something thin or specialised (a leaf's veins, a crack, a cable, a micrograph)?
+# Optional: got a photo of something thin or specialised? The collapsed cell below runs SAM on it, and
+# section 9 does this properly.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Try it on your image (optional, 2 min) -->
+# The collapsed cell below runs SAM on your image (or the demo image) with your clicks, the quickest way to
+# see whether your own problem looks more like the pets or like this section. A leaf's veins, a crack, a
+# cable or a micrograph all work.
 #
-# - Upload it with the folder icon on the left and put its path in `MY_IMAGE`.
+# - Open the cell, upload your image with the folder icon on the left and put its path in `MY_IMAGE`.
 # - Put one or more `(x, y)` clicks on the thing in `MY_CLICKS`, then run the cell.
 # - Left empty, it runs on the demo image. Section 9 does this properly, with scribbles and the whole ladder.
 
-# %% [markdown]
-# This cell runs SAM on your image (or the demo image) with your clicks and shows the mask, the quickest way
-# to see whether your own problem looks more like the pets or like this section.
-
 # %%
+# @title Try SAM on your own image { display-mode: "form" }
 MY_IMAGE = ""  # e.g. "/content/my_photo.jpg"; empty = the demo image
 MY_CLICKS = []  # e.g. [(120, 80), (300, 210)]; empty = the image centre
 if not isinstance(MY_IMAGE, str) or not isinstance(MY_CLICKS, list):
@@ -804,9 +807,7 @@ show_clicks(
 # <!-- callout: takeaway | Takeaway -->
 # - **Objects thinner than a 16 px patch** → raise the resolution first, and check how far the numbers move.
 # - **Score close to the "everything is foreground" line** → the model learnt nothing about the task; always
-#   compare with a baseline that knows nothing.
+#   compare with a baseline that knows nothing, and look at the mask next to the truth.
 # - **More clicks make SAM's mask bigger, not thinner** → stop prompting: a prompt says *where*, not *what
 #   kind of thing*.
 # - **IoU and clDice disagree** → trust the structure metric on thin objects, and look at the masks.
-# - **A crisp, confident mask** → still lay it next to the truth before believing it.
-# - **Perfect masks cost 3–5 hours per fundus** → the next sections use only cheap, incomplete labels.
