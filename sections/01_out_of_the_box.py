@@ -1,25 +1,17 @@
 # %% [markdown]
 # ## 1. Out of the box: pets
-#
-# **Objective:** see a foundation model segment pets almost perfectly, zero-shot.
-#
-# Three tools, no training data of ours: **SAM** segments whatever you point at, **DINOv3** turns an image
-# into a grid of features that already "know" what belongs together, and a **linear head** on those
-# features learns a new class from a handful of masks in seconds. Here they meet the easy task. Keep the
-# numbers you get: section 2 runs exactly the same three cells on the specialised task.
-#
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: two kinds of
-# foundation model.</b> <b>SAM</b> (Segment Anything) is <i>promptable</i>: you give it an image and a
-# hint (a click, a box), and it returns the mask of the object the hint is on. Nothing is trained. It
-# learnt "what an object is" from a billion masks of everyday photos. <b>DINOv3</b> is a <i>feature
-# extractor</i>: it cuts the image into 16 × 16 px patches and returns a 384-number description of each
-# patch, learnt without any labels. Two patches with similar descriptions look alike to the model. On
-# their own the features segment nothing; a tiny classifier on top of them does, and that is the
-# <b>linear head</b> we train below.</font></td></tr></table>
-#
-# This helper cell defines the two pieces this section measures with: how to turn a person's hint into a
-# SAM prompt, and `show_masks()`, the figure used for every comparison in the notebook (prediction in
-# violet, ground truth in green, prompts in teal).
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# See a foundation model segment pets almost perfectly, zero-shot (with no training on this task).
+
+# %% [markdown]
+# Here SAM, DINOv3 and a linear head (explained below the first figure) meet the easy task; keep your
+# numbers, because section 2 runs the same three cells on the specialised task.
+
+# %% [markdown]
+# This helper cell defines how to turn a person's hint into a SAM prompt, and `show_masks()`, the figure used
+# for every comparison in the notebook (prediction in violet, ground truth in green, prompts in teal).
 
 # %%
 # @title Prompts and figure helpers { display-mode: "form" }
@@ -92,10 +84,11 @@ def pca_rgb(feat: torch.Tensor, shape: tuple[int, int]) -> np.ndarray:
 
 
 # %% [markdown]
-# This cell loads the held-out pets, the evaluation set every approach in this notebook is scored on, and
-# fixes the resolution DINOv3 works at. On a CPU, 12 of them keep each cell under a minute.
+# This cell loads the held-out pets, the evaluation set every approach in this notebook is scored on (12 of
+# them on a CPU, to keep cells short), and fixes the resolution DINOv3 works at.
 
 # %%
+# @title Load the held-out pets { display-mode: "form" }
 PETS["feat_side"] = 256 if SMOKE else PETS["index"]["feature_long_side"]
 PETS["eval"] = PETS["held"] if (SMOKE or DEVICE == "cuda") else PETS["held"][:12]
 PETS_EVAL = [load_item(PETS, it) for it in PETS["eval"]]
@@ -104,22 +97,22 @@ print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PE
 # %% [markdown]
 # ### 1.1 SAM: one click, one box
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The next
-# cell gives SAM a single click on a pet, then a box around it. Before you run it: will one click be
-# enough for a clean mask of the whole animal, and what could go wrong (fur vs floor, the tail, a second
-# animal)? Say it to your neighbour or write it down.</font></td></tr></table>
+
+# %% [markdown]
+# <!-- callout: question | 🤔 Your prediction -->
+# The next cell gives SAM a single click on a pet, then a box around it. Before you run it: will one
+# click be enough for a clean mask of the whole animal, and what could go wrong (fur vs floor, the tail,
+# a second animal)? Say it to your neighbour or write it down.
 #
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell and look at the three panels.</font></td></tr></table>
+# Then run the next cell and look at the three panels.
 #
-# **Q2.** 🟡 Where do the one-click mask and the box mask differ from the ground truth, if at all? Is the
-# difference at the object's boundary, or is a whole part missing or added? Try the same cell on another
-# pet by changing the index.
+# **Q2.** 🟡 Compare the one-click mask and the box mask with the ground truth.
 #
-# ```python
-# demo = PETS_EVAL[0]   # try 1, 2, ...
-# ```
-#
+# - Where do they differ, if at all?
+# - Is the difference at the object's boundary, or is a whole part missing or added?
+# - Try another pet: change the index in `demo = PETS_EVAL[0]` (try 1, 2, ...).
+
+# %% [markdown]
 # This cell runs SAM twice on one held-out pet, once with a single click and once with a box, and shows
 # both masks next to the ground truth, so you can see what a promptable model gives for free.
 
@@ -141,26 +134,51 @@ show_masks(
 )
 
 # %% [markdown]
+# <!-- callout: theory | Theory: the three tools -->
+# - **SAM** (Segment Anything) is *promptable*. You give it an image and a hint (a click, a box on a pet);
+#   it returns the mask of the object under the hint. Nothing is trained: it learnt "what an object is" from
+#   a billion masks of everyday photos.
+# - **DINOv3** is a *feature extractor*. It cuts the image into 16 × 16 px patches and returns 384 numbers
+#   per patch, learnt without labels. Patches with similar numbers look alike to the model (two cat ears,
+#   say).
+# - A **linear head** is the tiny classifier that turns those features into a mask: the features segment
+#   nothing on their own, and the head learns a new class from a handful of masks in seconds (section 1.4).
+
+# %% [markdown]
 # ### 1.2 One number: IoU
 #
-# Looking at masks is the honest way to judge a segmentation, and a single number lets us compare
-# approaches on a hundred images. We use one metric for the whole workshop: **IoU** (intersection over
-# union), the overlap between the prediction and the ground truth divided by the area covered by either.
-# 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
+# Looking at masks is the honest way to judge a segmentation; one number lets us compare approaches on a
+# hundred images. The whole workshop uses one metric, **IoU** (intersection over union):
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 2 min).</b>
-# Fill <code>my_iou</code>: two boolean arrays in, one float out. Pixels where both are True are the
-# intersection; pixels where at least one is True are the union. If the union is empty, return 1.0 (two
-# empty masks agree). The cell below checks your version on a 4 × 4 play example and continues with
-# ours if you skip it.</font></td></tr></table>
+# `IoU = |pred ∩ truth| / |pred ∪ truth|`
+#
+# - Example: the predicted mask and the true mask each cover 100 pixels and share 80. The union is 120
+#   pixels, so IoU = 80 / 120 = 0.67.
+# - 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min) -->
+# Fill `my_iou`: two boolean arrays in, one float out.
+#
+# - Intersection: pixels where both are True.
+# - Union: pixels where at least one is True.
+# - Empty union: return 1.0 (two empty masks agree).
+#
+# The cell below checks your version on this 4 × 4 play example (1 = True) and continues with ours if you
+# skip it:
+#
+# ```
+# pred   truth
+# 0000   0110
+# 0111   0110
+# 0111   0110
+# 0000   0000
+# ```
+#
+# Intersection 4, union 8, so the answer is 0.5.
 
 # %%
-# ✍️ YOUR CODE
-def my_iou(pred: np.ndarray, truth: np.ndarray) -> float:
-    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty."""
-    ...
-
-
+# @title Reference solution (open only if stuck) { display-mode: "form" }
 def _ref_iou(pred: np.ndarray, truth: np.ndarray) -> float:
     """Reference: |pred ∧ truth| / |pred ∨ truth|."""
     inter, union = float((pred & truth).sum()), float((pred | truth).sum())
@@ -171,21 +189,31 @@ _play_pred = np.zeros((4, 4), bool)
 _play_pred[1:3, 1:4] = True  # 6 pixels
 _play_truth = np.zeros((4, 4), bool)
 _play_truth[0:3, 1:3] = True  # 6 pixels, 4 shared -> IoU = 4 / 8
+
+# %%
+# ✍️ YOUR CODE
+def my_iou(pred: np.ndarray, truth: np.ndarray) -> float:
+    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty."""
+    ...
+
+
 iou = use(my_iou, reference=_ref_iou, check=lambda f: round(float(f(_play_pred, _play_truth)), 4), name="iou")
 
 # %% [markdown]
 # This cell scores SAM's one-click and one-box masks on every evaluation pet with the IoU you just
-# defined, and keeps the mean as this task's zero-shot number: section 2 compares it with the
-# specialised task.
+# defined and keeps the mean as this task's zero-shot number, for section 2 to compare.
 
 # %%
+# @title Score SAM on every held-out pet { display-mode: "form" }
 t0 = time.monotonic()
-zero_shot = {"point": [], "box": []}
+zero_shot_all = {"point": [], "box": []}
 for it in PETS_EVAL:
     pt = click_point(it)
-    zero_shot["point"].append(iou(sam.probability(it["image"], points=[pt], labels=[1]) >= 0.5, it["mask"]))
-    zero_shot["box"].append(iou(sam.probability(it["image"], box=box_prompt(it)) >= 0.5, it["mask"]))
-zero_shot = {k: float(np.mean(v)) for k, v in zero_shot.items()}
+    by_point = sam.probability(it["image"], points=[pt], labels=[1]) >= 0.5
+    by_box = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
+    zero_shot_all["point"].append(iou(by_point, it["mask"]))
+    zero_shot_all["box"].append(iou(by_box, it["mask"]))
+zero_shot = {k: float(np.mean(v)) for k, v in zero_shot_all.items()}
 RESULTS["pets_zero_shot_iou"] = zero_shot["box"]  # the headline: SAM's best single prompt, one box
 RESULTS["pets_zero_shot_point_iou"] = zero_shot["point"]
 RESULTS["pets_zero_shot_box_iou"] = zero_shot["box"]
@@ -196,13 +224,30 @@ print(
 )
 
 # %% [markdown]
-# ### 1.3 What DINOv3 sees
-#
-# This cell takes the 384-number description DINOv3 gives each 16 × 16 px patch, keeps the three
-# directions that vary most (a PCA) and shows them as red, green and blue, so you can see what the model
-# groups together before any training.
+# A mean hides the spread, so this cell shows the **worst, median and best** held-out pet by one-box IoU:
+# violet where mask and truth agree, orange for a false alarm (extra mask), green for what SAM missed.
 
 # %%
+# @title Worst, median and best pet by IoU { display-mode: "form" }
+order = np.argsort(zero_shot_all["box"])
+panels = []
+for label, pos in (("worst", order[0]), ("median", order[len(order) // 2]), ("best", order[-1])):
+    it = PETS_EVAL[int(pos)]
+    pred = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
+    img = overlay(it["image"], pred & it["mask"], THEME["works"])
+    img = overlay(img, pred & ~it["mask"], THEME["fails"])
+    img = overlay(img, ~pred & it["mask"], THEME["truth"])
+    panels.append((f"{label} · IoU {zero_shot_all['box'][int(pos)]:.2f}", img))
+show_masks(panels)
+
+# %% [markdown]
+# ### 1.3 What DINOv3 sees
+#
+# This cell keeps the **3 main directions (a PCA)** of each patch's 384 numbers and shows them as red, green
+# and blue, so the same colour means the model sees those patches as similar (both cat ears, say).
+
+# %%
+# @title Show the patch features as colours { display-mode: "form" }
 fig_items = [load_item(PETS, it) for it in PETS["fit"][:3]]
 panels = []
 for it in fig_items:
@@ -212,30 +257,43 @@ for it in fig_items:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# **Q3.** 🟡 In the PCA images, which pixels share a colour: the whole animal, parts of it (head, fur,
-# legs), or the floor and the background too? Does the colour follow the object's outline, and how fine is
-# the grid behind it?
+# **Q3.** 🟡 Look at the PCA images above.
+#
+# - Which pixels share a colour: the whole animal, parts of it (head, fur, legs), or the floor too?
+# - Does the colour follow the object's outline?
+# - How fine is the grid behind it?
 #
 # <details><summary>What to look for</summary>
 #
-# The colours are not classes: they are the three directions along which the features vary most across
-# this image, so the same colour means "the model describes these patches alike". Typically the animal
-# separates from the background in one direction and its parts (face vs body) in another, and the blocky
-# edges show the 16 px grid: the features know <i>what</i> is where, at patch resolution, not <i>exactly
-# where</i> the boundary is. Whether that is enough depends on the size of what you want to segment.
+# The colours are not classes: they are the 3 directions along which the features vary most in this image.
+# Typically the animal separates from the background in one direction and its parts (face vs body) in
+# another. The blocky edges show the 16 px grid: the features know <i>what</i> is where, at patch resolution,
+# not <i>exactly where</i> the boundary is. Whether that is enough depends on the size of what you want to
+# segment.
 #
 # </details>
-#
+
+# %% [markdown]
 # ### 1.4 A linear head on five pets
+
+# %% [markdown]
+# **How the head works.** Each patch gets one score from its 384 feature numbers `f`:
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The next
-# cells train a classifier with 385 parameters on the patch features of just <b>five</b> pets with full
-# masks, then score it on the held-out ones. Will its IoU land above, near or below SAM's one-click number
-# from 1.2? Write down a number before you run.</font></td></tr></table>
+# `score = w · f + b` (384 weights + 1 bias = 385 parameters). Score above 0: the patch is "pet"; below 0:
+# "background".
 #
-# This helper cell defines the head used for every training step in the notebook: a 1 × 1 convolution on
-# standardised patch features, trained with a balanced cross-entropy that ignores pixels labelled −1, plus
-# `load_head()` for our precomputed checkpoints.
+# The "1 × 1 convolution" is this same formula applied to every patch of the grid.
+
+# %% [markdown]
+# <!-- callout: question | 🤔 Your prediction -->
+# The next cells train a classifier with 385 parameters on the patch features of just **five** pets with
+# full masks, then score it on the held-out ones. Will its IoU land above, near or below SAM's one-click
+# number from 1.2? Write down a number before you run.
+
+# %% [markdown]
+# This helper cell defines the head used for every training step in the notebook (that 1 × 1 convolution on
+# standardised patch features, with a balanced loss, where each class gets half the total weight, that
+# ignores pixels labelled −1) plus `load_head()` for our precomputed checkpoints.
 
 # %%
 # @title Linear head: train, predict, load a checkpoint { display-mode: "form" }
@@ -302,9 +360,8 @@ def load_head(dataset: dict, regime: str, long_side: int | None = None) -> tuple
 
 
 # %% [markdown]
-# This cell trains the head on the full masks of five fit pets (sections 1 and 2 are the only places
-# training sees full masks) and prints the seconds it took. Not done in a minute, or on a CPU and in a
-# hurry? Set `TRAIN_YOURSELF = False` and run it again: it loads our checkpoint instead.
+# This cell trains the head on the full masks of five fit pets (only sections 1 and 2 use full masks); set
+# `TRAIN_YOURSELF = False` and run it again to load our checkpoint instead.
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed head "full5" instead of training
@@ -331,6 +388,7 @@ if head_sec > 60:
 # pets with the head's mask next to the ground truth.
 
 # %%
+# @title Score the head on the held-out pets { display-mode: "form" }
 t0 = time.monotonic()
 head_preds = [
     predict_head(head_full5, features_for(PETS, it, PETS["feat_side"]), it["mask"].shape) for it in PETS_EVAL
@@ -357,14 +415,42 @@ for it, pred, v in list(zip(PETS_EVAL, head_preds, head_ious, strict=True))[:3]:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Two ways
-# to the same mask, scored on the same hidden ground truth: SAM needs <i>one hint per image</i> and no
-# training; the head needs <i>five full masks once</i> and then runs on every image with no hint. Keep both
-# numbers: the comparison table in section 8 starts with them, and section 2 reruns both on the
-# specialised task.</font></td></tr></table>
+# This cell shows the raw score `w · f + b` per 16 × 16 patch of three held-out pets, where the mask above
+# is only its sign: violet = pet-like (above 0), orange = background-like, white = undecided.
+
+# %%
+# @title Head score per patch, as a heatmap { display-mode: "form" }
+cmap = mpl.colors.LinearSegmentedColormap.from_list("score", [THEME["fails"], "#FFFFFF", THEME["works"]])
+panels = []
+for it in PETS_EVAL[:3]:
+    feat = features_for(PETS, it, PETS["feat_side"])
+    h = {k: v.to(feat.device) for k, v in head_full5.items()}
+    with torch.no_grad():
+        z = (feat - h["feat_mean"].view(-1, 1, 1)) / h["feat_std"].view(-1, 1, 1)
+        score = F.conv2d(z[None], h["weight"], h["bias"])[0, 0].cpu().numpy()
+    rgb = (cmap(0.5 + 0.5 * score / (np.abs(score).max() + 1e-9))[..., :3] * 255).astype(np.uint8)
+    blocks = np.repeat(np.repeat(rgb, 16, 0), 16, 1)  # one 16 px block per patch
+    panels += [
+        (it["name"], it["image"]),
+        (f"score per patch · {score.min():.1f} to {score.max():.1f}", blocks),
+    ]
+show_masks(panels, width=2.6)
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Two ways to the same mask, scored on the same hidden ground truth:
 #
-# **Q4.** 🟡 Compare the two numbers you got with the prediction you wrote down. Which approach would you
-# pick for 10 000 pet photos, and which for 10 photos? What does each one ask of a person?
+# - **SAM** needs *one hint per image* and no training.
+# - **The head** needs *five full masks once*, then runs on every image with no hint.
+#
+# Keep both numbers: the comparison table in section 8 starts with them, and section 2 reruns both on the
+# specialised task.
+
+# %% [markdown]
+# **Q4.** 🟡 Compare the two numbers you got with the prediction you wrote down.
+#
+# - Which approach would you pick for 10 000 pet photos, and which for 10 photos?
+# - What does each one ask of a person?
 #
 # <details><summary>One possible answer</summary>
 #
@@ -374,13 +460,44 @@ show_masks(panels, width=2.6)
 # objects get smaller. Hardware or seed may change the numbers; the trade-off stays.
 #
 # </details>
+
+# %% [markdown]
+# <!-- callout: question | 👥 Optional, 3 min -->
+# Pick different indices in `demo = PETS_EVAL[0]` (Q2), so you and your neighbour see different pictures, and
+# compare.
 #
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">👥 <b>Optional, 3 min.</b> Compare
-# the demo pet with your neighbour's: did one click fail on either of yours? If it did, was the click on
-# an ambiguous spot (fur against a similar floor, a collar, a second animal)?</font></td></tr></table>
-#
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: a clean mask is not
-# a correct one.</b> SAM always returns a confident-looking mask, whatever you click on. On pets that is
-# usually the right object. Keep that habit of looking at the mask next to the ground truth: in the next
-# section it is the only thing that shows the model has quietly segmented the wrong thing.
-# </font></td></tr></table>
+# - Did one click fail on either of yours?
+# - If so, was the click on an ambiguous spot (fur against a similar floor, a collar, a second animal)?
+
+# %% [markdown]
+# This cell clicks on the floor instead of the pet and shows what SAM returns.
+
+# %%
+# @title Click on the floor, not the pet { display-mode: "form" }
+it = PETS_EVAL[0]
+floor_ys, floor_xs = np.nonzero(~it["mask"])
+k = int(np.random.default_rng([SEED, len(floor_ys)]).integers(len(floor_ys)))
+floor_pt = [float(floor_xs[k]), float(floor_ys[k])]
+by_floor = sam.probability(it["image"], points=[floor_pt], labels=[1]) >= 0.5
+floor_title = f"SAM, click on the floor · IoU {iou(by_floor, it['mask']):.2f}"
+show_masks(
+    [
+        (floor_title, overlay(it["image"], by_floor, THEME["works"])),
+        ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
+    ],
+    prompts={"point": floor_pt},
+)
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: a clean mask is not a correct one -->
+# SAM returned a confident-looking mask for a click on the floor, so always compare a mask with the ground
+# truth (section 2 shows why).
+
+# %% [markdown]
+# <!-- callout: takeaway | Takeaway -->
+# - When you have a few photos and can click each one → SAM with a point or a box gives sharp masks, with no
+#   training.
+# - When you have thousands of photos and no one to click → train the linear head on a few full masks.
+# - When a mask looks clean → still check it against the ground truth before trusting it.
+# - When the head's edges look blocky (16 px grid) → expect lower IoU on small or thin objects; section 2
+#   tests it.

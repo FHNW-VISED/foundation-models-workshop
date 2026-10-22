@@ -1,27 +1,39 @@
 # %% [markdown]
 # ## 6. Path 2 · Recover supervision
 #
-# **Objective:** turn SAM pseudo-labels and Grad-CAM maps into training signal.
+# Path 1 kept the label file and changed the loss. Path 2 keeps the loss and fills in the labels.
 #
-# Path 1 kept the label file and changed the loss. Path 2 does the opposite: it keeps the loss and fills in
-# the labels. A second model looks at every pixel nobody painted and makes a guess, and the head trains on
-# those guesses as if a person had drawn them. That is a **pseudo-label**. Think of handing your half-done
-# colouring-in to a fast, confident colleague: the page comes back full, and every mistake they made with
-# confidence is now in your training set. We start from the scribbles of section 4 (a few strokes per
-# image, minutes of work), so this path costs no more annotation than rung 2 of the ladder. Two colleagues
-# get the job: **SAM**, prompted with clicks taken from the strokes, and **Grad-CAM**, the heat map of a
-# small classifier that only learnt whether a tile contains a vessel.
+# A second model, the **teacher** (the model whose output we use as labels), guesses every pixel nobody
+# painted, and the head trains on those guesses as if a person had drawn them. A guess used this way is a
+# **pseudo-label**. It is like handing your half-done colouring-in to a fast, confident colleague: the page
+# comes back full, and every confident mistake is now in your training set.
 #
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: pseudo-labels.</b>
-# Pseudo-labelling (Lee, "Pseudo-Label: The Simple and Efficient Semi-Supervised Learning Method", ICML
-# 2013 workshop) trains a model on another model's predictions for unlabelled data. It works when the
-# guesses are more often right than wrong <i>and</i> their mistakes are not systematic: a model trained on
-# its teacher's errors learns to repeat them, which the literature calls <i>confirmation bias</i>. The usual
-# guard is a confidence threshold: keep only guesses the teacher is sure of and leave the rest unlabelled
-# (FixMatch, Sohn et al., NeurIPS 2020, <a href="https://arxiv.org/abs/2001.07685">arXiv:2001.07685</a>).
-# Here the teacher is a different model, not the head itself, and the person's strokes always overrule it.
-# </font></td></tr></table>
+# We start from the scribbles of section 4 (a few strokes per image, no more annotation than rung 2). Two
+# teachers get the job: **SAM**, prompted with clicks taken from the strokes, and **Grad-CAM**, the heat
+# map of a small classifier that only learnt whether a tile contains a vessel.
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# Turn SAM pseudo-labels and Grad-CAM maps into training signal, and know when to distrust them.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: when pseudo-labels work -->
+# A pseudo-label works when the teacher's guesses are mostly right *and* its mistakes are not systematic.
 #
+# - Pets: SAM's mask of a cat is a fine pseudo-label.
+# - Retina: SAM's "vessel" mask is a fat region, and a head trained on it learns the region, not the line.
+# - Guard: keep only the guesses the teacher is sure of and leave the rest unlabelled (6.2). A person's
+#   strokes always overrule the teacher.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Pseudo-label papers and confirmation bias -->
+# A model trained on its teacher's errors learns to repeat them. The literature calls this *confirmation
+# bias*. The usual guard is a confidence threshold.
+#
+# - Lee, "Pseudo-Label", ICML 2013 workshop: the original recipe.
+# - FixMatch, Sohn et al., NeurIPS 2020: [arXiv:2001.07685](https://arxiv.org/abs/2001.07685)
+
+# %% [markdown]
 # This helper cell adds a colour for each head of this path and defines how to spread SAM clicks along the
 # strokes of one kind, vessel or background.
 
@@ -61,20 +73,35 @@ def stroke_points(item: dict, value: int, n: int) -> list[list[float]]:
 # %% [markdown]
 # ### 6.1 SAM fills in the gaps
 #
-# The scribbles of section 4 again: a few vessel strokes and a few background strokes on each of the same
-# five training images. We turn them into SAM prompts, twenty clicks spread along the vessel strokes as
-# "vessel" and twenty along the background strokes as "not vessel", and keep SAM's answer for every pixel.
-# Only the strokes go in (L-005). The ground truth appears in the figure for you to judge the guesses,
-# never in training.
+# We take the scribbles of section 4 again: a few vessel strokes and a few background strokes on each of the
+# same five training images.
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> Section 2
-# showed what SAM does with clicks on a vessel tree. With forty clicks per image, half of them saying "not
-# here", will its mask follow the vessels, or cover a region around them? Write one guess.
-# </font></td></tr></table>
+# - Twenty clicks spread along the vessel strokes go in as "vessel", twenty along the background strokes as
+#   "not vessel".
+# - SAM's answer for every pixel is the pseudo-label.
+# - Only the strokes go in. The ground truth appears in the figure so you can judge the guesses, and never
+#   in training.
+
+# %% [markdown]
+# <!-- callout: question | 🤔 Your prediction -->
+# Section 2 showed what SAM does with clicks on a vessel tree. Now it gets forty clicks per image, half of
+# them saying "not here". Will its mask follow the vessels, or cover a region around them? Write one guess.
+
+# %% [markdown]
+# How to read the printout and the last panel of the next cell:
 #
-# This cell asks SAM for a probability map on each training image from the stroke clicks (one SAM image
-# encoding per image: seconds on a GPU, up to half a minute per image on a CPU) and shows one image. Short
-# on time? Set `RUN_SAM = False` to load our maps, made with the same recipe and clicks drawn at random.
+# - **Probability spread:** the 5 %, 50 % and 95 % points of SAM's probability over the fundus pixels. Near 0
+#   or 1 means sure, near 0.5 means unsure.
+# - **Marked:** the share of fundus pixels the pseudo-label calls vessel (section 2 printed how much is
+#   really vessel).
+# - **IoU, clDice:** overlap with the hidden truth, as in section 2. Diagnosis only.
+# - **Colours:** violet = a real vessel found, orange = a vessel SAM invented, green = a vessel SAM left out.
+#   Every orange and green pixel becomes a wrong training label if we take the guesses as they are.
+
+# %% [markdown]
+# This cell asks SAM for a probability map on each training image from the stroke clicks and shows one image
+# (seconds per image on a T4, much slower on a CPU, where `RUN_SAM = False` loads our maps, made the same way
+# with clicks drawn at random).
 
 # %%
 RUN_SAM = True  # False -> load our precomputed SAM maps for the training images
@@ -135,51 +162,85 @@ show_clicks(
 )
 
 # %% [markdown]
-# In the last panel, violet = SAM's guess is a real vessel, orange = SAM invented a vessel, green = a vessel
-# SAM left out. Every orange and green pixel becomes a wrong training label if we take the guesses as they
-# are.
-#
-# **Q22.** 🟡 Where does SAM's guess go wrong: around the thick vessels, along the thin ones, in the
-# background between the strokes? Now look at the probability panel and the printed spread: is SAM sure
-# of itself (deep purple, deep orange) or unsure (pale)? What does that mean for a cut at exactly 0.5?
+# Is that one image typical? This cell scores each training image's pseudo-label (IoU against the hidden
+# truth, diagnosis only) and shows the worst, median and best side by side.
+
+# %%
+# @title Pseudo-label quality: worst, typical and best training image { display-mode: "form" }
+per_image_iou = [score(p >= 0.5, it)["iou"] for p, it in zip(pseudo_probs, scrib_train, strict=True)]
+rank_iou = np.argsort(per_image_iou)
+picks = [("worst", rank_iou[0]), ("typical (median)", rank_iou[len(rank_iou) // 2]), ("best", rank_iou[-1])]
+show_masks(
+    [
+        (
+            f"{label} · IoU {per_image_iou[k]:.2f}",
+            error_map(scrib_train[k]["image"], pseudo_probs[k] >= 0.5, scrib_train[k]),
+        )
+        for label, k in picks
+    ],
+    width=3.0,
+)
+
+# %% [markdown]
+# **Q22.** 🟡 Look at the three error maps and the probability panel. Where does SAM's guess go wrong: around
+# the thick vessels, along the thin ones, in the background between the strokes? Is SAM sure of itself (deep
+# purple, deep orange) or unsure (pale)? What does that mean for a cut at exactly 0.5?
 #
 # <details><summary>What to look for</summary>
 #
-# SAM looks for <i>objects</i> that contain the positive clicks and avoid the negative ones. Forty clicks
-# scattered over a vessel tree do not describe one object, so SAM settles for the object that contains
-# most of them, often the whole fundus, and draws its edge with care while the inside stays a region
-# (orange), not a tree. Thin branches between the clicks can drop out (green). The probability panel tells
-# you how much SAM believes it. If most of it is pale, the probabilities sit just around 0.5, and the
-# exact cut decides almost everything: a little below and the whole fundus is "vessel", a little above
-# and nothing is. The binary mask hides that doubt: it looks just as crisp as a confident one. Whatever you
-# see on your run, the threshold is a choice you make, not a property of SAM.
+# SAM looks for *objects* that contain the positive clicks and avoid the negative ones.
+#
+# - Forty clicks scattered over a vessel tree do not describe one object. SAM settles for the object that
+#   holds most of them, often the whole fundus. Its edge is careful, but the inside is a region (orange), not
+#   a tree. Thin branches between the clicks can drop out (green).
+# - If most of the probability panel is pale, the values sit just around 0.5 and the exact cut decides
+#   almost everything: a little below and the whole fundus is "vessel", a little above and nothing is. The
+#   binary mask hides that doubt, because it looks just as crisp as a confident one.
+# - Whatever you see on your run, the threshold is your choice, not a property of SAM.
 #
 # </details>
-#
+
+# %% [markdown]
 # ### 6.2 From a probability map to training targets
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 3 min).</b>
-# Fill <code>my_pseudo_targets</code>. In: SAM's <code>prob</code> map (floats in [0, 1]), the
-# <code>scribbles</code> map (0 unlabelled, 1 vessel stroke, 2 background stroke), the boolean
-# <code>region</code>, a <code>threshold</code> and an unsure <code>band</code>. Out: int8 targets, 1 vessel,
-# 0 background, −1 ignored. A pixel with <code>prob ≥ threshold + band</code> is vessel, one with
-# <code>prob &lt; threshold − band</code> is background, and the doubtful ones in between are ignored. The
-# person's strokes always win over SAM, and pixels outside <code>region</code> are always −1. The cell
-# checks your version on a 3 × 4 play map, without and with a band, and continues with ours if you skip it.
-# </font></td></tr></table>
+# A target is the label the head trains on: 1 vessel, 0 background, −1 ignored (the loss skips it). The cut
+# turns SAM's probability into a target, and an unsure band lets us ignore the doubtful pixels instead of
+# guessing.
 
+# %% [markdown]
+# This cell draws the rule once, for a cut of 0.5 and a band of 0.1.
 
 # %%
-# ✍️ YOUR CODE
-def my_pseudo_targets(
-    prob: np.ndarray, scribbles: np.ndarray, region: np.ndarray, threshold: float = 0.5, band: float = 0.0
-) -> np.ndarray:
-    """Targets (int8) from a pseudo-label probability map: 1 where prob >= threshold + band, 0 where
-    prob < threshold - band, -1 in between. Strokes overrule the map (1 vessel stroke -> 1, 2 background
-    stroke -> 0); outside `region` -> -1."""
-    ...
+# @title The cut and the unsure band, drawn { display-mode: "form" }
+cut, band_demo = 0.5, 0.1
+fig, ax = plt.subplots(figsize=(7.2, 1.5))
+for lo, hi, colour, label in [
+    (0, cut - band_demo, THEME["background"], "0 · background"),
+    (cut - band_demo, cut + band_demo, "white", "−1 · ignored"),
+    (cut + band_demo, 1, THEME["works"], "1 · vessel"),
+]:
+    ax.barh(0, hi - lo, left=lo, color=colour, edgecolor="black", height=0.5)
+    text_colour = "black" if colour == "white" else "white"
+    ax.text((lo + hi) / 2, 0, label, ha="center", va="center", fontsize=8, color=text_colour)
+ax.set_xlim(0, 1)
+ax.set_yticks([])
+ax.set_xlabel("SAM's probability for a pixel")
+ax.set_title(
+    f"cut {cut}, band {band_demo}: below {cut - band_demo} → 0 · between → −1 · from {cut + band_demo} → 1",
+    fontsize=9,
+)
+plt.tight_layout()
+plt.show()
 
+# %% [markdown]
+# Two rules sit on top of the cut: a person's stroke always wins over SAM, and pixels outside the fundus are
+# always −1.
 
+# %% [markdown]
+# This helper cell holds our solution of the next exercise. Open it only if you are stuck.
+
+# %%
+# @title Reference solution (open only if stuck) { display-mode: "form" }
 def _ref_pseudo_targets(
     prob: np.ndarray, scribbles: np.ndarray, region: np.ndarray, threshold: float = 0.5, band: float = 0.0
 ) -> np.ndarray:
@@ -191,6 +252,31 @@ def _ref_pseudo_targets(
     targets[scribbles == 2] = 0
     targets[~np.asarray(region, bool)] = -1
     return targets
+
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 3 min) -->
+# Fill `my_pseudo_targets` in the next cell.
+#
+# - **In:** SAM's `prob` map (floats in [0, 1]), the `scribbles` map (0 unlabelled, 1 vessel stroke, 2
+#   background stroke), the boolean `region`, a `threshold` and an unsure `band`.
+# - **Out:** int8 targets, 1 vessel, 0 background, −1 ignored.
+# - **Rules:** `prob ≥ threshold + band` is vessel, `prob < threshold − band` is background, the pixels in
+#   between are ignored. Strokes always win. Pixels outside `region` are always −1.
+#
+# The cell checks your version on a 3 × 4 play map, without and with a band, and continues with ours if you
+# skip it.
+
+
+# %%
+# ✍️ YOUR CODE
+def my_pseudo_targets(
+    prob: np.ndarray, scribbles: np.ndarray, region: np.ndarray, threshold: float = 0.5, band: float = 0.0
+) -> np.ndarray:
+    """Targets (int8) from a pseudo-label probability map: 1 where prob >= threshold + band, 0 where
+    prob < threshold - band, -1 in between. Strokes overrule the map (1 vessel stroke -> 1, 2 background
+    stroke -> 0); outside `region` -> -1."""
+    ...
 
 
 _play_prob = np.array([[0.95, 0.62, 0.45, 0.10], [0.55, 0.30, 0.71, 0.05], [0.20, 0.90, 0.40, 0.80]])
@@ -211,15 +297,14 @@ print("play example · targets with threshold 0.5 and band 0.2 (−1 = ignored):
 print(pseudo_targets(_play_prob, _play_scrib, _play_region, 0.5, 0.2))
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The
-# scribble head of section 4 heard about the strokes only. This head hears about every pixel of the fundus,
-# most of it in SAM's words. Will it mark more of the held-out fundus than the scribble head, or less? Will
-# its IoU be higher? Write two guesses.</font></td></tr></table>
-#
-# This cell turns SAM's maps into targets at the usual cut (threshold 0.5, no band), trains the section-2
-# head on them, and prints the seconds it took. Not done in a minute, or on a CPU and in a hurry? Set
-# `TRAIN_YOURSELF = False` and run it again: it loads our "pseudo" checkpoint, trained the same way on all
-# fit images.
+# <!-- callout: question | 🤔 Your prediction -->
+# The scribble head of section 4 heard about the strokes only. This head hears about every pixel of the
+# fundus, most of it in SAM's words. Will it mark more of the held-out fundus than the scribble head, or
+# less? Will its IoU be higher? Write two guesses.
+
+# %% [markdown]
+# This cell turns SAM's maps into targets at the usual cut (threshold 0.5, no band) and trains the section-2
+# head on them (`TRAIN_YOURSELF = False` loads our "pseudo" checkpoint instead, trained the same way).
 
 # %%
 TRAIN_YOURSELF = True  # False -> load our precomputed "pseudo" head instead of training
@@ -243,10 +328,11 @@ if sam_sec > 60:
     print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
 
 # %% [markdown]
-# This cell scores the new head on the held-out images with the numbers of section 4 and prints it under
-# the scribble head, which saw the same strokes but kept every other pixel unknown.
+# This cell scores the new head on the held-out images with the numbers of section 4 and prints it under the
+# scribble head, which saw the same strokes but kept every other pixel unknown.
 
 # %%
+# @title Score the SAM pseudo-label head on the held-out images { display-mode: "form" }
 t0 = time.monotonic()
 path2_preds = {
     "scribbles": ladder_preds["scribbles"],
@@ -285,22 +371,24 @@ def print_path2(reports: dict) -> None:
 print_path2(path2_report)
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next cell,
-# then move the cut.</font></td></tr></table>
+# <!-- callout: question | Question -->
+# Run the next cell, then move the cut.
 #
-# **Q23.** 🟡 Tune the pseudo-labels. Raise or lower `PSEUDO_THRESHOLD` and give the doubtful pixels an
-# `UNSURE_BAND` to ignore; pick your values from the spread printed in 6.1. How many training pixels does
-# each setting get wrong (the diagnosis lines), and does the head on the held-out images move the same way?
-# Is there a setting that beats 0.5 on your run?
+# **Q23.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
+# `PSEUDO_THRESHOLD` and give the doubtful pixels an `UNSURE_BAND` to ignore, picking values from the spread
+# printed in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
+# at the held-out line once: does it move the same way? Is there a setting that beats 0.5 on your run?
 #
 # ```python
 # PSEUDO_THRESHOLD = 0.5   # try 0.55, 0.6, 0.7 (or the median printed in 6.1)
 # UNSURE_BAND = 0.0        # try 0.03: pixels within 0.03 of the threshold are ignored
 # ```
-#
-# This cell turns SAM's maps into targets with your setting, measures on the training images how many of
-# them disagree with the hidden truth (diagnosis only), trains the same head on them (seconds) and prints it
-# next to the head at 0.5.
+
+# %% [markdown]
+# This cell trains the same head on targets made with your setting and prints it under the head at 0.5, with
+# three diagnosis columns from the hidden truth on the training images: **ignored** (the share of the fundus
+# set to −1), **vessel → bg** (the share of true vessel pixels that got label 0) and **bg → vessel** (the
+# share of true background pixels that got label 1).
 
 # %%
 # Q23 — tune the pseudo-label threshold and the unsure band
@@ -351,54 +439,140 @@ print(f"\nyour head: threshold {PSEUDO_THRESHOLD}, band {UNSURE_BAND} · trained
 print_path2({"threshold 0.5, no band": path2_report["sam_pseudo"], "your setting": tuned_report})
 
 # %% [markdown]
+# <!-- callout: question | 👥 Pair moment (optional, 4 min) -->
+# One of you tries a low cut (`PSEUDO_THRESHOLD = 0.55`), the other a high one (`0.7`). Compare your **vessel
+# → bg** and **bg → vessel** columns: which kind of wrong label did each of you buy, and what happened to the
+# held-out line?
+
+# %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# The threshold trades one kind of wrong label for the other. A low cut turns more of SAM's region into
-# "vessel" (bg → vessel rises), and the head learns to mark more; a high cut keeps only SAM's surest
-# pixels and calls the rest background (vessel → bg rises): the section-3 mistake again, now with SAM as
-# the annotator who stopped early. When SAM's probabilities crowd around one value, a step of 0.05 can
-# flip most of the fundus from one side to the other, so there may be no comfortable middle. The band
-# removes the doubtful pixels instead of guessing, so both error columns can fall at once, paid for with
-# fewer labelled pixels (the "ignored" column). Whether the held-out numbers follow the training diagnosis
-# depends on your run. In a real project you would pick the setting on a small fully labelled check set,
-# never on the test images.
+# The threshold trades one kind of wrong label for the other.
+#
+# - **Low cut:** more of SAM's region becomes "vessel" (bg → vessel rises) and the head learns to mark more.
+# - **High cut:** only SAM's surest pixels stay vessel and the rest becomes background (vessel → bg rises).
+#   That is the section-3 mistake again, with SAM as the annotator who stopped early.
+# - **Crowded probabilities:** when they crowd around one value, a step of 0.05 can flip most of the fundus
+#   from one side to the other, so there may be no comfortable middle.
+# - **The band:** it removes the doubtful pixels instead of guessing, so both error columns can fall at once.
+#   The price is fewer labelled pixels (the "ignored" column).
+#
+# Whether the held-out numbers follow the training diagnosis depends on your run. In a real project you pick
+# the setting on a small fully labelled check set, never on the test images.
 #
 # </details>
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: over-trusting SAM's confident masks -->
+# 1. SAM draws a crisp edge and fills the whole region. **Consequence:** it looks finished, with no "I don't
+#    know" anywhere.
+# 2. The head cannot tell a guess from a drawing. **Consequence:** it learns SAM's habit (a region where you
+#    wanted a line) as faithfully as the vessels.
+# 3. The habit repeats on every new image. **Consequence:** the error is systematic, so more images do not
+#    average it out.
+
+# %% [markdown]
+# This simulation invents a teacher that is right about the strokes but confidently calls the brightest blob
+# of the fundus (usually the optic disc) vessel, trains one head on the strokes alone and one with that blind
+# spot, and shows both on the same held-out image (no ground truth, seconds per head).
+
+# %%
+# @title Playful pitfall: a teacher with one confident blind spot { display-mode: "form" }
+def bright_blob(item: dict) -> np.ndarray:
+    """The brightest smooth blob of the fundus (usually the optic disc), found from the image alone."""
+    g = ndi.gaussian_filter(item["image"][..., 1].astype(float), sigma=max(item["mask"].shape) / 60)
+    g[~region(item)] = 0
+    peak = np.unravel_index(int(g.argmax()), g.shape)
+    lab, _ = ndi.label(g >= 0.9 * g.max())
+    return ndi.binary_dilation(lab == lab[peak], iterations=max(1, max(item["mask"].shape) // 100))
+
+
+def stroke_targets(item: dict, blind_spot: bool) -> np.ndarray:
+    """The strokes only (1 vessel, 0 background, -1 unknown); with `blind_spot`, the teacher also calls the
+    bright blob vessel wherever no stroke says otherwise."""
+    t = np.full(item["mask"].shape, -1, np.int8)
+    t[item["scribbles"] == 1] = 1
+    t[item["scribbles"] == 2] = 0
+    if blind_spot:
+        t[bright_blob(item) & (item["scribbles"] == 0)] = 1
+    return t
+
+
+clean_head, _ = train_head(scrib_feats, [stroke_targets(it, False) for it in scrib_train], HEAD_STEPS)
+biased_head, _ = train_head(scrib_feats, [stroke_targets(it, True) for it in scrib_train], HEAD_STEPS)
+feat_demo = features_for(SPECIALISED, demo, side)
+p_clean = predict_head(clean_head, feat_demo, demo["mask"].shape)
+p_biased = predict_head(biased_head, feat_demo, demo["mask"].shape)
+blob_demo = bright_blob(demo)
+print(
+    f"blind spot ({blob_demo.mean():.1%} of the image) marked as vessel · head on strokes alone "
+    f"{p_clean[blob_demo].mean():.0%} · head on the biased teacher {p_biased[blob_demo].mean():.0%}\n"
+    f"fundus marked as vessel · strokes alone {p_clean[region(demo)].mean():.0%} · "
+    f"biased teacher {p_biased[region(demo)].mean():.0%}"
+)
+show_masks(
+    [
+        ("the teacher's blind spot", overlay(demo["image"], blob_demo, THEME["fails"])),
+        ("head on the strokes alone", overlay(demo["image"], p_clean, THEME["works"])),
+        ("head on the biased teacher", overlay(demo["image"], p_biased, THEME["works"])),
+    ],
+    width=3.0,
+)
+
+# %% [markdown]
+# <details><summary>What to look for</summary>
 #
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: over-trusting SAM's
-# confident masks.</b> A pseudo-label looks like a real label: crisp edges, full coverage, no "I don't
-# know". The head cannot tell the difference, and it will learn SAM's habits (here, a region where you
-# wanted a line) as faithfully as the vessels. Before training on pseudo-labels, score them on a few images
-# you labelled completely, as the diagnosis line does here.</font></td></tr></table>
+# Compare the blind-spot share in the printout and the violet area inside the orange blob. If the biased head
+# marks the blob far more than the clean head, it copied the teacher's mistake onto an image it never saw
+# labelled. It may also mark other bright patches, because it learnt "bright and round means vessel", not
+# "this exact blob". If both heads mark about the same share on your run, the strokes alone already
+# outweighed the blind spot. Try another `demo` image in section 2 and compare.
 #
+# </details>
+
+# %% [markdown]
 # ### 6.3 Grad-CAM: where a classifier looks
 #
-# The second colleague does not segment at all. We train a small classifier to answer one yes/no question,
-# then ask it <i>where</i> in the image its "yes" came from. Grad-CAM turns that answer into a heat map,
-# and a threshold turns the heat map into a pseudo-mask.
+# The second colleague does not segment at all.
 #
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: an awkward fit, said
-# plainly.</b> Grad-CAM needs an image-level question with a "no" class, such as "is there a defect in this
-# image?". Every retina image contains vessels, so there is no "no" at image level. We fall back to a
-# patch-level question, "does this 64 px tile contain a vessel?", with tile labels read off the strokes.
-# Most tiles of a fundus crop do contain a vessel (the next cell counts them), and a heat map at tile or
-# patch resolution cannot outline a line a few pixels wide. Our bake-off judged it a poor fit; we run it
-# anyway because on a task with real image-level labels (defects, tumours, "contains a cell") it is often
-# the cheapest supervision there is.</font></td></tr></table>
+# 1. We train a small classifier to answer one yes/no question.
+# 2. We ask it *where* in the image its "yes" came from. Grad-CAM turns that answer into a heat map.
+# 3. A threshold turns the heat map into a pseudo-mask.
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: an awkward fit, said plainly -->
+# Grad-CAM needs an image-level question with a real "no" class, such as "is there a defect in this image?".
 #
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: Grad-CAM.</b> Take the
-# classifier's last feature maps <i>A<sub>k</sub></i> and the gradient of the class score with respect to
-# them. Average each gradient map into one weight α<sub>k</sub>, sum α<sub>k</sub>·<i>A<sub>k</sub></i>, keep
-# the positive part, and rescale to [0, 1]: that is the map (Selvaraju et al., ICCV 2017,
-# <a href="https://arxiv.org/abs/1610.02391">arXiv:1610.02391</a>; we use the <code>grad-cam</code> package).
-# Our classifier ends in an average over patches, and for such a classifier Grad-CAM reduces to the older
-# CAM (Zhou et al., CVPR 2016, <a href="https://arxiv.org/abs/1512.04150">arXiv:1512.04150</a>): the
-# classifier's own evidence for "vessel", patch by patch. The map is as coarse as the features it is
-# computed on: one value per 16 px patch.</font></td></tr></table>
+# - Every retina image contains vessels, so there is no "no" at image level.
+# - We fall back to a patch-level question: "does this 64 px tile contain a vessel?", with tile labels read
+#   off the strokes.
+# - Most tiles of a fundus crop do contain a vessel (the next cell counts them), and a map at patch
+#   resolution cannot outline a line a few pixels wide, so it fits this task poorly.
+# - We look at it anyway: on a task with real image-level labels (defects, tumours, "contains a cell") it is
+#   often the cheapest supervision there is, and seeing it fail here shows what to check.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: Grad-CAM -->
+# Grad-CAM answers: which parts of the input made the classifier say "yes"?
 #
-# This helper cell defines the tile classifier (a 3 × 3 convolution and a 1 × 1 convolution on the frozen
-# DINOv3 features, averaged over the tile), cuts feature grids into tiles, reads tile labels off the strokes,
-# trains the classifier and computes its Grad-CAM map on a whole image.
+# - **How:** each of the classifier's feature maps Aₖ gets a weight αₖ (how much the "yes" score grows when Aₖ
+#   grows). The heat map is the weighted sum of the maps, keeping only the positive evidence.
+# - **Pets:** for "is there a cat?" the map lights up the face, not the whole cat.
+# - **Here:** one value per 16 px patch, because the features have that resolution.
+
+# %% [markdown]
+# <!-- callout: go-deeper | Grad-CAM formula, CAM and the package -->
+# The formula: `αₖ = mean over (i, j) of ∂score/∂Aₖ[i, j]`, then `map = ReLU(Σₖ αₖ·Aₖ)`, rescaled to [0, 1].
+#
+# Our classifier ends in an average over patches. For such a classifier Grad-CAM reduces to the older CAM: the
+# classifier's own evidence for "vessel", patch by patch. We use the `grad-cam` package.
+#
+# - Grad-CAM, Selvaraju et al., ICCV 2017: [arXiv:1610.02391](https://arxiv.org/abs/1610.02391)
+# - CAM, Zhou et al., CVPR 2016: [arXiv:1512.04150](https://arxiv.org/abs/1512.04150)
+
+# %% [markdown]
+# This helper cell defines the tile classifier, the tiling, the tile labels from the strokes, its training and
+# its Grad-CAM map on a whole image.
 
 # %%
 # @title Grad-CAM helpers: tile classifier, tiles, labels from strokes, the map { display-mode: "form" }
@@ -458,12 +632,12 @@ def cam_map(clf: TileClassifier, feat: torch.Tensor) -> np.ndarray:
 
 
 # %% [markdown]
-# This cell cuts the features of the five training images into tiles of 64 px of the crop, labels each tile
-# from the strokes (a vessel stroke crosses it → "vessel"; only background strokes → "no vessel"; no stroke
-# → unused), trains the classifier (seconds) and prints how many tiles of each kind it saw. The last line
-# uses the held-out truth to show how rare a vessel-free tile really is.
+# This cell cuts the five training images into 64 px tiles, labels each from the strokes (a vessel stroke
+# crosses it → "vessel", only background strokes → "no vessel", no stroke → unused), trains the classifier in
+# seconds and counts the tiles, with the held-out truth showing how rare a vessel-free tile really is.
 
 # %%
+# @title Train the tile classifier and count the tiles { display-mode: "form" }
 TILE_PATCHES = 1 if SMOKE else 4  # 64 px of the 1024 px crop either way (smoke thumbnails are 4× smaller)
 CLS_STEPS = 30 if SMOKE else 200
 all_feats = torch.cat([f.flatten(1) for f in scrib_feats], 1)
@@ -493,15 +667,83 @@ print(
 print(f"held-out truth (evaluation only): {vessel_tile_share:.0%} of the fundus tiles contain a vessel")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> The
-# classifier only ever answered "vessel in this tile, yes or no". Will its heat map look like a vessel
-# tree, like blobs, or like noise? Write one guess.</font></td></tr></table>
-#
-# This cell computes the Grad-CAM map of every training image, cuts it at half its peak into a pseudo-mask
-# (with your `pseudo_targets`: strokes still win), trains the same head on it (seconds; there is no
-# checkpoint for this one) and scores it on the held-out images. The figure shows one training image.
+# <!-- callout: question | 🤔 Your prediction -->
+# The classifier only ever answered "vessel in this tile, yes or no". Will its heat map look like a vessel
+# tree, like blobs, or like noise? Write one guess. The sketches below show the three shapes.
+
+# %% [markdown]
+# This cell draws the three possible shapes as tiny made-up heat maps, on the same colour scale as the real
+# ones (purple = strongest evidence, orange = none).
 
 # %%
+# @title Sketch: three shapes a heat map could take { display-mode: "form" }
+sketch_rng = np.random.default_rng(SEED)
+tree = np.zeros((48, 48))
+for x0, y0, x1, y1 in [(24, 47, 24, 18), (24, 30, 8, 8), (24, 26, 42, 6), (24, 38, 40, 30), (24, 40, 10, 32)]:
+    for s in np.linspace(0, 1, 80):
+        tree[int(y0 + s * (y1 - y0)), int(x0 + s * (x1 - x0))] = 1
+tree = ndi.gaussian_filter(tree, 0.8)
+yy, xx = np.mgrid[0:48, 0:48]
+centres = [(14, 14), (32, 28), (18, 38)]
+blobs = sum(np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * 5**2)) for cx, cy in centres)
+noise = ndi.gaussian_filter(sketch_rng.random((48, 48)), 0.7)
+shapes = [("vessel tree: thin lines", tree), ("blobs: a few patches", blobs), ("noise: no structure", noise)]
+show_masks(
+    [(title, prob_rgb(0.5 + 0.5 * (m - m.min()) / (m.max() - m.min()))) for title, m in shapes],
+    width=2.0,
+)
+
+# %% [markdown]
+# This cell runs the four steps of Grad-CAM by hand on one training image; its last panel is the heat map
+# itself.
+
+# %%
+# @title Grad-CAM step by step on one training image { display-mode: "form" }
+cam_feat = std_feats[0]
+with torch.enable_grad():
+    act = clf.act(clf.hidden(cam_feat[None]))  # the feature maps A_k: [1, 32, h, w]
+    yes_score = clf.out(act).mean((2, 3))[0, 0]  # the "vessel" score
+    grads = torch.autograd.grad(yes_score, act)[0]  # how the score changes with each A_k pixel
+maps_a = act[0].detach().cpu().numpy()
+alpha = grads[0].mean((1, 2)).cpu().numpy()  # step 1: one weight per feature map
+weighted = np.tensordot(alpha, maps_a, axes=1)  # step 2: sum of alpha_k * A_k
+positive = np.maximum(weighted, 0)  # step 3: keep only the evidence FOR "vessel"
+positive = positive - positive.min()
+steps_heat = positive / (1e-7 + positive.max())  # step 4: rescale to [0, 1]
+k_hi, k_lo = int(alpha.argmax()), int(alpha.argmin())
+fig, axes = plt.subplots(1, 6, figsize=(14, 2.6))
+axes[0].imshow(ex["image"])
+axes[0].set_title("training image", fontsize=9)
+axes[1].imshow(maps_a[k_hi], cmap="Greys")
+axes[1].set_title(f"A_k with the largest α ({alpha[k_hi]:+.2f})", fontsize=8)
+axes[2].imshow(maps_a[k_lo], cmap="Greys")
+axes[2].set_title(f"A_k with the smallest α ({alpha[k_lo]:+.2f})", fontsize=8)
+sorted_alpha = np.sort(alpha)
+axes[3].bar(
+    range(len(alpha)), sorted_alpha, color=[THEME["works"] if a > 0 else THEME["fails"] for a in sorted_alpha]
+)
+axes[3].set_title("1 · weights α_k (one per map)", fontsize=8)
+limit = np.abs(weighted).max() + 1e-9
+axes[4].imshow(weighted, cmap="PuOr", vmin=-limit, vmax=limit)
+axes[4].set_title("2 · Σ α_k·A_k (purple +, orange −)", fontsize=8)
+axes[5].imshow(prob_rgb(steps_heat))
+axes[5].set_title("3 + 4 · ReLU, rescale: the heat map", fontsize=8)
+for a in axes:
+    if a is not axes[3]:
+        a.axis("off")
+plt.tight_layout()
+plt.show()
+print(
+    f"{(alpha > 0).sum()} of {len(alpha)} feature maps have a positive weight · "
+    f"max difference to the grad-cam package: {np.abs(steps_heat - cam_map(clf, cam_feat)).max():.4f}"
+)
+
+# %% [markdown]
+# This cell cuts each training image's Grad-CAM map at half its peak into a pseudo-mask (strokes still win),
+# trains the same head on it in seconds, scores it on the held-out images and shows one training image.
+
+# %%
+# @title Grad-CAM pseudo-labels: map, cut, head, score { display-mode: "form" }
 CAM_THRESHOLD = 0.5  # share of the map's peak; Grad-CAM maps are rescaled to [0, 1] per image
 t0 = time.monotonic()
 cam_probs = []
@@ -569,21 +811,22 @@ show_masks(
 #
 # <details><summary>What to look for</summary>
 #
-# The heat map is a set of blobs one or a few patches wide, sitting where the classifier found the most
-# "vessel-like" patches: usually the thick, dark vessels, and sometimes dark background. It does not
-# follow a line, because its resolution is the 16 px patch and because the question it learnt ("is there a
-# vessel somewhere in this tile?") does not need a line. Cut at half its peak, it turns into fat regions
-# around the vessels the classifier found most convincing: the thick ones, drawn several patches wide,
-# with the thin ones mostly missing. SAM's guess fails differently, as one big region with a careful edge.
-# Neither is the vessel map. A coarse but <i>local</i> guess can still teach the head more than a sharp
-# but global one, so compare the held-out lines above before you pick. On a task where the class really
-# is a blob (a defect, a nucleus) and some images contain none, the same recipe fits much better.
+# - **Shape:** blobs one or a few patches wide, where the classifier found the most "vessel-like" patches:
+#   usually the thick, dark vessels, sometimes dark background. It does not follow a line, because its
+#   resolution is the 16 px patch and because its question ("is there a vessel somewhere in this tile?")
+#   does not need a line.
+# - **After the cut:** fat regions around the vessels the classifier found most convincing, with the thin
+#   ones mostly missing. SAM's guess fails differently, as one big region with a careful edge.
+# - **Which is better:** neither is the vessel map. A coarse but *local* guess can still teach the head more
+#   than a sharp but global one, so compare the held-out lines above before you pick.
+# - **Other tasks:** where the class really is a blob (a defect, a nucleus) and some images contain none,
+#   the same recipe fits much better.
 #
 # </details>
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question (optional).</b> Run the
-# next cell to use the heat map as a SAM prompt instead of a mask.</font></td></tr></table>
+# <!-- callout: question | Question (optional) -->
+# Run the next cell to use the heat map as a SAM prompt instead of a mask.
 #
 # **Q25.** 🔴 Instead of cutting the heat map, let it pick SAM clicks: the hottest patches as "vessel", the
 # coldest as "not vessel" (the trick of section 4.2, with Grad-CAM in place of the prototype). Do SAM's
@@ -592,9 +835,10 @@ show_masks(
 # ```python
 # N_CAM_CLICKS = 5   # try 2, 10
 # ```
-#
-# This cell picks the clicks on each training image's heat map, asks SAM for a mask (one SAM image encoding
-# per image) and scores the three kinds of pseudo-label on the training images: diagnosis only, no training.
+
+# %% [markdown]
+# This cell picks SAM clicks on each training image's heat map, asks SAM for a mask and scores the three kinds
+# of pseudo-label on the training images (diagnosis only, no training).
 
 # %%
 # Q25 — Grad-CAM as a SAM prompt: hottest patches = vessel clicks, coldest = background clicks
@@ -631,23 +875,25 @@ show_clicks(
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# The clicks land where the heat map is hottest, usually on or next to a thick vessel, so SAM's mask looks
-# like SAM's masks of 6.1: sharp edges around whatever object contains the clicks, often a region rather
-# than a line. The prompt route swaps Grad-CAM's coarse blobs for SAM's sharp edges, but it also brings
-# back SAM's idea of an object, and a click that lands on dark background drags the mask there. Two weak
-# signals combined are not automatically a strong one; their mistakes can add up as easily as cancel out.
+# - The clicks land where the heat map is hottest, usually on or next to a thick vessel. SAM's mask then
+#   looks like its masks of 6.1: sharp edges around whatever object contains the clicks, often a region
+#   rather than a line.
+# - The prompt route swaps Grad-CAM's coarse blobs for SAM's sharp edges, but it brings back SAM's idea of an
+#   object. A click that lands on dark background drags the mask there.
+# - Two weak signals combined are not automatically a strong one: their mistakes can add up as easily as
+#   cancel out.
 #
 # </details>
-#
+
+# %% [markdown]
 # ### 6.4 Path 2, side by side
 #
-# This cell puts the three heads that start from the same strokes next to each other: the scribble head of
-# section 4 (unlabelled = unknown), the head on SAM's guesses, the head on Grad-CAM's guesses. Then a bar
-# chart in the approach colours and the error maps on the held-out demo image (violet found, orange
-# invented, green missed). It also writes the annotation effort for the comparison of section 8: the same
-# strokes for all three.
+# This cell puts the scribble head of section 4 and the SAM and Grad-CAM pseudo-label heads side by side
+# (bars in the approach colours, error maps on the held-out demo image) and writes the annotation effort
+# for section 8: the same strokes for all three.
 
 # %%
+# @title Path 2 side by side: table, bars and error maps { display-mode: "form" }
 RESULTS["path2_effort_min"] = {
     k: round(effort_minutes(n_strokes=n_strokes), 2) for k in ("sam_pseudo", "gradcam_pseudo")
 }
@@ -685,26 +931,42 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q26.** 🟡 All three heads cost the same strokes. Which one would you train if you could add one more
-# afternoon of work: more strokes, or a better second model (say, a SAM checkpoint fine-tuned on retinas)?
-# What does the table suggest, and what would you want to measure first?
+# **Q26.** 🟡 All three heads cost the same strokes. You can add one more afternoon (about 4 hours) of work.
+# Suppose a pilot (invented numbers) says:
+#
+# - **A, more strokes:** a second round on the same five images would lift the scribble head's held-out IoU
+#   by about 0.04.
+# - **B, a better teacher:** a SAM checkpoint fine-tuned on retinas would lift the pseudo-labels' IoU on the
+#   training images from 0.45 to 0.65, and nobody has measured the head yet.
+#
+# Which would you pick? What does the table suggest, and what would you want to measure first?
 #
 # <details><summary>A possible answer</summary>
 #
-# Pseudo-labels pass on the second model's habits, so a head trained on them is capped by how well that
-# model understands <i>your</i> structures. Here SAM thinks in objects and Grad-CAM in tiles, and neither
-# thinks in thin lines, so better pseudo-labels would need a better teacher for this domain, not a cleverer
-# threshold. More strokes add true information but no extra coverage between them. Which pays more depends
-# on the gap you see: if the pseudo-labels are close to the truth on a few fully labelled images, a better
-# teacher (or a cleaned-up pseudo-label) is the lever; if they are far, spend the afternoon on strokes. In
-# both cases the first measurement is the diagnosis line of 6.1 on a handful of images you labelled
-# completely.
+# - **Compare like with like:** A's +0.04 is on the head itself, B's +0.20 is on the pseudo-labels only. A
+#   better teacher helps the head only as far as its mistakes stop being systematic.
+# - **The cap:** a head trained on pseudo-labels is capped by how well the second model understands *your*
+#   structures. SAM thinks in objects and Grad-CAM in tiles, and neither thinks in thin lines, so better
+#   pseudo-labels need a better teacher for this domain, not a cleverer threshold.
+# - **More strokes:** they add true information, but no extra coverage between them.
+# - **How to choose:** if the pseudo-labels are close to the truth on a few fully labelled images, a better
+#   teacher (or a cleaned-up pseudo-label) is the lever. If they are far, spend the afternoon on strokes.
+# - **First measurement:** the diagnosis line of 6.1 on a handful of images you labelled completely.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> Path 1
-# changed what the loss is told about unlabelled pixels; Path 2 asks another model to label them. The
-# scribble head leaves the gaps unknown; the SAM head fills them with SAM's idea of an object; the
-# Grad-CAM head fills them with a classifier's coarse evidence. Each adds information <i>and</i> the second
-# model's bias, and the head cannot tell which is which. Section 7 drops the head altogether and asks SAM
-# directly, with the same clicks.</font></td></tr></table>
+
+# %% [markdown]
+# <!-- callout: takeaway | Takeaway: Path 2 -->
+# - **You are about to train on a teacher's guesses** → score them on a few fully labelled images first, and
+#   keep the person's strokes stronger than the teacher.
+# - **Its probabilities crowd around 0.5** → do not trust a hard cut. Tune the threshold on training images
+#   and ignore the doubtful band instead of guessing.
+# - **Every image has the structure, so there is no "no" class** → Grad-CAM is a poor fit. Use it when you
+#   have real image-level labels (defects, tumours).
+# - **You need more labels but cannot pay for strokes** → pseudo-labels add compute, not annotation, and
+#   bring the teacher's bias with them.
+
+# %% [markdown]
+# <!-- callout: across | Across approaches -->
+# Path 1 told the loss to ignore the gaps; Path 2 lets another model fill them, and the head inherits its bias
+# without knowing it. Section 7 drops the head and asks SAM directly, with the same clicks.

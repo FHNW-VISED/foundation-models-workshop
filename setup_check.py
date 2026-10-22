@@ -1,20 +1,29 @@
 # %% [markdown]
-# <table width="100%" bgcolor="#4A148C"><tr><td>
-# <font color="white" size="5"><b>Setup check · When Foundation Models Fall Short</b></font><br>
-# <font color="white">From Off-the-Shelf AI to Problem-Specific Adaptation · AMLD 2027 · SDS 2027</font>
-# <br><br>
-# <font color="white">Run this notebook <b>once, in the week before the workshop</b>. It takes about 5 minutes
-# on a normal connection and leaves everything the workshop needs (models, images, precomputed features,
-# checkpoints) in a folder of your Google Drive. On the day, the main notebook loads from that folder and
-# nothing is downloaded or installed in the room.</font>
-# </td></tr></table>
+# <!-- callout: banner | Setup check · When Foundation Models Fall Short -->
+# **From Off-the-Shelf AI to Problem-Specific Adaptation** · AMLD 2027 · SDS 2027
 #
-# **Objective:** fill `MyDrive/fm-workshop-cache/` with everything the workshop needs and see ✅ everywhere.
+# Run this notebook **once, in the week before the workshop**. It takes about 5 minutes
+# on a normal connection and leaves everything the workshop needs in a folder of your Google Drive. On the
+# day, the main notebook loads from that folder and nothing is downloaded or installed in the room.
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# Fill `MyDrive/fm-workshop-cache/` with everything the workshop needs and see ✅ everywhere.
+
+# %% [markdown]
+# **What you need**
 #
-# What you need: a Google account, this notebook open in **Google Colab**, and ~400 MB of free space on Drive.
-# No GPU is needed for this check. Run every cell from top to bottom (**Runtime → Run all**), then read the
-# summary at the bottom. If a line shows ❌, run the notebook again: every download picks up where it stopped.
-# If it still fails, send the summary to the organisers.
+# - A Google account.
+# - This notebook open in **Google Colab**.
+# - About 400 MB of free space on Drive. No GPU is needed.
+
+# %% [markdown]
+# **How to run it**
+#
+# 1. **Runtime → Run all.**
+# 2. Read the summary at the bottom.
+# 3. If a line shows ❌, run the notebook again: every download picks up where it stopped.
+# 4. If it still fails, send the summary to the organisers.
 
 # %% [markdown]
 # ## 1. Where things go
@@ -22,6 +31,7 @@
 # This cell detects where you are running and decides the cache folder; nothing is downloaded yet.
 
 # %%
+# @title Decide where the files go { display-mode: "form" }
 import os
 import sys
 import time
@@ -39,11 +49,9 @@ LOCAL_MODE = not SOURCE.startswith(("http://", "https://"))
 
 if LOCAL_MODE:
     CACHE_DIR = Path(os.environ.get("FM_SETUP_CACHE", "build/setup-check-cache")).resolve()
-    HF_CACHE_DIR = None  # the machine's own Hugging Face cache
 else:
     CACHE_DIR = Path("/content/drive/MyDrive/fm-workshop-cache")  # the main notebook reuses this path
-    HF_CACHE_DIR = CACHE_DIR / "hf"  # model weights, in Hugging Face's cache layout
-    os.environ["HF_HUB_CACHE"] = str(HF_CACHE_DIR)  # must be set before torch/timm/transformers are imported
+HF_CACHE_DIR = None  # models are plain files in CACHE_DIR/models/ (no Hugging Face cache layout, no symlinks)
 
 TRY_SAM3 = os.environ.get("FM_TRY_SAM3", "1" if IN_COLAB else "0") == "1"  # optional, never required
 
@@ -66,6 +74,7 @@ print(f"Colab: {IN_COLAB} · source: {SOURCE}\ncache folder: {CACHE_DIR}")
 # local folder instead.
 
 # %%
+# @title Mount Google Drive { display-mode: "form" }
 if IN_COLAB and not LOCAL_MODE:
     try:
         from google.colab import drive
@@ -93,6 +102,7 @@ except OSError as err:
 # This cell checks the session's GPU and the packages the workshop imports; it only reports, it never stops.
 
 # %%
+# @title Check the GPU and the packages { display-mode: "form" }
 import torch
 
 if torch.cuda.is_available():
@@ -190,6 +200,7 @@ def sync_files(files: list[dict]) -> dict[str, dict]:
 
 
 # %%
+# @title Download data, features and checkpoints { display-mode: "form" }
 if "REPLACE-ME" in SOURCE:
     record(
         "Data and precomputed files", False, "the release is not published yet (BASE_URL is a placeholder)"
@@ -214,8 +225,9 @@ else:
 # %% [markdown]
 # ## 5. Models
 #
-# This cell downloads the two foundation models from Hugging Face into the cache (no account needed), verifies
-# the weight files against the checksums Hugging Face publishes, and loads each one once on the CPU.
+# This cell downloads the two foundation models from Hugging Face into `models/` in the cache (no account
+# needed), verifies the weight files against the checksums Hugging Face publishes, and loads each one once
+# on the CPU. Each model is a plain folder of files, so it survives in your Drive between Colab sessions.
 
 # %%
 # @title Model helpers { display-mode: "form" }
@@ -228,54 +240,109 @@ SAM_LICENCE = "Apache-2.0"
 SAM3_ID = "facebook/sam3"
 
 
+MODEL_DONE = ".fm-complete.json"  # written last; the main notebook looks for it (see sections/00_setup.py)
+
+
+def model_dir(repo_id: str) -> Path:
+    """Where a model lives: CACHE_DIR/models/<org>--<name>/, plain files (same rule as the main notebook)."""
+    return CACHE_DIR / "models" / repo_id.replace("/", "--")
+
+
+def model_files(folder: Path) -> list[Path]:
+    """The model's own files, without Hugging Face's bookkeeping (.cache/) and our marker."""
+    return [
+        p
+        for p in sorted(folder.rglob("*"))
+        if p.is_file() and ".cache" not in p.relative_to(folder).parts and p.name != MODEL_DONE
+    ]
+
+
+def is_cached(folder: Path) -> bool:
+    """True when the folder holds every file listed in its marker, with the same size and sha256."""
+    try:
+        saved = json.loads((folder / MODEL_DONE).read_text())
+    except (OSError, ValueError):
+        return False
+    found = {p.relative_to(folder).as_posix(): p for p in model_files(folder)}
+
+    def same(name: str, meta: dict) -> bool:
+        path = found.get(name)
+        return path is not None and path.stat().st_size == meta["bytes"] and sha256_of(path) == meta["sha256"]
+
+    return bool(saved) and all(same(name, meta) for name, meta in saved.items())
+
+
+def mark_cached(folder: Path) -> None:
+    """Record size and sha256 of every file, so the next run can tell the folder is complete."""
+    meta = {
+        p.relative_to(folder).as_posix(): {"bytes": p.stat().st_size, "sha256": sha256_of(p)}
+        for p in model_files(folder)
+    }
+    (folder / MODEL_DONE).write_text(json.dumps(meta, indent=1))
+
+
 def verify_snapshot(repo_id: str, folder: Path, token: str | None) -> tuple[int, int]:
-    """Re-hash the weight files of a downloaded snapshot against the sha256 the Hub publishes for them."""
+    """Re-hash the weight files against the Hub's sha256; delete bad ones so a re-run fetches them again."""
     try:
         info = HfApi().model_info(repo_id, files_metadata=True, token=token)
         expected = {s.rfilename: s.lfs.sha256 for s in info.siblings if s.lfs}
-    except Exception:  # noqa: BLE001 - offline: the cache's blob names are those same sha256 values
+    except Exception:  # noqa: BLE001 - offline: nothing to compare with; the marker still records the hashes
         expected = {}
-        for p in folder.rglob("*"):
-            blob = Path(os.path.realpath(p)).name
-            if p.is_file() and len(blob) == 64:
-                expected[p.relative_to(folder).as_posix()] = blob
     checked, bad = 0, 0
     for name, sha in expected.items():
         if (folder / name).is_file():
             checked += 1
-            bad += sha256_of(folder / name) != sha
+            if sha256_of(folder / name) != sha:
+                bad += 1
+                (folder / name).unlink()
     return checked, bad
 
 
 def cache_model(item: str, repo_id: str, licence: str, load) -> None:
     t = time.monotonic()
+    folder = model_dir(repo_id)
     try:
-        folder = Path(snapshot_download(repo_id, token=HF_TOKEN))
-        checked, bad = verify_snapshot(repo_id, folder, HF_TOKEN)
-        if bad:
-            record(item, False, f"{bad} of {checked} weight files failed their checksum: run this cell again")
-            return
-        load()
-        mb = sum(p.stat().st_size for p in folder.rglob("*") if p.is_file()) / 2**20
+        cached = is_cached(folder)
+        if not cached:
+            snapshot_download(repo_id, local_dir=folder, token=HF_TOKEN)  # plain files, no symlinks
+            checked, bad = verify_snapshot(repo_id, folder, HF_TOKEN)
+            if bad:
+                msg = f"{bad} of {checked} weight files failed their checksum: run this cell again"
+                record(item, False, msg)
+                return
+            mark_cached(folder)
+        load(folder)
+        mb = sum(p.stat().st_size for p in model_files(folder)) / 2**20
+        note = " · already cached" if cached else ""
         record(
-            item, True, f"{repo_id} · {licence} · {mb:.0f} MB · loads on CPU · {time.monotonic() - t:.0f} s"
+            item,
+            True,
+            f"{repo_id} · {licence} · {mb:.0f} MB · loads on CPU · {time.monotonic() - t:.0f} s{note}",
         )
     except Exception as err:  # noqa: BLE001 - one plain line instead of a traceback
         record(item, False, f"{repo_id}: {type(err).__name__}: {str(err).splitlines()[0][:160]}")
 
 
-def load_dino() -> None:
-    timm.create_model("vit_small_patch16_dinov3.lvd1689m", pretrained=True, num_classes=0).eval()
+def load_dino(folder: Path) -> None:
+    weights = folder / "model.safetensors"
+    weights = weights if weights.is_file() else sorted(folder.glob("*.safetensors"))[0]
+    timm.create_model(
+        "vit_small_patch16_dinov3.lvd1689m",
+        pretrained=True,
+        num_classes=0,
+        pretrained_cfg_overlay={"file": str(weights)},  # load these plain files, not the hub cache
+    ).eval()
 
 
-def load_sam() -> None:
+def load_sam(folder: Path) -> None:
     from transformers import Sam2Model, Sam2Processor
 
-    Sam2Processor.from_pretrained(SAM_ID)
-    Sam2Model.from_pretrained(SAM_ID).eval()
+    Sam2Processor.from_pretrained(str(folder))
+    Sam2Model.from_pretrained(str(folder)).eval()
 
 
 # %%
+# @title Download and check the two models { display-mode: "form" }
 HF_TOKEN = os.environ.get("HF_TOKEN")  # only matters for SAM 3; DINOv3 and SAM 2.1 need no account
 if IN_COLAB and HF_TOKEN is None:
     try:
@@ -296,6 +363,7 @@ cache_model("SAM 2.1 hiera-small", SAM_ID, SAM_LICENCE, load_sam)
 # otherwise it says so and moves on.
 
 # %%
+# @title Cache SAM 3 if you have access { display-mode: "form" }
 if not TRY_SAM3:
     record("SAM 3 (optional)", None, "skipped", icon="⏭️")
 elif HF_TOKEN is None:
@@ -307,9 +375,15 @@ elif HF_TOKEN is None:
     )
 else:
     try:
-        folder = Path(snapshot_download(SAM3_ID, token=HF_TOKEN))
-        checked, bad = verify_snapshot(SAM3_ID, folder, HF_TOKEN)
-        record("SAM 3 (optional)", not bad, f"{SAM3_ID} cached ({checked} weight files checked)")
+        folder = model_dir(SAM3_ID)
+        if is_cached(folder):
+            record("SAM 3 (optional)", True, f"{SAM3_ID} · already cached")
+        else:
+            snapshot_download(SAM3_ID, local_dir=folder, token=HF_TOKEN)  # plain files, no symlinks
+            checked, bad = verify_snapshot(SAM3_ID, folder, HF_TOKEN)
+            if not bad:
+                mark_cached(folder)
+            record("SAM 3 (optional)", not bad, f"{SAM3_ID} cached ({checked} weight files checked)")
     except Exception as err:  # noqa: BLE001 - optional: never a ❌
         msg = f"not available for this account ({type(err).__name__}). SAM 2.1 is enough."
         record("SAM 3 (optional)", None, msg, icon="⏭️")
@@ -320,6 +394,7 @@ else:
 # This cell prints one line per item and writes the result into the cache, where the main notebook reads it.
 
 # %%
+# @title Print the summary { display-mode: "form" }
 TOTAL_S = time.monotonic() - T0
 failed = [k for k, (icon, _) in CHECKS.items() if icon == "❌"]
 print("\n".join(f"{icon} {item}: {msg}" for item, (icon, msg) in CHECKS.items()))
@@ -329,7 +404,7 @@ if failed:
         f"❌ {len(failed)} item(s) failed: {', '.join(failed)}. Run the notebook again (Runtime → Run all)."
     )
 else:
-    print("✅ All set. You can close this notebook; on the workshop day open the main one.")
+    print("✅ All set. Run the last cell, then close this notebook; on the workshop day open the main one.")
 SETUP_RESULT = {
     "ok": not failed,
     "checks": {k: {"icon": i, "message": m} for k, (i, m) in CHECKS.items()},
@@ -343,10 +418,31 @@ except OSError as err:
     print(f"(could not write setup-check.json: {err})")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FFF8E1"><tr><td><font color="#5D4037">🧾 <b>What the main notebook reuses.</b>
-# <code>CACHE_DIR</code> = <code>MyDrive/fm-workshop-cache/</code>, holding <code>data/</code> (images, masks,
-# scribbles), <code>precomputed/</code> (DINOv3 features, SAM pseudo-labels, head checkpoints),
-# <code>hf/</code> (model weights, loaded with <code>HF_HUB_CACHE</code> pointing there),
-# <code>specialised.json</code>, <code>manifest.json</code> and <code>setup-check.json</code>.
-# DINOv3 weights come with Meta's DINOv3 License, SAM 2.1 with Apache-2.0.
-# </font></td></tr></table>
+# <!-- callout: note | What the main notebook reuses -->
+# `MyDrive/fm-workshop-cache/` holds:
+#
+# - `data/`: images, masks, scribbles.
+# - `precomputed/`: DINOv3 features, SAM pseudo-labels, head checkpoints.
+# - `models/`: model weights, one plain folder per model.
+# - `specialised.json`, `manifest.json`, `setup-check.json`.
+
+# %% [markdown]
+# <!-- callout: takeaway | Takeaway -->
+# - When every line is ✅ → close this notebook; on the workshop day open the main one.
+# - When a line shows ❌ → run the notebook again (Runtime → Run all); downloads resume where they stopped.
+# - When "Google Drive is not mounted" → run the Drive cell again and click Allow on every permission.
+# - When there is no GPU → fine for this check; pick the T4 GPU runtime on the workshop day.
+
+# %% [markdown]
+# ## 8. Flush Drive
+#
+# Drive is flushed and unmounted so the cache is complete; the main notebook mounts it again.
+
+# %%
+# @title Flush and unmount Drive { display-mode: "form" }
+if IN_COLAB and not LOCAL_MODE:
+    try:
+        drive.flush_and_unmount()
+        print("✅ Drive flushed and unmounted. The cache is complete; you can close this notebook.")
+    except Exception as err:  # noqa: BLE001 - the cache is written either way; just ask for a short wait
+        print(f"(could not flush Drive: {type(err).__name__}: {err}). Wait a minute before closing this tab.")

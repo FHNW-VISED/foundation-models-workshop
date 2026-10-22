@@ -1,6 +1,6 @@
 # RULES — every notebook
 
-Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-19.
+Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-21.
 Do not edit here; SPEC.md › Notebook-specific rules (L-xxx) override these for this notebook.
 Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = read for it.
 
@@ -39,3 +39,19 @@ Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = re
 | N-031 | Every code cell a participant runs is preceded by one sentence saying what it does and why. Understanding over execution. | review |
 | N-032 | The material (notebook, setup check, data) is shared before the session, and the required skills and prerequisites are stated at the top of the notebook. | review |
 | N-033 | Every notebook ships a facilitation guide (`FACILITATION.md`) for whoever presents it: per section, what to say, what learners do, minutes, where to pause, the show-of-hands or pair moments. It is generated from the SPEC. | review |
+| N-034 | Callouts and the title banner are HTML **output** of a hidden code cell (`# @title` with no text, form view) whose output the build saves into the `.ipynb`, so the box shows before anything runs and re-running redraws it. Never markdown tables for coloured boxes: Colab sets `white-space: nowrap; overflow: hidden` on table cells and cuts the text. Coloured text in a markdown blockquote is the fallback. | lint |
+| N-035 | Every cell the learner only runs (no value to change, no code to write) is collapsed with `# @title <what it does>`, plotting and demo cells included. Only cells the learner edits show code. | lint |
+| N-036 | No walls of text. A markdown cell holds at most three short paragraphs or one list; enumerations and questions are bullet lists, link collections a compact list or table with one line each, and blank space separates blocks. | review |
+| N-037 | Show before asking: learners see example images or data before any question that asks them to judge that data. | review |
+| N-038 | Every theory or checklist point carries a concrete example from the notebook's own story (e.g. the park's cameras in winter and summer), and every criterion a question asks about must be answerable from what the notebook shows. | review |
+| N-039 | Every statistic is defined in one plain line (how it is computed) where it first appears, and shown on real images: the minimum, a typical (median) and the maximum side by side. | review |
+| N-040 | Distributions are drawn as violin plots, not box plots. | lint |
+| N-041 | A question gives the learner every input it needs (invent concrete numbers if necessary), and a question about the shape of a plot shows tiny example plots of the possible shapes right under it. | review |
+| N-042 | A non-obvious mechanism gets a small visual and, where it helps, its formula (bilinear interpolation, perceptual-hash bit distance). When a result would look identical to the reference in the same encoding, show it in a different one (e.g. a heatmap of the interpolated mask). | review |
+| N-043 | No cryptic sentences: every abstract claim is anchored in a concrete scenario, and a scenario is written as short numbered steps, each with its consequence, plus a small visual of what the learner should look for. | review |
+| N-044 | Objective lines and Takeaways each have their own colour. A Takeaway is a list of "When you see X → do Y" lines. | review |
+| N-045 | No licence or attribution text in learner-facing notebooks; credits live in the repo (README, `data/ATTRIBUTION.md`). | review |
+| N-046 | The reference solution of a learner-code cell sits in a collapsed helper cell above the stub, never visible right under it; `use(…)` still falls back to it so Run all never blocks (N-029). | review |
+| N-047 | The notebook fits its slot. Each section has a minute budget in the SPEC; after every build a cutting review proposes what to drop, and only Simone approves removals. | review |
+| N-048 | Main points are visually dominant; depth is visibly secondary (collapsed `<details>` or a muted "Go deeper" callout), so a learner who only reads the coloured parts still gets the lesson. | review |
+| N-049 | An abstract pitfall is shown with a tiny, slightly playful simulation on the notebook's own data (e.g. a fake model that always answers "sheep"), not only described. | review |

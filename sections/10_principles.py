@@ -1,14 +1,19 @@
 # %% [markdown]
 # ## 10. Guiding principles & wrap-up
 #
-# **Objective:** turn the results into rules you can reuse.
-#
 # A table is good for one decision; a rule is what you take to the next problem. This last section reads the
-# numbers *your* session produced in sections 1 to 8 and writes them up as a handful of principles, each with
-# the evidence attached. They are not general truths about foundation models: they are what this run, on
-# this task, with these settings, actually showed. If your neighbour's session ran with other settings, some
-# of the sentences may read differently, and that is fine.
+# numbers *your* session produced in sections 1 to 8 and writes them up as a handful of principles, each
+# with its evidence.
 #
+# They are not general truths about foundation models. They are what this run, on this task, with these
+# settings, showed. If your neighbour's session ran with other settings, some sentences may read
+# differently, and that is fine.
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# turn the results into rules you can reuse.
+
+# %% [markdown]
 # This cell draws the whole story in one picture: the pets one box got almost right, the same box on the
 # specialised task, and the best approach of every path on the same hidden ground truth.
 
@@ -48,9 +53,8 @@ plt.show()
 # %% [markdown]
 # ### 10.1 The principles, from your numbers
 #
-# This cell writes four to six rules from the numbers above, each one a sentence of advice followed by the
-# evidence from this session. The wording follows the numbers: if a lesson did not hold in your run, the
-# sentence says so instead of pretending it did.
+# The next cell writes six rules as cards, each with the evidence from your session (a rule with your own
+# number attached tells you how strongly to believe it), and says so where a lesson did not hold in your run.
 
 # %%
 # @title Principles from this run { display-mode: "form" }
@@ -80,7 +84,8 @@ def p_resolution() -> str:
         rule = "Check the resolution first: a patch feature describes a 16 px block, not a pixel."
     fact = (
         f"The same head on complete masks scored IoU {a['iou']:.2f} at {lo} px and {b['iou']:.2f} at {hi} px "
-        f"(clDice {a['cldice']:.2f} → {b['cldice']:.2f}), against {RESULTS['pets_head_iou']:.2f} on pets."
+        f"(clDice {a['cldice']:.2f} → {b['cldice']:.2f}); on pets the same kind of head scored "
+        f"{RESULTS['pets_head_iou']:.2f}."
     )
     if b["iou"] - a["iou"] < 0.05:
         return f"{rule} {fact} More pixels helped little, so the limit is the patch: plan for cheap labels."
@@ -171,29 +176,40 @@ PRINCIPLES = [
     p_minutes_before_hours(),
 ]
 RESULTS["principles"] = PRINCIPLES
-print(f"Principles from this session ({SPECIALISED['name']}, {len(SPEC_EVAL)} held-out images, {DEVICE}):\n")
-for n, text in enumerate(PRINCIPLES, start=1):
-    print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
+headline = f"Principles from this session ({SPECIALISED['name']}, {len(SPEC_EVAL)} held-out images, {DEVICE})"
+try:
+    from html import escape
+
+    from IPython.display import HTML, display
+
+    cards = ""
+    for n, text in enumerate(PRINCIPLES, start=1):
+        rule, _, evidence = text.partition(". ")  # the rule is the first sentence, the rest is the evidence
+        cards += (
+            f'<div style="flex:1 1 300px;background:#EDE7F6;border-left:6px solid {THEME["works"]};'
+            'border-radius:6px;padding:10px 12px;color:#311B92;line-height:1.45">'
+            f'<div style="font-weight:bold;font-size:15px">{n}. {escape(rule.rstrip("."))}.</div>'
+            f'<div style="font-size:12px;margin-top:5px;color:#4527A0">{escape(evidence)}</div></div>'
+        )
+    display(
+        HTML(
+            f'<div style="font-weight:bold;color:#311B92;margin:4px 0">{escape(headline)}</div>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:8px">{cards}</div>'
+        )
+    )
+except ImportError:  # no IPython: plain text
+    print(headline + ":\n")
+    for n, text in enumerate(PRINCIPLES, start=1):
+        print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#EDE7F6"><tr><td><font color="#311B92">📘 <b>Theory: why the principles are
-# generated, not written.</b> A rule copied from a slide ("SAM is great", "always fine-tune") tends to be
-# true on the slide's data. A rule with your own number attached tells you how strongly to believe it and
-# what to measure on the next problem to check it again. The same six questions carry over to any task:
-# is the out-of-the-box result above the trivial line, is the structure smaller than a patch, what do the
-# gaps in the labels mean, does the model beat the hints alone, which mistake costs most, and how many
-# minutes does every new image cost.</font></td></tr></table>
+# <!-- callout: your-turn | Your turn (2 min) -->
+# **Q36.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
+# section 9). Which of the principles above would have changed what you did first, and what number would you
+# measure to check it?
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (2 min).</b> Think of
-# one segmentation or detection problem of your own: at work, in your research, or the images you used in
-# section 9. Write it in one line, then the first thing you would do on Monday, as a rule with a number you
-# would measure. The cell only prints it back; nothing is checked.</font></td></tr></table>
-#
-# **Q36.** 🟢 Which of the principles above would have changed what you did first on your own problem, and
-# what number would you measure to check it? Write the problem and your first step in the next cell.
-#
-# This cell prints your problem and first step next to the principle you picked, so you leave with one line
-# you can act on.
+# - Write the problem and your first step on Monday, as a rule with a number, in the next cell.
+# - The cell prints them next to the principle you picked and checks nothing.
 
 # %%
 # Q36 — your problem and your first step (leave "" to skip)
@@ -214,93 +230,115 @@ else:
 # %% [markdown]
 # <details><summary>A possible answer</summary>
 #
-# Take cracks in drone photos of bridges. They are thin, like vessels, so principle 2 changes the plan: before
-# training anything, run one box and one feature head on ten images at two input sizes and see whether the
-# larger one moves clDice at all. If it does not, the patch is the limit, and the first afternoon goes into
-# strokes on twenty images rather than into a bigger model. The number to measure is the gap between the
-# head and the "everything" line on a small test set you label completely, a few images, once. A different
-# problem gives a different first step; what carries over is the habit of writing the step with the number
-# that would prove it wrong.
+# Take cracks in drone photos of bridges. They are thin, like vessels, so principle 2 changes the plan.
+#
+# 1. Run one box and one feature head on ten images at two input sizes.
+# 2. See whether the larger size moves clDice at all.
+# 3. If it does not, the patch is the limit: spend the first afternoon on strokes for twenty images, not
+#    on a bigger model.
+#
+# The number to measure is the gap between the head and the "everything" line on a small test set you
+# label completely, a few images, once. A different problem gives a different first step; what carries
+# over is writing the step with the number that would prove it wrong.
 #
 # </details>
-#
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Show of hands.</b> Which
-# principle would you have got wrong this morning, before section 1? And which one would you most like to
-# check on your own data next week?</font></td></tr></table>
-#
+
+# %% [markdown]
+# <!-- callout: question | Show of hands -->
+# - Which principle would you have got wrong this morning, before section 1?
+# - Which one would you most like to check on your own data next week?
+
+# %% [markdown]
 # ### 10.2 What you can do now
+
+# %% [markdown]
+# At the end you can:
 #
-# <table width="100%" bgcolor="#4A148C"><tr><td>
-# <font color="white" size="4"><b>The three outcomes from the start, and where you practised each.</b></font>
-# <ol>
-# <li><font color="white"><b>Judge when a vision foundation model is good enough out of the box, and
-# recognise the signs that it is not.</b> Sections 1 and 2: the same box on pets and on the specialised task,
-# the "everything" line, more clicks making the mask bigger instead of thinner, the 16 px patch.</font></li>
-# <li><font color="white"><b>Adapt it with cheap, incomplete supervision, and explain what each approach
-# uses and assumes.</b> Sections 3 to 7: one complete example, strokes, a loss that treats the gaps as
-# unknown, pseudo-labels from SAM and from Grad-CAM, and prompts on every image.</font></li>
-# <li><font color="white"><b>Compare approaches on accuracy, annotation effort, reliability and compute, and
-# decide what to do next on a new problem, including your own images.</b> Section 8's table, section 9's
-# disagreement maps without a referee, and the principles above.</font></li>
-# </ol>
-# </td></tr></table>
+# 1. **Judge when a vision foundation model is good enough out of the box**, and recognise the signs that it
+#    is not (sections 1 and 2).
+# 2. **Adapt it with cheap, incomplete supervision**, and explain what each approach uses and assumes
+#    (sections 3 to 7).
+# 3. **Compare approaches** on accuracy, annotation effort, reliability and compute, and decide what to do
+#    next on a new problem, including your own images (sections 8 and 9).
+
+# %% [markdown]
+# <!-- callout: takeaway | When you see X, do Y: the whole workshop -->
+# - **When** one box scores about the same as "mark everything", or the structure is thinner than a 16 px
+#   patch **→** compare with the "everything" line, trust clDice over IoU, and try a larger input
+#   (sections 1 and 2).
+# - **When** labels are partly missing, or you only have strokes **→** treat an unlabelled pixel as unknown,
+#   turn strokes into pseudo-labels or SAM prompts, and compare with the thickened strokes alone
+#   (sections 3 and 5 to 7).
+# - **When** two approaches differ by less than their spread, or a method needs strokes on every one of
+#   thousands of new images **→** call it a tie and choose by annotation minutes; train a head once
+#   (section 8).
+# - **When** there is no ground truth **→** look where the approaches disagree, add a stroke there, and
+#   label a small test set before deciding (section 9).
 #
+# The same six questions carry over to any task:
+#
+# - Is the out-of-the-box result above the "everything" line?
+# - Is the structure smaller than a 16 px patch?
+# - What do the gaps in the labels mean?
+# - Does the model beat the hints alone?
+# - Which mistake costs most?
+# - How many minutes does every new image cost?
+
+# %% [markdown]
 # ### 10.3 Where to go next
 #
-# - **Label a small test set first.** A few completely annotated images of your own problem turn every
-#   later decision into a measurement, as the hidden ground truth did here.
-# - **Let the model choose the next stroke.** Section 9's disagreement map is the simplest form of
-#   interactive annotation and active learning: draw where the approaches disagree, retrain, repeat.
-# - **A light decoder instead of a linear head.** The heads here saw one 16 px patch at a time; a small
-#   upsampling decoder on the same frozen features is the next step before any fine-tuning.
-# - **The 🔴 parts you skipped.** The PU loss (section 5), Grad-CAM peaks as SAM clicks (section 6), SAM 3
-#   from a word (section 7) and adding strokes where the rungs disagree (section 9).
-# - **The original sources.** [DINOv3](https://github.com/facebookresearch/dinov3),
-#   [SAM 2](https://github.com/facebookresearch/sam2) and
-#   [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam) each come with examples worth an
-#   afternoon.
+# - **Label a small test set first**: a few fully annotated images turn every later decision into a
+#   measurement, as the hidden ground truth did here.
+# - **Let the model choose the next stroke**: draw where the approaches disagree (section 9), retrain, repeat.
+# - **A light decoder instead of a linear head**: a small upsampling decoder on the same frozen features
+#   comes before any fine-tuning.
+# - **The 🔴 parts you skipped**: PU loss (5), Grad-CAM peaks as clicks (6), SAM 3 from a word (7), extra
+#   strokes (9).
+# - **Sources**: [DINOv3](https://github.com/facebookresearch/dinov3) ·
+#   [SAM 2](https://github.com/facebookresearch/sam2) ·
+#   [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)
+
+# %% [markdown]
+# <!-- callout: across | Across approaches, one last time -->
+# The question on the first screen was what modern AI solves out of the box, when its limits start to
+# matter, and what to do next.
 #
-# ### 10.4 Credits and licences
+# Your session's answer is in the six principles above, with numbers. The foundation model was a starting
+# point, not an answer, and every way out paid for its gain in a different currency: minutes of strokes, a
+# wrong assumption about the gaps, a second model's mistakes, or a person pointing at every image.
 #
-# <table width="100%" bgcolor="#FFF8E1"><tr><td><font color="#5D4037">🧾 <b>Models, data and code used in
-# this notebook.</b>
-# <b>DINOv3</b> ViT-S/16 (Meta), via the <code>timm</code> re-host
-# <a href="https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m">timm/vit_small_patch16_dinov3.lvd1689m</a>,
-# under the DINOv3 License, Copyright © Meta Platforms, Inc. (the full notice is in section 0).
-# <b>SAM 2.1</b> hiera-small (Meta), <a href="https://huggingface.co/facebook/sam2.1-hiera-small">facebook/sam2.1-hiera-small</a>,
-# Apache-2.0. SAM 3, if you used it, comes under Meta's own SAM 3 licence, which you accepted on Hugging Face.
-# <b>Oxford-IIIT Pet</b>: Parkhi, Vedaldi, Zisserman and Jawahar, <i>Cats and Dogs</i>, CVPR 2012,
-# <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>; the subset shipped with this
-# workshop is resized and shared under the same licence. <b>pytorch-grad-cam</b> (Jacob Gildenblat and
-# contributors), MIT. The specialised dataset is printed by the next cell from the dataset config, and
-# every derived file (scribbles, hidden labels, pseudo-labels, features) carries its source's licence. The
-# full list is in <code>data/ATTRIBUTION.md</code>. Meta's terms are re-checked about four weeks before each
-# event.</font></td></tr></table>
-#
-# This cell prints the credits for the models and for the specialised dataset of this session, read from the
-# same config every section used, so they stay right if the dataset is swapped.
+# On your next problem, measure first, spend minutes before hours, and keep the table. Thank you for taking
+# part.
 
 # %%
-print("Models")
-print(f"  DINOv3 ViT-S/16 · {DINO_SOURCE} · {DINO_LICENCE}")
-print(f"  SAM 2.1 hiera-small · {SAM_ID} · {SAM_LICENCE}")
-print("Datasets")
-print(f"  {PETS['name']} · {PETS['task']} · {PETS['licence']}")
+# @title Credits: models and datasets of this session { display-mode: "form" }
 cfg = SPECIALISED
-print(f"  {cfg['name']} · {cfg['task']} · {cfg['licence']} ({cfg['licence_url']})")
-print(textwrap.fill(cfg["citation"], width=100, initial_indent="    ", subsequent_indent="    "))
-print(f"    {cfg['homepage']}")
-print(textwrap.fill(cfg["hook"], width=100, initial_indent="    effort figure: ", subsequent_indent="    "))
+print(f"DINOv3 ViT-S/16 · {DINO_SOURCE} · {DINO_LICENCE}")
+print(f"SAM 2.1 hiera-small · {SAM_ID} · {SAM_LICENCE}")
+print(f"{PETS['name']} · {PETS['licence']}")
+print(f"{cfg['name']} · {cfg['licence']} ({cfg['licence_url']})")
+print(textwrap.fill(cfg["citation"], width=100, initial_indent="  ", subsequent_indent="  "))
 RESULTS["credits"] = {
     "models": {DINO_SOURCE: DINO_LICENCE, SAM_ID: SAM_LICENCE},
     "datasets": {PETS["name"]: PETS["licence"], SPECIALISED["name"]: SPECIALISED["licence"]},
 }
 
 # %% [markdown]
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches, one last
-# time.</b> The question on the first screen was what modern AI solves out of the box, when its limits start
-# to matter, and what to do next. Your session's answer is in the six principles above, with numbers: the
-# foundation model was a starting point, not an answer, and every way out paid for its gain in a different
-# currency: minutes of strokes, a wrong assumption about the gaps, a second model's mistakes, or a person
-# pointing at every image. On your next problem, measure first, spend minutes before hours, and keep the
-# table. Thank you for taking part.</font></td></tr></table>
+# <!-- callout: go-deeper | Credits & licences -->
+# - **DINOv3** ViT-S/16 (Meta), via the `timm` re-host
+#   [timm/vit_small_patch16_dinov3.lvd1689m](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m).
+# - DINOv3 is licensed under the
+#   [DINOv3 License](https://huggingface.co/timm/vit_small_patch16_dinov3.lvd1689m), Copyright © Meta
+#   Platforms, Inc. All Rights Reserved. It allows research and commercial use under Meta's conditions and
+#   acceptable-use policy; keep this notice if you redistribute the weights or anything derived from them.
+#   SAM 2.1 is Apache-2.0.
+# - **SAM 2.1** hiera-small (Meta),
+#   [facebook/sam2.1-hiera-small](https://huggingface.co/facebook/sam2.1-hiera-small). SAM 3, if you used
+#   it, comes under Meta's own SAM 3 licence, which you accepted on Hugging Face.
+# - **Oxford-IIIT Pet**: Parkhi, Vedaldi, Zisserman and Jawahar, *Cats and Dogs*, CVPR 2012,
+#   [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The subset shipped with this workshop
+#   is resized and shared under the same licence.
+# - **pytorch-grad-cam** (Jacob Gildenblat and contributors), MIT.
+# - The specialised dataset is printed by the credits cell above, read from the dataset config.
+# - Every derived file (scribbles, hidden labels, pseudo-labels, features) carries its source's licence.
+#   The full list is in `data/ATTRIBUTION.md`.

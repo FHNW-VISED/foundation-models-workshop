@@ -29,6 +29,7 @@ dev = [
     "pytest>=8",
     "ruff>=0.6",
     "jupyterlab>=4",
+    "markdown>=3.11.2",
 ]
 
 [tool.ruff]

@@ -1,26 +1,33 @@
 # %% [markdown]
 # ## 9. Your own images
 #
-# **Objective:** scribble on your own images and run the ladder.
-#
 # Everything so far ran on our images, where a hidden ground truth told us who was right. This section is
-# the dress rehearsal for your next problem: pick one to three photos of your own (a leaf, a crack in a
-# wall, cells, a satellite tile, a pet), draw a few strokes on what you want and on what you do not want,
-# and run three rungs of the ladder on them: SAM with one box (zero-shot), the section-4 head trained on
-# *your* strokes, and SAM prompted with clicks from your strokes (Path 3). There is no ground truth here,
-# so you judge the masks the way you would on a real project: by eye, against your strokes, and by where
-# the three approaches disagree.
+# the dress rehearsal for your next problem.
 #
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: privacy.</b> Your
-# images never leave your Colab session: they are uploaded to this session's <code>/content</code> folder,
-# the canvas runs in your browser and sends your strokes only to your own Colab kernel, and nothing is
-# written to Drive. We never use a public share link (such as Gradio's <code>share=True</code>): that would
-# put your images on a public URL. Even so, pick images you are allowed to process in a cloud notebook:
-# no patient data, nothing under an NDA.</font></td></tr></table>
+# Pick one to three photos of your own (a leaf, a crack in a wall, cells, a satellite tile, a pet) and draw a
+# few strokes on what you want and on what you do not want. Then run three rungs of the ladder on them.
 #
-# This helper cell defines the tools of this section: shrinking an image to a workable size, our example
-# images, a drawing canvas inside Colab with two pens, and the code that turns a saved drawing (or a PNG you
-# painted elsewhere) into a stroke map: 0 nothing, 1 the thing, 2 background, as in section 4.
+# There is no ground truth here. You judge the masks the way you would on a real project: by eye, against
+# your strokes, and by where the three approaches disagree.
+
+# %% [markdown]
+# <!-- callout: objective | Objective -->
+# scribble on your own images and run the ladder.
+
+# %% [markdown]
+# <!-- callout: pitfall | Pitfall: privacy -->
+# - Your images stay in your Colab session: they go to this session's `/content` folder, and nothing is
+#   written to Drive.
+# - The canvas runs in your browser and sends your strokes only to your own Colab kernel.
+# - We never use a public share link (such as Gradio's `share=True`): that would put your images on a
+#   public URL.
+# - Even so, pick images you are allowed to process in a cloud notebook: no patient data, nothing under
+#   an NDA.
+
+# %% [markdown]
+# This helper cell defines the tools of this section: shrinking an image, our example images, a drawing
+# canvas with two pens, and the code that turns a drawing (or a PNG you painted elsewhere) into a stroke
+# map: 0 nothing, 1 the thing, 2 background, as in section 4.
 
 # %%
 # @title Your images: example, canvas, stroke decoding { display-mode: "form" }
@@ -107,20 +114,32 @@ def own_item(name: str, image: np.ndarray, source: str, auto=None, mask=None) ->
     }
 
 
+def shrink_strokes(strokes: np.ndarray, max_side: int) -> np.ndarray:
+    """Like `shrink` for strokes, but thin strokes survive: a pixel keeps a stroke if its block has one"""
+    if max(strokes.shape) <= max_side:
+        return strokes
+    out = np.zeros(shrink(strokes, max_side).shape, np.uint8)
+    for v in (2, 1):  # the thing wins over the background where they meet
+        layer = Image.fromarray(((strokes == v) * 255).astype(np.uint8))
+        out[np.array(layer.resize((out.shape[1], out.shape[0]), Image.BOX)) > 0] = v
+    return out
+
+
 def example_items(max_side: int) -> list[dict]:
-    """Our example: two held-out pets, with the strokes our scribble generator drew from their masks."""
+    """Our example: two held-out pets (compact) and one held-out retina image (thin vessels), with the strokes
+    our scribble generator drew from their masks."""
     out = []
-    for meta in PETS["held"][:2]:
-        it = load_item(PETS, meta)
-        out.append(
-            own_item(
-                it["name"],
-                shrink(it["image"], max_side),
-                "example",
-                auto=shrink(it["scribbles"], max_side),
-                mask=shrink(it["mask"], max_side),
-            )
+    for it in [load_item(PETS, meta) for meta in PETS["held"][:2]] + [SPEC_EVAL[0]]:
+        item = own_item(
+            it["name"],
+            shrink(it["image"], max_side),
+            "example",
+            auto=shrink_strokes(it["scribbles"], max_side),
+            mask=shrink(it["mask"], max_side),
         )
+        if it.get("fov") is not None:  # the retina's black border is not scored
+            item["fov"] = shrink(it["fov"], max_side)
+        out.append(item)
     return out
 
 
@@ -197,24 +216,32 @@ if IN_COLAB:
 
 # %% [markdown]
 # ### 9.1 Pick one to three images
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min): choose your images -->
+# By default the next cell uses our example: two held-out pets and one retina image, with strokes drawn by
+# our scribble generator. To use your own images:
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 2 min):
-# choose your images.</b> Run the next cell and pick one to three JPEG or PNG files with the upload button
-# that appears. Choose images that show the <i>same kind of thing</i> (the head is trained on all of them
-# together), where the thing is something a model trained on everyday photos may or may not know. Already
-# uploaded them with the folder icon on the left? Put their paths in <code>MY_IMAGES</code> instead. Press
-# Cancel, or set <code>USE_EXAMPLE = True</code>, to work on our example: two held-out pets with strokes
-# drawn by our scribble generator. Nothing here is mandatory.</font></td></tr></table>
+# 1. Tick `ASK_UPLOAD` in the next cell and run it.
+# 2. Pick one to three JPEG or PNG files in the upload button that appears (press Cancel to keep the example).
 #
-# This cell asks for your images (in Colab), keeps them in this session only, shrinks each one so its long
-# side is at most 1024 px (enough detail, and every step stays within seconds), and shows them.
+# - Choose images that show the *same kind of thing*: the head is trained on all of them together.
+# - Already uploaded them with the folder icon on the left? Put their paths in `MY_IMAGES` instead.
+#
+# Nothing here is mandatory.
+
+# %% [markdown]
+# This cell uploads your images only if `ASK_UPLOAD` is ticked (in Colab), shrinks each one to at most
+# 1024 px on its long side, and shows them.
 
 # %%
-USE_EXAMPLE = False  # True -> skip the upload and use our example images
+ASK_UPLOAD = False  # @param {type:"boolean"}
+# ASK_UPLOAD: set True to upload your own images; False uses the bundled example images.
+USE_EXAMPLE = False  # True -> use our example images even if you uploaded or listed your own
 MY_IMAGES = []  # or paths uploaded with the folder icon, e.g. ["/content/leaf1.jpg", "/content/leaf2.jpg"]
 OWN_MAX_SIDE = 256 if SMOKE else 1024  # long side, in pixels, after shrinking
-if not isinstance(USE_EXAMPLE, bool) or not isinstance(MY_IMAGES, list):
-    raise SystemExit("USE_EXAMPLE must be True or False, and MY_IMAGES a list of paths in quotes.")
+if not isinstance(ASK_UPLOAD, bool) or not isinstance(USE_EXAMPLE, bool) or not isinstance(MY_IMAGES, list):
+    raise SystemExit("ASK_UPLOAD, USE_EXAMPLE must be True or False; MY_IMAGES a list of paths in quotes.")
 missing = [p for p in MY_IMAGES if not Path(p).is_file()]
 if missing:
     raise SystemExit(f"not found: {missing}. Upload with the folder icon on the left and copy each path.")
@@ -222,7 +249,7 @@ if missing:
 seed_everything()
 OWN_STROKES.clear()  # a fresh start: strokes from an earlier run belong to earlier images
 own_paths = [Path(p) for p in MY_IMAGES]
-if IN_COLAB and not SMOKE and not USE_EXAMPLE and not own_paths:
+if ASK_UPLOAD and IN_COLAB and not USE_EXAMPLE and not own_paths:  # opt-in: Run all never waits here
     from google.colab import files
 
     print("Pick 1 to 3 images (JPEG or PNG), or press Cancel to use our example.")
@@ -248,44 +275,51 @@ for p in own_paths if not USE_EXAMPLE else []:
         print(f"⚠️ {p.name}: could not read it as an image ({type(err).__name__}), skipped. JPEG or PNG work.")
 if not OWN:
     OWN = example_items(OWN_MAX_SIDE)
-    print("ℹ️ Using our example: two held-out pets with generated strokes.")
+    print("ℹ️ Using our example: two held-out pets and one retina image, with generated strokes.")
 sizes = ", ".join(f"{it['name']} {it['image'].shape[1]}×{it['image'].shape[0]}" for it in OWN)
 print(f"{len(OWN)} image(s) · {sizes} · {OWN[0]['source']}")
 show_masks([(it["name"], it["image"]) for it in OWN], width=3.0)
 
 # %% [markdown]
 # ### 9.2 Draw your strokes 🖍️
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 4 min): scribble -->
+# Run the next cell: a canvas appears over each image.
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 4 min):
-# scribble.</b> Run the next cell: a canvas appears over each image. With the <b>the thing</b> pen
-# (teal), draw two to five short strokes <i>on</i> what you want segmented, on different parts of it; with
-# the <b>background</b> pen (grey), two to five strokes on what you do not want, especially near the
-# boundary and on anything that looks similar. Strokes, not outlines: a few seconds per image, the
-# annotation budget of section 4. Press <b>💾 save strokes</b> under each canvas, then run the cell after
-# the next text. On the example, drawing is optional: an image you do not save keeps its generated strokes.
-# </font></td></tr></table>
+# 1. With the **thing** pen (teal), draw two to five short strokes *on* what you want segmented, on
+#    different parts of it.
+# 2. With the **background** pen (grey), draw two to five strokes on what you do not want, especially near
+#    the boundary and on anything that looks similar.
+# 3. Press **💾 save strokes** under each canvas, then run the "collect strokes" cell further down.
 #
-# This cell draws one canvas per image. The drawing happens in your browser; the save button sends the
-# stroke layer, a small PNG, to this Colab kernel, where it is turned into a stroke map.
+# Strokes, not outlines: a few seconds per image, the annotation budget of section 4. On the example,
+# drawing is optional: an image you do not save keeps its generated strokes.
+
+# %% [markdown]
+# This cell draws one canvas per image; the save button sends your strokes, as a small PNG, to this Colab
+# kernel, where they become a stroke map.
 
 # %%
+# @title Draw your strokes on a canvas { display-mode: "form" }
 for k, it in enumerate(OWN):
     show_canvas(k, it["image"], f"image {k + 1} of {len(OWN)} · {it['name']}")
 if not IN_COLAB:
     print("ℹ️ Not in Colab: the canvases show, but saving needs Colab. Use the PNG fallback below.")
 
 # %% [markdown]
-# <table width="100%" bgcolor="#FDECEA"><tr><td><font color="#8B1A10">⚠️ <b>Pitfall: no canvas, or the save
-# button does nothing?</b> Some browsers or extensions block the canvas. The fallback: open a copy of your
-# image in any paint program (Preview, Paint, a phone's markup tool), draw the thing strokes in <b>pure
-# red</b> (255, 0, 0) and the background strokes in <b>pure blue</b> (0, 0, 255), save it as PNG, upload it
-# with the folder icon on the left, and put its path in <code>MY_STROKE_PNGS</code> below, one per image,
-# in the order above (<code>""</code> skips one). Any size works; it is scaled to the image.
-# </font></td></tr></table>
+# <!-- callout: pitfall | Pitfall: no canvas, or the save button does nothing? -->
+# Some browsers or extensions block the canvas. The fallback:
 #
-# This cell collects the strokes of every image (your PNGs first, then what the canvas saved, then, for the
-# example only, the generated strokes, passed through the same decoder as the canvas), checks that there is
-# something to learn from, counts the strokes and shows them.
+# 1. Open a copy of your image in any paint program (Preview, Paint, a phone's markup tool).
+# 2. Draw the thing strokes in **pure red** (255, 0, 0) and the background strokes in **pure blue**
+#    (0, 0, 255), and save it as PNG.
+# 3. Upload it with the folder icon on the left and put its path in `MY_STROKE_PNGS` below, one per image,
+#    in the order above (`""` skips one). Any size works.
+
+# %% [markdown]
+# This "collect strokes" cell gathers the strokes of every image (your PNGs, then the canvas, then the
+# generated strokes for the example), counts them and shows them.
 
 # %%
 MY_STROKE_PNGS = []  # fallback, e.g. ["/content/leaf1_strokes.png", ""]: one path (or "") per image, in order
@@ -330,21 +364,19 @@ show_strokes(LADDER_OWN)
 # %% [markdown]
 # ### 9.3 The ladder on your images
 #
-# Three rungs, the same recipes as before, nothing new to learn. **Zero-shot**: SAM with one box, the box a
-# person would draw around the thing (here: around your thing strokes, grown by 5 % of the image). **Your
-# scribble head**: the section-4 head, a linear layer on DINOv3 patch features, trained with the partial
-# cross-entropy on your strokes only, every unlabelled pixel ignored; with several images it learns from all
-# of them together. **SAM from your strokes**: ten clicks spread along your thing strokes and ten along
-# your background strokes, one SAM prompt per image (Path 3, section 7.1).
+# Three rungs, the same recipes as before, nothing new to learn.
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your prediction.</b> Think of
-# what your images show. Is your thing an "object" in SAM's sense (compact, a clear inside and outside), or
-# more like the vessels (thin, scattered, a texture)? Which of the three rungs do you expect to give the
-# cleanest mask on your images, and which one the worst? Write both down.</font></td></tr></table>
-#
-# This helper cell defines the three rungs on a list of images, plus the only check we have without a
-# ground truth: how much of your thing strokes a mask covers, and how much of your background strokes it
-# leaves alone.
+# - **Zero-shot**: SAM with one box, the box a person would draw around the thing (here: around your thing
+#   strokes, grown by 5 % of the image).
+# - **Your scribble head**: the section-4 head, a linear layer on DINOv3 patch features. It is trained with
+#   the partial cross-entropy on your strokes only (every unlabelled pixel ignored), on all your images
+#   together.
+# - **SAM from your strokes**: ten clicks along your thing strokes and ten along your background strokes,
+#   one SAM prompt per image (Path 3, section 7.1).
+
+# %% [markdown]
+# This helper cell defines the three rungs on a list of images, plus the only check we have without a ground
+# truth: how much of your thing strokes a mask covers, and how much of your background strokes it spares.
 
 # %%
 # @title The ladder on your images: box, head on your strokes, SAM from clicks { display-mode: "form" }
@@ -393,18 +425,20 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 
 
 # %% [markdown]
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">❓ <b>Question.</b> Run the next
-# cell and look at each row of masks.</font></td></tr></table>
+# <!-- callout: question | 🤔 Your prediction (1 min) -->
+# Look at your images and strokes above. Is your thing an "object" in SAM's sense (compact, a clear inside
+# and outside), or more like the vessels (thin, scattered, a texture)?
 #
-# **Q33.** 🟡 Which rung gave the mask you would keep, image by image? Compare with your prediction. Where
-# a rung failed, was it SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too
-# much), or the 16 px patches of the head (blocky edges, small parts lost), or your strokes (a part of the
-# thing you never touched)?
+# - Write down which of the three rungs you expect to give the cleanest mask, and which the worst.
+# - Then run the next cell (seconds on a T4, much slower on CPU): it shows each image with the three masks
+#   in the approach colours of sections 4 and 7, and the IoU on the example.
 #
-# This cell runs the three rungs on your images (on a CPU: about 10–20 s per image for SAM, the head in
-# seconds), prints the numbers we can compute without a ground truth, and shows each image with the
-# three masks in the approach colours of sections 4 and 7. On the example, which has a ground truth, it
-# also prints the IoU.
+# **Q33.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
+# Where a rung failed, was it:
+#
+# - SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too much)?
+# - the 16 px patches of the head (blocky edges, small parts lost)?
+# - your strokes (a part of the thing you never touched)?
 
 # %%
 # Q33 — the ladder on your images: zero-shot SAM, your scribble head, SAM from your strokes
@@ -435,17 +469,21 @@ for k in OWN_APPROACHES:
     }
     if has_truth:  # the example only: its ground truth scores, it never trains (L-005)
         pairs = zip(own_preds[k], LADDER_OWN, strict=True)
-        own_report[k]["iou"] = float(np.mean([iou(p, it["mask"]) for p, it in pairs]))
+        own_report[k]["iou"] = float(
+            np.mean([iou(p & region(it), it["mask"] & region(it)) for p, it in pairs])
+        )
     v = own_report[k]
     print(
         f"{APPROACH_NAMES[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
         f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
     )
-print("thing ✓ = share of your thing strokes inside the mask · bg ✓ = share of your bg strokes outside it")
+print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
+print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
 for n, it in enumerate(LADDER_OWN):
     panels = [(f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9))]
     for k in OWN_APPROACHES:
-        tag = f" · IoU {iou(own_preds[k][n], it['mask']):.2f}" if has_truth else ""
+        r_n = region(it)
+        tag = f" · IoU {iou(own_preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
         title = f"{APPROACH_NAMES[k].split(':')[0]}{tag}"
         panels.append((title, overlay(it["image"], own_preds[k][n], APPROACH_COLOURS[k])))
     if has_truth:
@@ -463,31 +501,55 @@ RESULTS["own_images"] = {
 RESULTS["own_images_ok"] = all(len(own_preds[k]) == len(LADDER_OWN) for k in OWN_APPROACHES)  # SPEC §9
 
 # %% [markdown]
-# <details><summary>What to look for</summary>
-#
-# The two percentages next to each rung are the only "score" you get on a real problem before anyone
-# labels a test set, and they are weak ones: SAM's clicks sit <i>on</i> your strokes and the head was
-# trained on them, so both should respect them; a low number there means the approach ignored what you
-# drew. The masks matter more. For a compact, photo-like thing, expect the three rungs to agree closely, as
-# on the pets in section 1: the foundation model already knows the object, and the box alone is often
-# enough. For a thin, scattered or textural thing, expect section 2 again: SAM's box grabs a region, the
-# clicks give one blob or several, and the head draws the thing at patch resolution but in all the right
-# places. If your strokes covered only one part of the thing, both the head and the clicks tend to stop at
-# that part: the information you did not give is information no rung has.
-#
-# </details>
-#
+# <!-- callout: go-deeper | How to read the stroke checks and the masks -->
+# - The two percentages are the only "score" you get on a real problem before anyone labels a test set, and
+#   they are weak. SAM's clicks sit *on* your strokes and the head was trained on them, so both should
+#   respect them. A low number means the approach ignored what you drew.
+# - The masks matter more. For a compact, photo-like thing, expect the three rungs to agree, as on the
+#   pets in section 1: the box alone is often enough.
+# - For a thin, scattered or textural thing, expect section 2 again. SAM's box grabs a region, the clicks
+#   give one blob or several, and the head draws the thing at patch resolution but in all the right places.
+# - If your strokes covered only one part of the thing, both the head and the clicks tend to stop at that
+#   part. Information you did not give is information no rung has.
+
+# %% [markdown]
 # ### 9.4 No ground truth: look where they disagree
 #
-# Without a ground truth, a useful habit is to run two or three different approaches and look at the
-# pixels where they disagree: that is where the image is hard, and where one more stroke is worth the most.
+# Without a ground truth, run two or three different approaches and look at the pixels where they
+# disagree. That is where the image is hard, and where one more stroke is worth the most.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: the disagreement map -->
+# The map is `True` on every pixel that **some** of the masks mark and **others** do not. Three masks over
+# four pixels:
 #
-# <table width="100%" bgcolor="#FFE8D6"><tr><td><font color="#7A2E00">✏️ <b>Your turn (optional, 2 min):
-# the disagreement map.</b> Fill <code>my_disagreement</code>. It takes a list of boolean masks of the
-# same image and returns a boolean map that is <code>True</code> where they do not all agree: some masks
-# mark the pixel and others do not. (<code>np.stack</code> puts the masks on a new first axis;
-# <code>.any(0)</code> and <code>.all(0)</code> reduce along it.) The cell checks your version on three
-# masks of four pixels each and continues with ours if you skip it.</font></td></tr></table>
+# ```
+# mask A      1 1 0 0
+# mask B      1 0 1 0
+# mask C      1 1 1 0
+# disagree    0 1 1 0
+# ```
+#
+# - **Low, a thin rim** along the thing: the rungs agree on *what* it is and differ only on the exact edge.
+# - **High, whole patches**: they disagree on what belongs to the thing. That is where the next stroke pays.
+
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min): the disagreement map -->
+# Fill `my_disagreement`.
+#
+# - **In:** a list of boolean masks of the same image.
+# - **Out:** a boolean map, `True` where they do not all agree (some mark the pixel, some do not).
+# - **Hint:** `np.stack` puts the masks on a new first axis; `.any(0)` and `.all(0)` reduce along it.
+#
+# The cell checks your version on the three play masks above and continues with ours if you skip it.
+
+# %%
+# @title Reference solution (open only if stuck) { display-mode: "form" }
+def _ref_disagreement(masks: list[np.ndarray]) -> np.ndarray:
+    """Reference: marked by some, not by all."""
+    stack = np.stack([np.asarray(m, bool) for m in masks])
+    return stack.any(0) & ~stack.all(0)
+
 
 # %%
 # ✍️ YOUR CODE
@@ -495,12 +557,6 @@ def my_disagreement(masks: list[np.ndarray]) -> np.ndarray:
     """Boolean map, same shape as each mask: True where the masks disagree (at least one marks the pixel and
     at least one does not)."""
     ...
-
-
-def _ref_disagreement(masks: list[np.ndarray]) -> np.ndarray:
-    """Reference: marked by some, not by all."""
-    stack = np.stack([np.asarray(m, bool) for m in masks])
-    return stack.any(0) & ~stack.all(0)
 
 
 _play_masks = [np.array([[1, 1, 0, 0]], bool), np.array([[1, 0, 1, 0]], bool), np.array([[1, 1, 1, 0]], bool)]
@@ -517,6 +573,7 @@ print("play example · three masks over four pixels → disagreement:", disagree
 # the image it covers, and shows it in orange next to your strokes.
 
 # %%
+# @title Disagreement map of the three rungs { display-mode: "form" }
 own_disagree = [disagreement([own_preds[k][n] for k in OWN_APPROACHES]) for n in range(len(LADDER_OWN))]
 RESULTS["own_images"]["disagreement"] = float(np.mean([d.mean() for d in own_disagree]))
 panels = []
@@ -529,55 +586,77 @@ for it, d in zip(LADDER_OWN, own_disagree, strict=True):
 show_masks(panels, width=2.8)
 
 # %% [markdown]
-# **Q34.** 🟡 Where is the orange: along the boundary of the thing, on whole parts of it, or on something
-# in the background that looks similar? If you could add only two more strokes per image, where would you
-# put them, and with which pen?
+# **Q34.** 🟡 Where is the orange?
+#
+# - Along the boundary of the thing?
+# - On whole parts of it?
+# - On something in the background that looks similar?
+#
+# If you could add only two more strokes per image, where would you put them, and with which pen? On the
+# example, compare the retina's orange with the pets'.
 #
 # <details><summary>What to look for</summary>
 #
-# A thin orange rim around the thing means the rungs agree on <i>what</i> it is and differ only on the exact
-# edge: SAM's sharp boundary against the head's 16 px squares. That is a resolution question, and more
-# strokes will not fix it. Whole orange parts mean they disagree on what belongs to the thing, usually a
-# part you never stroked or a background region that looks like it; that is exactly where the next stroke
-# pays. Put a thing stroke on a missed part, or a background stroke on a false alarm. This is the idea
-# behind interactive annotation tools and active learning: let the models show you where to look.
+# - A thin orange rim means the rungs agree on *what* it is and differ only on the exact edge: SAM's sharp
+#   boundary against the head's 16 px squares. That is a resolution question, and more strokes will not
+#   fix it.
+# - Whole orange parts mean they disagree on what belongs to the thing: usually a part you never stroked,
+#   or a background region that looks like it. That is exactly where the next stroke pays.
+# - Put a thing stroke on a missed part, or a background stroke on a false alarm. This is the idea behind
+#   interactive annotation and active learning: let the models show you where to look.
 #
 # </details>
+
+# %% [markdown]
+# **Q35.** 🔴 Test your answer to Q34.
 #
-# **Q35.** 🔴 Test your answer to Q34. Draw your two extra strokes per image on the canvas of 9.2 (draw
-# over the old ones, they stay until you press clear; on the example, a saved canvas replaces the generated
-# strokes, so draw a full set there), save, and run the cells from the stroke collection to here again.
-# Did the disagreement shrink where you drew? Did the head change elsewhere too?
+# 1. Draw your two extra strokes per image on the canvas of 9.2. Draw over the old ones; they stay until
+#    you press clear. On the example, a saved canvas replaces the generated strokes, so draw a full set.
+# 2. Save, and run the cells from the stroke collection to here again.
+# 3. Did the disagreement shrink where you drew? Did the head change elsewhere too?
 #
 # <details><summary>What to look for</summary>
 #
-# SAM from clicks changes only on the image you drew on, near the new clicks. The head changes on every
-# image, because it learns one rule from all the strokes together: a background stroke on a false alarm in
-# one image can remove similar false alarms in another, or, if the two regions really are the same kind
-# of thing, remove true parts too. That is the trade-off of section 8 in miniature: a trained head pays
-# annotation once and spreads it everywhere, for better and for worse; direct prompting stays local.
+# - SAM from clicks changes only on the image you drew on, near the new clicks.
+# - The head changes on every image, because it learns one rule from all the strokes together. A
+#   background stroke on a false alarm in one image can remove similar false alarms in another, or, if the
+#   two regions really are the same kind of thing, remove true parts too.
+# - That is the trade-off of section 8 in miniature: a trained head pays annotation once and spreads it
+#   everywhere, for better and for worse; direct prompting stays local.
 #
 # </details>
+
+# %% [markdown]
+# <!-- callout: question | 👥 Pairs, 5 min: compare your images -->
+# Show your neighbour your strokes, your three masks and your disagreement map.
 #
-# <table width="100%" bgcolor="#F3E5F5"><tr><td><font color="#4A148C">👥 <b>Pairs, 5 min: compare your
-# images.</b> Show your neighbour your strokes, your three masks and your disagreement map. Whose thing was
-# easier for the foundation model, and what made it easier: its shape, its contrast, how "photo-like" it
-# is? Did the same rung win on both your images? Agree on one sign you would look for, on a new problem,
-# that says "a box will do" versus "I need strokes and a head".</font></td></tr></table>
-#
+# - Whose thing was easier for the foundation model, and what made it easier: its shape, its contrast, how
+#   "photo-like" it is?
+# - Did the same rung win on both your images?
+# - Agree on one sign you would look for, on a new problem, that says "a box will do" versus "I need
+#   strokes and a head".
+
+# %% [markdown]
 # <details><summary>What pairs usually find</summary>
 #
-# Compact, everyday objects (a mug, a pet, a car, a leaf on a plain background) make all three rungs agree,
-# and the zero-shot box is often already the mask you would keep. Thin, repeated, textural or specialist
-# things (cracks, cells, vessels, roads from above, defects) make them disagree, and the trained head or
-# many small prompts start to matter. The sign to look for is the one from section 2: if the thing is not
-# an "object" with a clear inside and outside, or is much smaller than a 16 px patch, plan for strokes.
+# - Compact, everyday objects (a mug, a pet, a car, a leaf on a plain background) make all three rungs
+#   agree, and the zero-shot box is often already the mask you would keep.
+# - Thin, repeated, textural or specialist things (cracks, cells, vessels, roads from above, defects) make
+#   them disagree, and the trained head or many small prompts start to matter.
+# - The sign to look for is the one from section 2: if the thing is not an "object" with a clear inside
+#   and outside, or is much smaller than a 16 px patch, plan for strokes.
 #
 # </details>
+
+# %% [markdown]
+# <!-- callout: takeaway | When you see X, do Y: on your own images -->
+# - **When** your thing is compact and photo-like and the three rungs agree **→** the zero-shot box is
+#   probably enough; stop there.
+# - **When** the rungs disagree on whole parts of the thing **→** add a thing stroke on the missed part or
+#   a background stroke on the false alarm, then rerun.
+# - **When** only a thin rim disagrees **→** that is the 16 px patch against SAM's sharp edge; more strokes
+#   will not fix it.
+# - **When** there is no ground truth **→** use your strokes and the disagreement map as a sanity check,
+#   then label a few images completely so the next decision is measured.
 #
-# <table width="100%" bgcolor="#E8EAF6"><tr><td><font color="#1A237E">🔀 <b>Across approaches.</b> On your
-# own images the comparison loses its referee: there is no hidden ground truth, so the table of section 8
-# becomes a judgement. What remains is what you used in this section: your strokes as a sanity check, the
-# disagreement between approaches as a map of where to look, and your eye. On a real project, that is the
-# moment to label a small, fully annotated test set, a few images, so the next decision is measured again.
-# Section 10 turns all of this into rules you can take to the next problem.</font></td></tr></table>
+# Section 10 turns all of this into rules you can take to the next problem.
