@@ -1,0 +1,11 @@
+# Versions
+
+One folder per version of the notebook: `SPEC.md` and the built notebook exactly as they were.
+The newest folder is always the notebook on `main`. Make one with `just version "what changed"`
+before merging to main; `just version-check` fails if `main` has moved on without one.
+Never edit a version folder.
+
+| Version | Date | What changed | Commit |
+|---|---|---|---|
+| v01 | 2026-10-20 | Night run 2026-10-19: all issues built (PR #15) | 1bcac93 |
+| v02 | 2026-10-21 | Transfer pass: your EDA review applied here, bugs #16 #17 fixed (PR #20) | 5c7c9f9 |

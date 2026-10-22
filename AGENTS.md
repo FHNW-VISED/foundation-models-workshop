@@ -14,6 +14,8 @@ The `.ipynb` is a **build artifact**. The source is the small Jupytext files in 
 ⛔ Do not read the whole `sections/` folder "for context". `just api` plus the SPEC table is the context.
 ⛔ Do not edit `SPEC.md`, except the **Status** column of the sections table for the section you finished.
 ⛔ Do not edit `RULES.md`, `scripts/`, `tests/`, `pyproject.toml` or `uv.lock` unless the issue names them.
+⛔ Never edit `versions/`: each folder is a frozen version (SPEC.md + notebooks). The newest one always equals `main`;
+`just version "what changed"` adds the next one, and only the person or runner merging to main runs it.
 `FACILITATION.md` (N-033): when you finish a section, add or update its row in the section-by-section table.
 
 ## Commands
@@ -25,6 +27,8 @@ The `.ipynb` is a **build artifact**. The source is the small Jupytext files in 
 | `just lint` | Rule checks a script can decide + ruff |
 | `just smoke` | Build, then execute the whole notebook with `NB_SMOKE=1` (tiny data, CPU) |
 | `just api` | List every function and class defined in the notebook |
+| `just version "…"` | Snapshot SPEC.md + the notebooks as the next folder in `versions/` (before merging to main) |
+| `just version-check` | Fails if the newest version differs from SPEC.md or the built notebooks |
 
 Environment: `uv` only (`uv add <pkg>` if an issue allows a new dependency). Never `pip install` into the system.
 
