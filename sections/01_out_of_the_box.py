@@ -193,7 +193,8 @@ _play_truth[0:3, 1:3] = True  # 6 pixels, 4 shared -> IoU = 4 / 8
 # %%
 # ✍️ YOUR CODE
 def my_iou(pred: np.ndarray, truth: np.ndarray) -> float:
-    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty."""
+    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty.
+    e.g. 0.62"""
     ...
 
 

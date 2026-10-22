@@ -227,7 +227,8 @@ def _ref_masked_loss(logits: torch.Tensor, labels: torch.Tensor, ignore_mask: to
 # ✍️ YOUR CODE
 def masked_loss(logits: torch.Tensor, labels: torch.Tensor, ignore_mask: torch.Tensor) -> torch.Tensor:
     """Balanced binary cross-entropy over the pixels where `ignore_mask` is False: the mean loss on the
-    known vessel pixels and the mean loss on the known background pixels, averaged."""
+    known vessel pixels and the mean loss on the known background pixels, averaged.
+    e.g. tensor(0.4137), one number"""
     ...
 
 

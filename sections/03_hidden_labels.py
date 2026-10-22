@@ -166,7 +166,8 @@ def _ref_hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
 # %%
 # ✍️ YOUR CODE
 def my_hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
-    """Share of the `hidden` pixels that `pred` marks as foreground; 0.0 when `hidden` is empty."""
+    """Share of the `hidden` pixels that `pred` marks as foreground; 0.0 when `hidden` is empty.
+    e.g. 0.38 (38 % of the hidden vessel pixels found)"""
     ...
 
 

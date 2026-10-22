@@ -275,7 +275,8 @@ def my_pseudo_targets(
 ) -> np.ndarray:
     """Targets (int8) from a pseudo-label probability map: 1 where prob >= threshold + band, 0 where
     prob < threshold - band, -1 in between. Strokes overrule the map (1 vessel stroke -> 1, 2 background
-    stroke -> 0); outside `region` -> -1."""
+    stroke -> 0); outside `region` -> -1.
+    e.g. threshold 0.5, band 0.1, no strokes: prob [[0.9, 0.55, 0.3, 0.05]] -> [[1, -1, 0, 0]]"""
     ...
 
 

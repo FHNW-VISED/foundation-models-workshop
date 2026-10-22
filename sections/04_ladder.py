@@ -470,7 +470,8 @@ def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_p
 def my_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_px: float | None = None):
     """Targets (int8) from a scribble map: 1 vessel stroke, 0 background stroke, -1 ignored. Outside
     `region`: -1. If bg_beyond_px is a number, unlabelled pixels farther than bg_beyond_px from every vessel
-    stroke become 0 (background); the others stay -1."""
+    stroke become 0 (background); the others stay -1.
+    e.g. on a 3×4 crop, same shape as `scribbles`: [[-1, -1, 1, -1], [0, -1, 1, -1], [0, 0, -1, -1]]"""
     ...
 
 

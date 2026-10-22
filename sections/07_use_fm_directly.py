@@ -312,7 +312,8 @@ def _ref_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
 # ✍️ YOUR CODE
 def my_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
     """The box [x0, y0, x1, y1] around the True pixels of `stroke`, grown by `pad` pixels on every side and
-    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1."""
+    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1.
+    e.g. [12.0, 40.0, 58.0, 71.0]"""
     ...
 
 
