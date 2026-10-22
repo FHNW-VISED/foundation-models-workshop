@@ -60,7 +60,7 @@ CLAUDE_ARGS+=(--settings "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Agent|Task\
 
 # The gate must not be weakened by the agent it gates: undo edits to these paths unless the
 # issue's FILES line names them explicitly.
-PROTECTED=(tests scripts RULES.md justfile .github AGENTS.md CLAUDE.md)
+PROTECTED=(tests scripts RULES.md justfile .github AGENTS.md CLAUDE.md versions)
 revert_protected() {  # $1 issue number, $2 issue body
   local files_line; files_line=$(grep -m1 '^FILES:' <<<"$2" || true)
   for p in "${PROTECTED[@]}"; do

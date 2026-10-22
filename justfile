@@ -8,6 +8,7 @@ build:
 lint:
     uv run python scripts/lint_notebook.py
     uv run ruff check --quiet sections scripts tests
+    uv run pytest -q -p no:warnings tests/test_version.py
 
 # Execute the whole notebook headless on tiny data (NB_SMOKE=1)
 smoke: build
@@ -35,3 +36,11 @@ drift: build
 # Compare runtime deps with what Google Colab preinstalls (gpu runtime by default)
 colab-pins runtime="gpu":
     uv run python scripts/colab_pins.py {{runtime}}
+
+# Snapshot SPEC.md + the built notebooks as the next version in versions/ (do this before merging to main)
+version label: build
+    uv run python scripts/version.py new "{{label}}"
+
+# The newest version in versions/ must equal SPEC.md and the built notebooks (true on main, always)
+version-check: build
+    uv run python scripts/version.py check
