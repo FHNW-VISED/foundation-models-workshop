@@ -7,11 +7,13 @@
 #   scripts/night.sh                 # run all open `night` issues
 #   scripts/night.sh --max 3         # at most 3 issues
 #   scripts/night.sh --dry-run       # show what would run, call nothing
-#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-fable-5-1)
+#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-opus-5-5)
 # Resumable: re-running on the same day continues night/<date> and skips issues already committed there.
+# NIGHT_DATE=YYYY-MM-DD continues an earlier night's branch; NIGHT_UNTIL=<epoch s> starts no issue after it.
+# Claude session limit: the issue is undone (no failure label), the reset time goes to build/night.limit, run stops.
 set -euo pipefail
 
-LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-fable-5-1}"; RETRIES=1
+LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-opus-5-5}"; RETRIES=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --label) LABEL="$2"; shift 2 ;;
@@ -35,10 +37,12 @@ LOCK="build/night.lock"
 if [[ -f "$LOCK" ]] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then echo "a night run is already active (pid $(cat "$LOCK")); not starting another" >&2; exit 3; fi
 echo $$ > "$LOCK"; trap 'rm -f "$LOCK"' EXIT
 
-DATE="$(date +%Y-%m-%d)"
+DATE="${NIGHT_DATE:-$(date +%Y-%m-%d)}"   # NIGHT_DATE=YYYY-MM-DD resumes an earlier night past midnight
 BRANCH="night/$DATE"
 LOGDIR="build/night/$DATE"            # raw logs: gitignored
 REPORT="reports/night-$DATE.md"       # summary: committed, becomes the PR body
+UNTIL="${NIGHT_UNTIL:-}"
+LIMITFILE="build/night.limit"; rm -f "$LIMITFILE"
 mkdir -p "$LOGDIR" reports
 
 ISSUES=$(gh issue list --label "$LABEL" --state open --limit 100 --json number --jq 'map(.number) | sort | .[]' | sort -n | head -n "$MAX")
@@ -48,6 +52,11 @@ echo "issues to run: $(echo $ISSUES | tr '\n' ' ')"
 TOOLS="Read,Edit,Write,Glob,Grep,Bash(just:*),Bash(uv run:*),Bash(uv add:*),Bash(ls:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Bash(grep:*)"
 CLAUDE_ARGS=(-p --permission-mode acceptEdits --allowedTools "$TOOLS" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --output-format json)
 [[ -n "$MODEL" ]] && CLAUDE_ARGS+=(--model "$MODEL")
+# Subagents are never Fable: Sonnet unless the agent names haiku/opus; the hook blocks "fable" and forks.
+export CLAUDE_CODE_SUBAGENT_MODEL="${NIGHT_SUBAGENT_MODEL:-sonnet}"
+[[ "$CLAUDE_CODE_SUBAGENT_MODEL" == *fable* ]] && { echo "NIGHT_SUBAGENT_MODEL must not be fable" >&2; exit 2; }
+GUARD="python3 $ROOT/scripts/subagent_guard.py"
+CLAUDE_ARGS+=(--settings "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Agent|Task\",\"hooks\":[{\"type\":\"command\",\"command\":\"$GUARD\"}]}]}}")
 
 # The gate must not be weakened by the agent it gates: undo edits to these paths unless the
 # issue's FILES line names them explicitly.
@@ -105,13 +114,16 @@ else { echo "# Night run $DATE"; echo; echo "Branch \`$BRANCH\` · label \`$LABE
 DONE=0; STOPPED=""
 
 for n in $ISSUES; do
-  if git log --format=%s main..HEAD | grep -q "^night: #$n "; then echo "== #$n already done on $BRANCH, skipping"; continue; fi
+  # No pipe here: grep -q exits early, git log gets SIGPIPE, and pipefail turned "done" into "not done".
+  if grep -q "^night: #$n " <<<"$(git log --format=%s main..HEAD)"; then echo "== #$n already done on $BRANCH, skipping"; continue; fi
+  if [[ -n "$UNTIL" ]] && (( $(date +%s) >= UNTIL )); then STOPPED="#$n (cut-off $(date -r "$UNTIL" +%H:%M))"; break; fi
   title=$(gh issue view "$n" --json title --jq .title)
   body=$(gh issue view "$n" --json body --jq .body)
   echo "== #$n $title"
-  tail_msg=""; ok=0
+  tail_msg=""; ok=0; limited=0
   for attempt in $(seq 0 "$RETRIES"); do
     claude "${CLAUDE_ARGS[@]}" "$(prompt_for "$n" "$title" "$body" "$tail_msg")" > "$LOGDIR/issue-$n-try$attempt.json" 2>&1 || true
+    if grep -qiE "hit your [a-z ]*limit" "$LOGDIR/issue-$n-try$attempt.json"; then limited=1; break; fi
     revert_protected "$n" "$body"
     if ! section_marked_done "$body"; then
       echo "SECTION status in SPEC.md was not set to done — the content tests for it never ran." > "$LOGDIR/issue-$n-check$attempt.log"
@@ -119,7 +131,15 @@ for n in $ISSUES; do
     tail_msg=$(tail -40 "$LOGDIR/issue-$n-check$attempt.log")
   done
 
-  if [[ "$ok" == 1 ]]; then
+  if [[ "$limited" == 1 ]]; then
+    reset_at=$(grep -oiE "resets [0-9:]+ ?[ap]m" "$LOGDIR/issue-$n-try$attempt.json" | head -1 | cut -d' ' -f2- | tr -d ' ' || true)
+    rm -f reports/latest-task.md
+    git reset --quiet --hard HEAD && git clean -fdq -e reports/   # redo this issue from scratch after the reset
+    echo "${reset_at:-unknown}" > "$LIMITFILE"
+    { echo "## ⏸ #$n — $title (paused: Claude session limit, resets ${reset_at:-?})"; echo; } >> "$REPORT"
+    STOPPED="#$n (session limit)"
+    break
+  elif [[ "$ok" == 1 ]]; then
     { echo "## ✅ #$n — $title"; echo; cat reports/latest-task.md 2>/dev/null || echo "(no task note written)"; echo; } >> "$REPORT"
     rm -f reports/latest-task.md
     git add -A

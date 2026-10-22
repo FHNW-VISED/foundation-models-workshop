@@ -1,0 +1,105 @@
+{
+ "root": "data/smoke/precomputed",
+ "files": [
+  {
+   "path": "heads/hrfcrop_full_256.safetensors",
+   "bytes": 5348,
+   "sha256": "0dd42e810d4eb6803be415c483b3ebd2197b6f49ba362c71ecbbf94c38b17856"
+  },
+  {
+   "path": "heads/hrfcrop_hidden_bg_256.safetensors",
+   "bytes": 5436,
+   "sha256": "d1df8f71976f9a000f4b51194267ebdcea1f75ff6a7fd72bb489e12a8818e5b5"
+  },
+  {
+   "path": "heads/hrfcrop_hidden_bg_balanced_256.safetensors",
+   "bytes": 5436,
+   "sha256": "b75557decc3eefa08b648c0e4e18a2e0651bd4bd1db4667995af35217b2cbd16"
+  },
+  {
+   "path": "heads/hrfcrop_masked_256.safetensors",
+   "bytes": 5428,
+   "sha256": "edb37236a283aa81060f20e79b39f05ceb37d03bd1229d7969f66d4c9243ebc7"
+  },
+  {
+   "path": "heads/hrfcrop_pseudo_256.safetensors",
+   "bytes": 5388,
+   "sha256": "acc44559456ddc46d93e298ae4601acfc619e93c5fb7faa2b69139eb983e7bc4"
+  },
+  {
+   "path": "heads/hrfcrop_scribbles_256.safetensors",
+   "bytes": 5372,
+   "sha256": "9833ed32c34b400d77fe3fe939402e759fccedfcbbf2ba5f640c757b70eb253a"
+  },
+  {
+   "path": "heads/index.json",
+   "bytes": 7697,
+   "sha256": "168502c8533e0073d3fcf1b32958b87cf3fe863ae5a31543e4e84cef7b96b3c1"
+  },
+  {
+   "path": "heads/pets_full5_256.safetensors",
+   "bytes": 5348,
+   "sha256": "308fcfac87e14ef25acfbc94152a8d9fe057baf1877e8dc9c1bb62d363bb5795"
+  },
+  {
+   "path": "heads/pets_full_256.safetensors",
+   "bytes": 5356,
+   "sha256": "aaf659d05e2539c779d59d7351e77f756e296e637d12f890413d0a67fb15a756"
+  },
+  {
+   "path": "heads/pets_hidden_bg_256.safetensors",
+   "bytes": 5436,
+   "sha256": "27f0d377bc6f9fc40645d667cd6e9a71d121c5bff45130d889bcc09cc3a84307"
+  },
+  {
+   "path": "heads/pets_hidden_bg_balanced_256.safetensors",
+   "bytes": 5436,
+   "sha256": "ab59a14ebed1b8fda753ebf4b53cfcb1aa37642f495bfdaec668d2df7e984020"
+  },
+  {
+   "path": "heads/pets_masked_256.safetensors",
+   "bytes": 5436,
+   "sha256": "fb03eee57c3d0935a24b2caed5ba880ca6863ca3ebe213f2eceb3b0cec0f8a1e"
+  },
+  {
+   "path": "heads/pets_pseudo_256.safetensors",
+   "bytes": 5388,
+   "sha256": "8e8eac9bdbf4053eace4558f6ee4582128528611fd9cfe532dd9795933613e09"
+  },
+  {
+   "path": "heads/pets_scribbles_256.safetensors",
+   "bytes": 5380,
+   "sha256": "5f1831f7d23c6d180e0a0097ba70bf1b7e3c39a6ef9b3163102572590766d6c4"
+  },
+  {
+   "path": "pseudo_labels/pets/chihuahua_17.png",
+   "bytes": 14630,
+   "sha256": "52ddbc7cfcd9b34b53b9cbb76a777bbe68266e10728b869ad7f40883678ebd56"
+  },
+  {
+   "path": "pseudo_labels/pets/english_cocker_spaniel_103.png",
+   "bytes": 20391,
+   "sha256": "530ce752b2e1428f21d735be82e75380bcfb53ecffb33fd82defa0a8e69c7878"
+  },
+  {
+   "path": "pseudo_labels/pets/prompts.json",
+   "bytes": 2861,
+   "sha256": "809b48d500814ffaf64ed68a84d7e6a2b5c2c55dc5f6bdfe22cbce19952c23b0"
+  },
+  {
+   "path": "pseudo_labels/specialised/07_dr.png",
+   "bytes": 43590,
+   "sha256": "6d0e178647398a18f57e640b39286111304d4ee76794f12269b9f100c206fb6c"
+  },
+  {
+   "path": "pseudo_labels/specialised/08_dr.png",
+   "bytes": 49086,
+   "sha256": "1eed1de66b8a43cf0c8158b87e7685cb3d6845b15310dc7f8dddb42b3d5c081a"
+  },
+  {
+   "path": "pseudo_labels/specialised/prompts.json",
+   "bytes": 3561,
+   "sha256": "62677c3bd2ad3a8fb2186588df13cd380263ca2e91770876c8e417e4f37e88a1"
+  }
+ ]
+}

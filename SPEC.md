@@ -79,17 +79,17 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 
 | # | File | Title | Objective (one line) | Level | Time | Status |
 |---|---|---|---|---|---|---|
-| 0 | sections/00_setup.py | Setup & the question | Load the cached models and data; see the question and outcomes | 🟢 | 5 | todo |
-| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 15 | todo |
-| 2 | sections/02_falls_short.py | Where it falls short | Run the same tools on the specialised task and probe SAM with escalating prompts | 🟡 | 20 | todo |
-| 3 | sections/03_hidden_labels.py | Hide the labels: the naive baseline | Train a head with "missing = background" and watch it fail differently | 🟡 | 20 | todo |
-| 4 | sections/04_ladder.py | The adaptation ladder | Zero-shot → one-shot → scribbles: see how predictions change at each rung | 🟡 | 25 | todo |
-| 5 | sections/05_learn_from_less.py | Path 1 · Learn from less | Treat missing labels as unknown; write the masked / PU loss | 🟡🔴 | 20 | todo |
-| 6 | sections/06_recover_supervision.py | Path 2 · Recover supervision | Turn SAM pseudo-labels and Grad-CAM maps into training signal | 🟡🔴 | 20 | todo |
-| 7 | sections/07_use_fm_directly.py | Path 3 · Skip specialist training | Prompt the foundation model directly with scribble points and boxes | 🟡 | 10 | todo |
-| 8 | sections/08_compare.py | Compare everything | Fill the comparison table, predicting the winner first | 🟡 | 15 | todo |
-| 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 20 | todo |
-| 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | todo |
+| 0 | sections/00_setup.py | Setup & the question | Load the cached models and data; see the question and outcomes | 🟢 | 5 | done |
+| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 15 | done |
+| 2 | sections/02_falls_short.py | Where it falls short | Run the same tools on the specialised task and probe SAM with escalating prompts | 🟡 | 20 | done |
+| 3 | sections/03_hidden_labels.py | Hide the labels: the naive baseline | Train a head with "missing = background" and watch it fail differently | 🟡 | 20 | done |
+| 4 | sections/04_ladder.py | The adaptation ladder | Zero-shot → one-shot → scribbles: see how predictions change at each rung | 🟡 | 25 | done |
+| 5 | sections/05_learn_from_less.py | Path 1 · Learn from less | Treat missing labels as unknown; write the masked / PU loss | 🟡🔴 | 20 | done |
+| 6 | sections/06_recover_supervision.py | Path 2 · Recover supervision | Turn SAM pseudo-labels and Grad-CAM maps into training signal | 🟡🔴 | 20 | done |
+| 7 | sections/07_use_fm_directly.py | Path 3 · Skip specialist training | Prompt the foundation model directly with scribble points and boxes | 🟡 | 10 | done |
+| 8 | sections/08_compare.py | Compare everything | Fill the comparison table, predicting the winner first | 🟡 | 15 | done |
+| 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 20 | done |
+| 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | done |
 
 **Block 1** = sections 0–3 (+ the start of 4), "when it works and when it doesn't", ending on the cliffhanger before coffee.
 **Block 2** = sections 4–10, "ways out".
