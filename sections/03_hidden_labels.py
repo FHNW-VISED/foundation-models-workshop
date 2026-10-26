@@ -116,7 +116,7 @@ def show_keyed(
 # are the ones left in the label file, **hidden** vessels are in the full ground truth but the file leaves
 # them unpainted, so it calls them background.
 #
-# The printout gives two shares that differ a little: the share of hidden *segments* is what we ask for, the
+# The card gives two shares that differ a little: the share of hidden *segments* is what we ask for, the
 # share of hidden vessel *pixels* is what results, because long segments hold more pixels than short ones.
 # What to look for: the $\color{#00838F}{\blacksquare}$ teal (painted) vessels in the third picture and the
 # $\color{#2E7D32}{\blacksquare}$ green (hidden) vessels in the
@@ -138,10 +138,19 @@ for it in miss_train:
     same_as_cache.append(float((visible == it["visible"]).mean()))
     it["visible"], it["hidden"] = visible, it["mask"] & ~visible  # from now on: what training may see
 hidden_share = float(np.mean([it["hidden"].sum() / max(it["mask"].sum(), 1) for it in miss_train]))
-print(
-    f"{len(miss_train)} training images · {hidden_share:.0%} of the vessel pixels hidden "
-    f"(asked for {missing_labels['hidden_fraction']:.0%} of the segments) · pixels identical to the cached "
-    f"labels our checkpoints used: {np.mean(same_as_cache):.2%}"
+show_result(
+    "Half-finished label files for the training images",
+    {
+        "pixels": hidden_share,
+        "segments": missing_labels["hidden_fraction"],
+        "same": f"{np.mean(same_as_cache):.2%}",
+    },
+    [
+        ("pixels", "vessel pixels hidden", "what the label files leave out", "pct"),
+        ("segments", "segments hidden", "the share we asked for", "pct"),
+        ("same", "same as our labels", "pixels identical to our cached labels", "text"),
+    ],
+    meta=f"{len(miss_train)} training images",
 )
 
 ex = miss_train[0]
@@ -362,7 +371,7 @@ naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_NAIVE_HEAD)
 # %% [markdown]
 # This cell scores the naive head and the section-2 head (full masks) on three sets of vessel pixels: the
 # ones we hid, the ones that were painted, and every vessel of the held-out images. Each bar is the share of
-# that set the head finds. The printout adds the held-out IoU, the precision, and **calls vessel**: the share
+# that set the head finds. The table adds the held-out IoU, the precision, and **calls vessel**: the share
 # of the fundus (the scored area) the head calls vessel, next to the share that really is vessel.
 #
 # What to look for (the numbers are from our run, yours will differ a little):
@@ -370,7 +379,7 @@ naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_NAIVE_HEAD)
 # - The **hidden** bars: how far below the section-2 head is the naive head? On our run it finds about 6 %
 #   of the hidden vessels, the section-2 head about 88 %.
 # - The **painted** bars: does it find even the vessels it was told about? On our run it misses many.
-# - The printout: does the naive head mark more or less of the fundus, and is its precision higher or lower?
+# - The table: does the naive head mark more or less of the fundus, and is its precision higher or lower?
 
 # %%
 # @title Score both heads on hidden, painted and held-out vessels { display-mode: "form" }
@@ -416,16 +425,33 @@ GROUPS = {
     "recall_visible_fit": "painted vessels\n(told: vessel)",
     "recall_held": "held-out images\n(all vessels)",
 }
-print(
-    f"{'head':<30}{'hidden found':>13}{'painted':>9}{'held-out':>10}"
-    "   held-out IoU / precision / calls vessel"
+show_table(
+    "Hidden, painted and held-out vessels: full-mask head and naive head",
+    [
+        {
+            "name": name,
+            "hidden": r["recall_hidden_fit"],
+            "painted": r["recall_visible_fit"],
+            "iou": r["iou_held"],
+            "recall": r["recall_held"],
+            "precision": r["precision_held"],
+            "marked": r["marked_held"],
+        }
+        for name, r in naive_report.items()
+    ],
+    [
+        ("hidden", "hidden found", "of the hidden vessels (training)", "pct"),
+        ("painted", "painted found", "of the painted vessels (training)", "pct"),
+        "iou",
+        "recall",
+        "precision",
+        "marked",
+    ],
+    refs=[{"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True}],
+    meta=f"{len(miss_train)} training images · IoU, recall, precision and calls vessel on {len(spec_eval)} "
+    "held-out images",
+    name_label="head",
 )
-for name, r in naive_report.items():
-    print(
-        f"{name:<30}{r['recall_hidden_fit']:>13.3f}{r['recall_visible_fit']:>9.3f}{r['recall_held']:>10.3f}"
-        f"   {r['iou_held']:.3f} / {r['precision_held']:.3f} / {r['marked_held']:.0%}"
-    )
-print(f"really vessel on the held-out images: {fg_share:.0%} of the fundus")
 
 x = np.arange(len(GROUPS))
 fig, ax = plt.subplots(figsize=(6.4, 3.2))
@@ -497,7 +523,7 @@ show_keyed(
 
 # %% [markdown]
 # **Try it: hide more or fewer vessels.** The next helper rebuilds the label file with a different share of
-# hidden segments, trains the naive head again on it (a few seconds), and prints the result next to the
+# hidden segments, trains the naive head again on it (a few seconds), and shows the result next to the
 # default one.
 
 # %%
@@ -507,7 +533,7 @@ _HELD_FEATS: dict = {}
 
 def naive_with_hidden_share(percent: int) -> None:
     """Hide `percent` % of the vessel segments (the 3.1 helper), retrain the plain head from scratch on that
-    label file (the 3.3 helper), and print hidden vessels found and held-out precision next to the default."""
+    label file (the 3.3 helper), and show hidden vessels found and held-out precision next to the default."""
     if not isinstance(percent, int) or not 0 <= percent <= 90:
         raise SystemExit("HIDE_PERCENT must be a whole number from 0 to 90.")
     thin = specialised["thin_structures"]
@@ -533,7 +559,7 @@ def naive_with_hidden_share(percent: int) -> None:
             naive["precision_held"],
         ),
         f"this run ({percent}% of segments)": (
-            part_recall(fit_preds, trial, "hidden") if has_hidden else float("nan"),
+            part_recall(fit_preds, trial, "hidden") if has_hidden else None,
             part_recall(fit_preds, trial, "visible"),
             float(
                 np.mean(
@@ -546,18 +572,28 @@ def naive_with_hidden_share(percent: int) -> None:
         ),
     }
     share = np.mean([it["hidden"].sum() / max(it["mask"].sum(), 1) for it in trial])
-    print(
-        f"The naive head is retrained from scratch on the same {len(miss_train)} training images, with their "
-        f"label files rebuilt so that {percent}% of the vessel segments are hidden (trained in {sec:.1f} s "
-        f"on {DEVICE})."
+    note = (
+        f"That hides {share:.0%} of the vessel pixels: the two percentages differ because segments differ in "
+        "size, and long segments hold more pixels than short ones."
+        if has_hidden
+        else "Nothing is hidden at 0%, so there is no 'hidden found' to report: the head sees the full masks."
     )
-    print(
-        f"That hides {share:.0%} of the vessel pixels: the two percentages differ because segments differ "
-        f"in size, and long segments hold more pixels than short ones."
+    show_table(
+        f"Naive head retrained with {percent}% of the vessel segments hidden",
+        [
+            {"name": name, "hidden": hid, "painted": vis, "precision": prec}
+            for name, (hid, vis, prec) in rows.items()
+        ],
+        [
+            ("hidden", "hidden found", "of the hidden vessels (training)", "pct"),
+            ("painted", "painted found", "of the painted vessels (training)", "pct"),
+            "precision",
+        ],
+        meta=f"retrained from scratch on the same {len(miss_train)} training images · {sec:.1f} s on "
+        f"{DEVICE} · precision on the held-out images",
+        note=note,
+        name_label="label file",
     )
-    print(f"{'':<28}{'hidden found':>13}{'painted found':>15}{'held-out precision':>20}")
-    for name, (hid, vis, prec) in rows.items():
-        print(f"{name:<28}{hid:>13.2f}{vis:>15.2f}{prec:>20.2f}")
     if has_hidden:
         print(
             f"The three pictures show training image {trial.index(shown)}: its new label file, the vessels "
@@ -572,10 +608,6 @@ def naive_with_hidden_share(percent: int) -> None:
             ],
             width=3.0,
             roles=["input", "truth", "errors"],
-        )
-    else:
-        print(
-            "Nothing is hidden at 0%, so there is no 'hidden found' to report: the head sees the full masks."
         )
 
 

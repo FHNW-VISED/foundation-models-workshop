@@ -24,11 +24,11 @@
 # - **Reliability, or spread**: the standard deviation of the per-image IoU, i.e. how far a typical image
 #   sits from the average. IoUs of 0.60, 0.62, 0.58 give a spread of 0.02: trust the average. IoUs of
 #   0.90, 0.30, 0.60 have the same average but a spread of 0.25: some images fail badly.
-# - **Compute**: seconds of training plus inference in this session.
+# - **Compute**: seconds of training plus inference in this session (in the plot of 8.3).
 # - **Scalability**: a sentence, not a number. What does the next 1,000 images cost?
 #
-# The table also shows **recall** (the share of the true vessel pixels the mask finds) and **worst** (the
-# lowest IoU on any single image).
+# The table also shows **recall** (the share of the true vessel pixels the mask finds); the scalability
+# sentences follow in a list under it.
 
 # %% [markdown]
 # <!-- callout: note | Assumptions behind the minutes -->
@@ -213,7 +213,7 @@ def spread(per_image_iou: list[float]) -> float:
 # ### 8.2 The table
 #
 # This cell scores every approach image by image against the hidden ground truth and shows the table,
-# sorted by IoU, then where your two picks landed. The best value of each column is in bold.
+# sorted by IoU, with where your two picks landed under it.
 
 # %%
 # @title Score every approach and show the table { display-mode: "form" }
@@ -246,92 +246,53 @@ RESULTS["comparison_assumptions"] = dict(specialised["annotation_effort"]) | {
     "seconds": f"training + pseudo-labels + inference in this session, on {DEVICE}",
 }
 
-from html import escape
-
 ranked = sorted(comparison, key=lambda r: r["iou"], reverse=True)
 thick_iou = RESULTS["sam_direct_strokes_alone"]["iou"]
-table_cols = [  # header, row key, number format, which value is the best one
-    ("IoU", "iou", "{:.3f}", max),
-    *([("clDice", "cldice", "{:.3f}", max)] if use_cldice else []),
-    ("recall", "recall", "{:.3f}", max),
-    ("± spread", "reliability", "{:.3f}", min),
-    ("worst", "worst_iou", "{:.3f}", max),
-    ("effort min", "effort_min", "{:.1f}", min),
-    ("/new img", "effort_min_per_new_image", "{:.2f}", min),
-    ("sec", "seconds", "{:.1f}", min),
-]
-
-
-def comparison_html(rows: list[dict]) -> str:
-    """The table as HTML: a colour chip per approach, the best value of each column in bold."""
-    best = {}
-    for _, key, fmt, pick in table_cols:
-        top = fmt.format(pick(r[key] for r in rows))
-        ties = sum(fmt.format(r[key]) == top for r in rows)
-        best[key] = top if ties <= 3 else None  # when many rows tie, nobody is "the best"
-    th = "padding:4px 8px;border-bottom:2px solid #311B92;color:#311B92;text-align:"
-    td = "padding:3px 8px;border-bottom:1px solid #D1C4E9;text-align:"
-    head = f'<th style="{th}left">approach</th>'
-    head += "".join(f'<th style="{th}right">{h}</th>' for h, *_ in table_cols)
-    lines = []
-    for r in rows:
-        chip = (
-            '<span style="display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;'
-            f'background:{approach_colours[r["approach"]]}"></span>'
-        )
-        cells = f'<td style="{td}left;white-space:nowrap">{chip}{escape(COMPARE_LABEL[r["approach"]])} '
-        cells += f'<span style="color:#757575">{r["approach"]}</span></td>'
-        for _, key, fmt, _pick in table_cols:
-            text = fmt.format(r[key])
-            text = f"<b>{text}</b>" if text == best[key] else text
-            cells += f'<td style="{td}right">{text}</td>'
-        lines.append(f"<tr>{cells}</tr>")
-    for label, value in (
-        ("no model: strokes thickened (section 7)", thick_iou),
-        ("everything is foreground", RESULTS["specialised_everything_iou"]),
-    ):
-        grey = "color:#757575;font-style:italic"
-        lines.append(
-            f'<tr><td style="{td}left;{grey}">{label}</td><td style="{td}right;{grey}">{value:.3f}</td>'
-            f'<td colspan="{len(table_cols) - 1}" style="{td}left"></td></tr>'
-        )
-    scales = "".join(f"<li><b>{r['approach']}</b>: {escape(r['scalability'])}</li>" for r in rows)
-    return (
-        '<table style="border-collapse:collapse;font-size:13px;margin:6px 0">'
-        f"<tr>{head}</tr>{''.join(lines)}</table>"
-        '<div style="font-size:12px;color:#616161;margin:2px 0 6px">recall = share of the true vessel pixels '
-        "found · ± spread = std of the per-image IoU · worst = lowest per-image IoU · effort min = "
-        "annotation minutes once · /new img = annotation minutes per new image · bold = best of its column · "
-        "the colour chip is the approach's colour in the charts below"
-        + (" · clDice = how well the mask follows the vessel centre lines (section 2.2)" if use_cldice else "")
-        + "</div>"
-        '<details style="background:#F5F5F5;border-left:6px solid #616161;border-radius:6px;padding:8px 12px;'
-        'color:#616161;font-size:13px"><summary><b>🔍 How each one scales</b></summary>'
-        f'<ul style="margin:6px 0">{scales}</ul></details>'
-    )
-
-
-try:
-    from IPython.display import HTML, display
-
-    display(HTML(comparison_html(ranked)))
-except ImportError:  # no IPython: a plain list with the same numbers
-    for r in ranked:
-        nums = " · ".join(f"{h} {fmt.format(r[key])}" for h, key, fmt, _ in table_cols)
-        print(f"{r['approach']:<16}{nums}")
-    print(f"no model: strokes thickened (section 7) {thick_iou:.3f}")
-    print(f"everything is foreground {RESULTS['specialised_everything_iou']:.3f}")
-
 winner = ranked[0]["approach"]
 steadiest = min(comparison, key=lambda r: r["reliability"])["approach"]
 by_spread = [r["approach"] for r in sorted(comparison, key=lambda r: r["reliability"])]
-print(f"highest IoU: {winner} · steadiest: {steadiest}")
+picks = []
 if MY_WINNER in by_spread:
     rank = [r["approach"] for r in ranked].index(MY_WINNER) + 1
-    print(f"your IoU pick {MY_WINNER} ranks {rank} of {len(ranked)}")
+    picks.append(f"your IoU pick {MY_WINNER} ranks {rank} of {len(ranked)}")
 if MY_STEADIEST in by_spread:
     rank = by_spread.index(MY_STEADIEST) + 1
-    print(f"your steadiness pick {MY_STEADIEST} ranks {rank} of {len(by_spread)}")
+    picks.append(f"your steadiness pick {MY_STEADIEST} ranks {rank} of {len(by_spread)}")
+table_rows = [
+    {
+        **r,
+        "name": COMPARE_LABEL[r["approach"]],
+        "colour": approach_colours.get(r["approach"]),
+        "spread": f"{r['reliability']:.2f}",
+        "annotation": f"≈ {r['effort_min']:.0f} min once"
+        + (f" + {r['effort_min_per_new_image']:.1f} min per new image" if r["effort_min_per_new_image"] else ""),
+    }
+    for r in ranked
+]
+show_table(
+    "Every approach on the same held-out images, best IoU first",
+    table_rows,
+    [
+        "iou",
+        *(["cldice"] if use_cldice else []),
+        "recall",
+        ("spread", "spread", "how much IoU varies; lower = steadier", "text"),
+        ("annotation", "annotation", "a person's drawing time", "text"),
+    ],
+    refs=[
+        {"name": "no model: strokes thickened (section 7)", "iou": thick_iou},
+        {"name": "everything is foreground", "iou": RESULTS["specialised_everything_iou"]},
+    ],
+    meta=f"{len(spec_eval)} held-out images · compute time is in the plot of 8.3",
+    note=" · ".join(
+        [f"highest IoU: {COMPARE_LABEL[winner]}", f"steadiest: {COMPARE_LABEL[steadiest]}", *picks]
+    ),
+)
+show_list(
+    "How each one scales",
+    [f"{COMPARE_LABEL[r['approach']]}: {r['scalability']}" for r in ranked],
+    numbered=False,
+)
 if not (MY_WINNER or MY_STEADIEST):
     print("no prediction written in Q19; fine, but next time guess first: it is the cheapest lesson here")
 

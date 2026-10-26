@@ -153,8 +153,8 @@ def model_key(name: str) -> tuple:
 
 # %% [markdown]
 # This cell loads the held-out retina images (1024 px crops of a 3504 × 2336 fundus), the evaluation set for
-# the rest of the notebook. Keep the printed share of the fundus the vessels cover; it comes back as a
-# baseline.
+# the rest of the notebook. Keep the share of the fundus the vessels cover, shown in the card; it comes
+# back as a baseline.
 
 # %%
 # @title Load the held-out retina images { display-mode: "form" }
@@ -163,9 +163,12 @@ specialised["eval"] = specialised["held"] if (SMOKE or DEVICE == "cuda") else sp
 spec_eval = [load_item(specialised, it) for it in specialised["eval"]]
 demo = spec_eval[0]  # the image the figures of sections 2 to 8 show
 fg_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
-print(
-    f"evaluation set: {len(spec_eval)} held-out images · {specialised['task']} · the foreground covers "
-    f"{fg_share:.0%} of the evaluation region · DINOv3 features at {specialised['feat_side']} px long side"
+show_result(
+    "Held-out retina images",
+    {"share": fg_share},
+    [("share", "vessels cover", "share of the fundus that is vessel", "pct")],
+    meta=f"{len(spec_eval)} images · {specialised['task']} · "
+    f"DINOv3 features at {specialised['feat_side']} px long side",
 )
 
 # %% [markdown]
@@ -201,9 +204,15 @@ for ax in axes:
     ax.axis("off")
 add_key(fig, [("vessels (ground truth)", THEME["truth"]), ("16 px patch grid", "#FFFFFF")])
 plt.show()
-print(
-    f"{demo['name']}: vessels are about {vessel_px:.1f} px wide on average, one patch is {patch_px:.0f} px, "
-    f"so a typical vessel fills about {vessel_px / patch_px:.0%} of a patch's width"
+show_result(
+    "A vessel against one DINOv3 patch",
+    {"width": f"{vessel_px:.1f} px", "patch": f"{patch_px:.0f} px", "fills": vessel_px / patch_px},
+    [
+        ("width", "vessel width", "average, in image pixels", "text"),
+        ("patch", "one patch", "the square the head labels", "text"),
+        ("fills", "a vessel fills", "of a patch's width", "pct"),
+    ],
+    meta=demo["name"],
 )
 
 # %% [markdown]
@@ -461,12 +470,12 @@ explain_cldice(CASE)
 # - Will the box beat 20 clicks?
 # - Where will the <span style="color:#9E9E9E">■</span> grey line sit? It scores a mask that says "everything
 #   is foreground": if vessels cover 12 %
-#   of the fundus, overlap 12 % ÷ union 100 % gives IoU 0.12. The load cell printed your share.
+#   of the fundus, overlap 12 % ÷ union 100 % gives IoU 0.12. The load cell showed your share.
 
 # %% [markdown]
-# This cell runs the ladder on every evaluation image and prints three numbers per setting. **IoU** is
-# overlap ÷ union. **Recall** is the share of the true vessel pixels the mask finds. **Marked** is the share
-# of the fundus the mask covers (100 % = the whole eye).
+# This cell runs the ladder on every evaluation image and shows three numbers per setting in a table.
+# **IoU** is overlap ÷ union. **Recall** is the share of the true vessel pixels the mask finds. **Marked**
+# (shown as "calls vessel") is the share of the fundus the mask covers (100 % = the whole eye).
 #
 # Then two figures. The bars show mean IoU for each setting ($\color{#E65100}{\blacksquare}$ orange), the
 # dashed $\color{#9E9E9E}{\blacksquare}$ grey line is the score of
@@ -516,23 +525,33 @@ RESULTS["specialised_everything_iou"] = everything_mean["iou"]
 RESULTS["specialised_zero_shot_seconds"] = spec_sec
 
 vessel_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
-print(f"SAM prompt ladder on {len(spec_eval)} held-out images · {spec_sec} s on {DEVICE}")
-print(
-    "calls vessel = share of the fundus the mask calls vessel "
-    f"(100 % = the whole eye; the vessels really cover about {vessel_share:.0%})"
-)
-print("recall = share of the true vessel pixels the mask finds")
-print(f"{'setting':<12}{'IoU':>7}{'recall':>8}{'calls vessel':>14}")
-for name, v in ladder_mean.items():
-    print(f"{name:<12}{v['iou']:>7.3f}{np.mean(ladder_recall[name]):>8.3f}{np.mean(ladder_cover[name]):>14.0%}")
-print(f"{'everything':<12}{everything_mean['iou']:>7.3f}{1:>8.3f}{1:>14.0%}")
-print(f"{'truth':<12}{'':>15}{vessel_share:>14.0%}")
 box_marked = float(np.mean(ladder_cover["box"]))
-if abs(ladder_mean["box"]["iou"] - everything_mean["iou"]) < 0.02:
-    print(
-        "'box' and 'everything' have the same IoU because SAM's box mask covers "
-        f"{box_marked:.0%} of the fundus, so it scores like marking everything."
-    )
+same_as_everything = abs(ladder_mean["box"]["iou"] - everything_mean["iou"]) < 0.02
+show_table(
+    "SAM with more and more prompts, on the held-out retina images",
+    [
+        {
+            "name": name,
+            "iou": v["iou"],
+            "recall": float(np.mean(ladder_recall[name])),
+            "marked": float(np.mean(ladder_cover[name])),
+        }
+        for name, v in ladder_mean.items()
+    ],
+    ["iou", "recall", "marked"],
+    refs=[
+        {"name": "everything is foreground", "iou": everything_mean["iou"], "recall": 1.0, "marked": 1.0},
+        {"name": "really vessel (the ground truth)", "marked": vessel_share, "truth": True},
+    ],
+    meta=f"{len(spec_eval)} images · {spec_sec} s on {DEVICE}",
+    note=(
+        f"'box' and 'everything' have the same IoU: SAM's box mask covers {box_marked:.0%} of the fundus, "
+        "so it scores like marking everything."
+        if same_as_everything
+        else None
+    ),
+    name_label="prompt",
+)
 
 fig, ax = plt.subplots(figsize=(6.4, 3))
 names = list(ladder_mean)
@@ -658,7 +677,7 @@ TRAIN_SPEC_HEADS = True  # @param {type:"boolean"}
 spec_train, spec_heads = fit_spec_heads(TRAIN_SPEC_HEADS)
 
 # %% [markdown]
-# This cell scores both heads on the evaluation images and prints mean IoU, recall and "calls vessel" per
+# This cell scores both heads on the evaluation images and shows mean IoU, recall and "calls vessel" per
 # resolution, next to SAM's one box. What to look for: does doubling the resolution add more than 0.05 to
 # IoU, and does recall rise with it?
 
@@ -686,16 +705,30 @@ RESULTS["specialised_head"] = {
     "infer_sec": round(time.monotonic() - t0, 1),
 }
 RESULTS["resolution_effect"] = {f"{side} px": v for side, v in res_scores.items()}
-for side, v in res_scores.items():
-    print(
-        f"linear head @ {side:>4} px · mean IoU {v['iou']:.3f} · recall {res_recall[side]:.3f} · "
-        f"calls {res_marked[side]:.0%} of the fundus vessel"
-    )
-print(
-    f"SAM one box · mean IoU {ladder_mean['box']['iou']:.3f} · recall {np.mean(ladder_recall['box']):.3f} · "
-    f"calls {np.mean(ladder_cover['box']):.0%} of the fundus vessel"
+show_table(
+    "Linear head at two resolutions, and SAM's one box",
+    [
+        {
+            "name": f"linear head @ {side} px",
+            "iou": v["iou"],
+            "recall": res_recall[side],
+            "marked": res_marked[side],
+        }
+        for side, v in res_scores.items()
+    ]
+    + [
+        {
+            "name": "SAM, one box",
+            "iou": ladder_mean["box"]["iou"],
+            "recall": float(np.mean(ladder_recall["box"])),
+            "marked": float(np.mean(ladder_cover["box"])),
+        }
+    ],
+    ["iou", "recall", "marked"],
+    refs=[{"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True}],
+    meta=f"{len(spec_eval)} held-out images · mean over the images",
+    name_label="approach",
 )
-print(f"(really vessel: {fg_share:.0%} of the fundus; recall = share of the true vessel pixels a mask finds)")
 
 # %% [markdown]
 # This cell puts the section-1 pet numbers next to this section's vessel numbers, for the same two tools
@@ -713,10 +746,16 @@ rows = {
     "SAM,\none box": (RESULTS["pets_zero_shot_box_iou"], RESULTS["specialised_zero_shot_box_iou"]),
     "linear head on\nDINOv3 features": (RESULTS["pets_head_iou"], RESULTS["specialised_head_iou"]),
 }
-print(f"{'tool':<32}{'pets IoU':>10}{'vessels IoU':>13}")
-for name, (p, v) in rows.items():
-    print(f"{name.replace(chr(10), ' '):<32}{p:>10.3f}{v:>13.3f}")
-print(f"{'everything is foreground':<32}{'':>10}{RESULTS['specialised_everything_iou']:>13.3f}")
+show_table(
+    "The same two tools on pets and on vessels",
+    [
+        {"name": name.replace("\n", " "), "pets": p, "vessels": v} for name, (p, v) in rows.items()
+    ],
+    [("pets", "pets", "IoU on the pets", "iou"), ("vessels", "vessels", "IoU on the vessels", "iou")],
+    refs=[{"name": "everything is foreground", "vessels": RESULTS["specialised_everything_iou"]}],
+    meta="mean IoU on the held-out images",
+    name_label="tool",
+)
 
 x = np.arange(len(rows))
 fig, ax = plt.subplots(figsize=(6.4, 3.2))

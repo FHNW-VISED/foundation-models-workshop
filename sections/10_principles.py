@@ -57,8 +57,8 @@ plt.show()
 # %% [markdown]
 # ### 10.1 The principles, from your numbers
 #
-# The next cell writes six rules as cards. Each carries a number from your own session, which tells you how
-# strongly to believe it, and says so where a lesson did not hold in your run.
+# The next cell writes six rules as a numbered list. Each carries a number from your own session, which tells
+# you how strongly to believe it, and says so where a lesson did not hold in your run.
 
 # %%
 # @title Principles from this run { display-mode: "form" }
@@ -179,31 +179,11 @@ principles = [
     p_minutes_before_hours(),
 ]
 RESULTS["principles"] = principles
-headline = f"Principles from this session ({specialised['name']}, {len(spec_eval)} held-out images, {DEVICE})"
-try:
-    from html import escape
-
-    from IPython.display import HTML, display
-
-    cards = ""
-    for n, text in enumerate(principles, start=1):
-        rule, _, evidence = text.partition(". ")  # the rule is the first sentence, the rest is the evidence
-        cards += (
-            f'<div style="flex:1 1 300px;background:#EDE7F6;border-left:6px solid {THEME["works"]};'
-            'border-radius:6px;padding:10px 12px;color:#311B92;line-height:1.45">'
-            f'<div style="font-weight:bold;font-size:15px">{n}. {escape(rule.rstrip("."))}.</div>'
-            f'<div style="font-size:12px;margin-top:5px;color:#4527A0">{escape(evidence)}</div></div>'
-        )
-    display(
-        HTML(
-            f'<div style="font-weight:bold;color:#311B92;margin:4px 0">{escape(headline)}</div>'
-            f'<div style="display:flex;flex-wrap:wrap;gap:8px">{cards}</div>'
-        )
-    )
-except ImportError:  # no IPython: plain text
-    print(headline + ":\n")
-    for n, text in enumerate(principles, start=1):
-        print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
+show_list(
+    "Principles from this session",
+    principles,
+    meta=f"{specialised['name']} · {len(spec_eval)} held-out images · {DEVICE}",
+)
 
 # %% [markdown]
 # ### 10.2 Your framework: six questions for any task
@@ -294,16 +274,190 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 # - Which one would you most like to check on your own data next week?
 
 # %% [markdown]
-# ### 10.3 How far from the state of the art?
+# ### 10.3 A specialist from scratch, and the state of the art
 #
 # The best IoU of the day is far from a finished vessel map, so it is fair to ask whether the methods are
-# worth anything. The next cell puts your bars next to three reference points that were measured outside this
-# notebook:
+# worth anything. Two checks. First, a specialist with no foundation model at all, trained here on the same
+# five training images. Then the published state of the art.
+
+# %% [markdown]
+# <!-- callout: theory | Theory: a small U-Net -->
+# A **U-Net** is the classic network for medical segmentation. It sees only pixels and learns everything from
+# the masks you give it.
 #
-# - **A small U-Net trained from scratch on the same five complete masks** (a plain convolutional network
-#   that works on the pixels, no foundation model). We trained it on our 1024 px crops for about three
-#   minutes on a laptop and scored it on the same 25 held-out images, with the cut chosen on the training
-#   images.
+# - It shrinks the image step by step, to see the context around each pixel (is this a vessel or a shadow?).
+# - It grows it back to full size, and copies the fine detail across from the way down ("skip connections").
+# - So it decides **per pixel**, where every head of today decided per 16 px patch.
+#
+# Ours is small (three levels, about 120,000 numbers to learn) and starts from random weights.
+
+# %% [markdown]
+# <!-- callout: question | 🤔 Your prediction -->
+# The U-Net trains twice on the same five images: once on the complete masks (like the head of section 2.4),
+# once on the strokes only (like the scribble head of section 4). Will it beat the head with the complete
+# masks? And with the strokes only?
+
+# %% [markdown]
+# This helper defines the U-Net, its training loop (random 256 px pieces of the five images, flipped at
+# random, the balanced loss of every head so far) and its prediction. The cut is chosen on the training
+# images, never on the held-out ones.
+
+# %%
+# @title U-Net helpers: the network, training on pieces of the images, the cut { display-mode: "form" }
+class SmallUNet(torch.nn.Module):
+    """Three levels down (16, 32, 64 channels) and two back up, with skip connections."""
+
+    def __init__(self, c: tuple[int, int, int] = (16, 32, 64)):
+        super().__init__()
+
+        def block(a: int, b: int) -> torch.nn.Sequential:
+            conv = torch.nn.Conv2d
+            return torch.nn.Sequential(conv(a, b, 3, padding=1), torch.nn.ReLU(), conv(b, b, 3, padding=1),
+                                       torch.nn.ReLU())
+
+        self.e1, self.e2, self.e3 = block(3, c[0]), block(c[0], c[1]), block(c[1], c[2])
+        self.u2, self.d2 = torch.nn.ConvTranspose2d(c[2], c[1], 2, 2), block(2 * c[1], c[1])
+        self.u1, self.d1 = torch.nn.ConvTranspose2d(c[1], c[0], 2, 2), block(2 * c[0], c[0])
+        self.out = torch.nn.Conv2d(c[0], 1, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        e1 = self.e1(x)
+        e2 = self.e2(F.max_pool2d(e1, 2))
+        e3 = self.e3(F.max_pool2d(e2, 2))
+        d2 = self.d2(torch.cat([self.u2(e3), e2], 1))
+        return self.out(self.d1(torch.cat([self.u1(d2), e1], 1)))
+
+
+def unet_input(item: dict) -> torch.Tensor:
+    """The photo as a [3, H, W] tensor, centred around 0."""
+    return (torch.from_numpy(item["image"]).permute(2, 0, 1).float() / 255 - 0.5) / 0.25
+
+
+def train_unet(items: list[dict], labels: list[np.ndarray], steps: int, piece: int = 256, batch: int = 8):
+    """A fresh SmallUNet trained on random `piece` px pieces; labels 1 vessel, 0 background, -1 ignored.
+    Returns the network and the training seconds."""
+    torch.manual_seed(SEED)
+    rng = np.random.default_rng(SEED)
+    images = [unet_input(it) for it in items]
+    labs = [torch.from_numpy(np.asarray(t, np.int8)) for t in labels]
+    n_pos, n_neg = (sum(int((t == v).sum()) for t in labs) for v in (1, 0))
+    net = SmallUNet().to(DEVICE)
+    opt = torch.optim.AdamW(net.parameters(), lr=2e-3, weight_decay=1e-4)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=2e-3, total_steps=steps)
+    t0 = time.monotonic()
+    for _ in tqdm(range(steps), desc="U-Net training", leave=False):
+        xs, ts = [], []
+        for _ in range(batch):
+            k = int(rng.integers(len(images)))
+            h, w = labs[k].shape
+            size = min(piece, h, w) // 4 * 4
+            y, x = int(rng.integers(0, h - size + 1)), int(rng.integers(0, w - size + 1))
+            img, t = images[k][:, y : y + size, x : x + size], labs[k][y : y + size, x : x + size]
+            if rng.random() < 0.5:
+                img, t = img.flip(-1), t.flip(-1)
+            if rng.random() < 0.5:
+                img, t = img.flip(-2), t.flip(-2)
+            xs.append(img)
+            ts.append(t)
+        x, t = torch.stack(xs).to(DEVICE), torch.stack(ts).to(DEVICE)
+        z = net(x)[:, 0]
+        weight = torch.where(t == 1, 0.5 / max(n_pos, 1), torch.where(t == 0, 0.5 / max(n_neg, 1), 0.0))
+        loss = (F.binary_cross_entropy_with_logits(z, (t == 1).float(), reduction="none") * weight).sum()
+        opt.zero_grad()
+        (loss * (n_pos + n_neg) / t.numel()).backward()
+        opt.step()
+        sched.step()
+    return net.eval(), time.monotonic() - t0
+
+
+@torch.no_grad()
+def unet_probability(net: torch.nn.Module, item: dict) -> np.ndarray:
+    """The U-Net's probability of vessel for every pixel of one image (sides cropped to a multiple of 4)."""
+    x = unet_input(item)
+    h, w = x.shape[1:]
+    prob = np.zeros((h, w), np.float32)
+    prob[: h // 4 * 4, : w // 4 * 4] = torch.sigmoid(net(x[None, :, : h // 4 * 4, : w // 4 * 4].to(DEVICE)))[
+        0, 0
+    ].cpu().numpy()
+    return prob
+
+
+def training_cut(probs: list[np.ndarray], items: list[dict]) -> float:
+    """The probability cut with the best mean IoU on the training images (never the held-out images)."""
+    cuts = np.linspace(0.05, 0.95, 19)
+    scores = [np.mean([score(p >= c, it)["iou"] for p, it in zip(probs, items, strict=True)]) for c in cuts]
+    return float(cuts[int(np.argmax(scores))])
+
+
+approach_colours |= {"unet_full": "#37474F", "unet_strokes": "#90A4AE"}
+approach_names |= {
+    "unet_full": "U-Net from scratch · 5 complete masks",
+    "unet_strokes": "U-Net from scratch · strokes only",
+}
+
+# %% [markdown]
+# The next cell trains the U-Net twice, on the complete masks and on the strokes, and scores both on the
+# held-out images next to the two heads they should be compared with. On a T4 each training takes one to two
+# minutes (`UNET_STEPS` training steps); on a CPU untick `TRAIN_UNET` and the next cell shows our
+# run's number instead. What to look for: the IoU of the two U-Nets against the two heads, and how much of the
+# fundus each U-Net calls vessel.
+
+# %%
+# @title Train the U-Net on the complete masks, then on the strokes only { display-mode: "form" }
+TRAIN_UNET = True  # @param {type:"boolean"}
+UNET_STEPS = 1500  # @param {type:"slider", min:1000, max:3000, step:250}
+unet_report = {}
+if TRAIN_UNET:
+    steps = 20 if SMOKE else UNET_STEPS
+    unet_targets = {
+        "unet_full": [np.where(region(it), it["mask"], -1).astype(np.int8) for it in scrib_train],
+        # 4.2's targets: vessel and background strokes, every other pixel unknown (-1)
+        "unet_strokes": [scribble_targets(it["scribbles"], region(it)) for it in scrib_train],
+    }
+    unet_preds = {}
+    for k, targets in unet_targets.items():
+        net, sec = train_unet(scrib_train, targets, steps)
+        cut = training_cut([unet_probability(net, it) for it in scrib_train], scrib_train)
+        unet_preds[k] = [unet_probability(net, it) >= cut for it in spec_eval]
+        unet_report[k] = rung_report(unet_preds[k]) | {"cut": cut, "train_sec": round(sec, 1), "steps": steps}
+    RESULTS["unet"] = unet_report
+    full_head_preds = spec_head_preds[max(spec_head_preds)]  # section 2.4, the higher resolution
+    show_table(
+        "A small U-Net from scratch, on the same five training images",
+        [
+            {"name": approach_names[k], "colour": approach_colours[k], **v,
+             "cut_text": f"{v['cut']:.2f}", "time": v["train_sec"]}
+            for k, v in unet_report.items()
+        ],
+        ["iou", "recall", "marked", ("cut_text", "cut", "chosen on the training images", "text"),
+         ("time", "training", "on this session's device", "sec")],
+        refs=[
+            {"name": "linear head on DINOv3 · 5 complete masks (2.4)", **rung_report(full_head_preds)},
+            {"name": "scribble head on DINOv3 · strokes only (4.2)", **ladder_report["scribbles"]},
+            {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True},
+        ],
+        meta=f"{len(spec_eval)} held-out images · {steps} training steps each on {DEVICE}",
+    )
+    show_masks(
+        [
+            (rung_title("U-Net · complete masks", unet_preds["unet_full"][k_demo], demo),
+             error_map(demo["image"], unet_preds["unet_full"][k_demo], demo)),
+            (rung_title("U-Net · strokes only", unet_preds["unet_strokes"][k_demo], demo),
+             error_map(demo["image"], unet_preds["unet_strokes"][k_demo], demo)),
+            (rung_title("linear head · complete masks", full_head_preds[k_demo], demo),
+             error_map(demo["image"], full_head_preds[k_demo], demo)),
+        ],
+        width=3.2,
+        roles=["errors"] * 3,
+        legend=["found", "invented", "missed", "unscored"],
+        note="The held-out demo image under the two U-Nets and the section-2 head.",
+    )
+else:
+    print("ℹ️ U-Net skipped: the next cell shows our run's number (IoU 0.58 with the complete masks) instead.")
+
+# %% [markdown]
+# Now the published reference points, next to your session's bars:
+#
 # - **ESRVS** (Xu & Zhang, PRCV 2026, [arXiv:2607.24453](https://arxiv.org/abs/2607.24453)): DINOv3
 #   features and pseudo-labels, the ingredients of section 6, with **one** labelled image and 31 unlabelled
 #   ones, and a real decoder (Mask2Former) at 1024 px.
@@ -324,12 +478,14 @@ def dice_to_iou(dice: float) -> float:
     return dice / (2 - dice)
 
 
-sota_references = [  # (label, IoU, where it comes from): measured outside this notebook, see the text above
-    ("small U-Net from scratch · same 5 complete masks", 0.581, "our run on these crops, 2026-10-26"),
+sota_references = [  # (label, IoU, where it comes from): published, see the text above
     ("ESRVS · DINOv3 + pseudo-labels · 1 labelled image", dice_to_iou(0.7263), "arXiv:2607.24453, Table 3"),
     ("best published · 15 complete masks", dice_to_iou(0.8104), "Little W-Net, arXiv:2009.01907, Table 2"),
 ]
+if not unet_report:  # the U-Net was skipped: our run's number, measured the same way (2026-10-26)
+    sota_references.insert(0, ("U-Net from scratch · 5 complete masks", 0.581, "our run on these crops"))
 sota_rows = [(label, value, colour, False) for label, value, colour in story[1:]]  # the specialised task
+sota_rows += [(approach_names[k], v["iou"], approach_colours[k], False) for k, v in unet_report.items()]
 sota_rows += [(label, value, "#BDBDBD", True) for label, value, _ in sota_references]
 fig, ax = plt.subplots(figsize=(8, 4.2))
 for y, (_label, value, colour, outside) in enumerate(sota_rows[::-1]):
@@ -340,25 +496,30 @@ ax.set_yticks(range(len(sota_rows)), [r[0] for r in sota_rows[::-1]], fontsize=8
 ax.axvline(everything_iou, color=THEME["background"], ls="--")
 ax.set_xlim(0, 1)
 ax.set_xlabel("mean IoU on held-out retina images")
-ax.set_title("Your session (solid) and three reference points (hatched)")
+ax.set_title("Your session (solid) and the reference points (hatched)")
 add_key(
     fig,
     [
         ("solid: your session (colour = the approach, as in section 8)", "#455A64"),
-        ("measured outside this notebook (hatched)", "#BDBDBD"),
+        ("published, or our run if you skipped the U-Net (hatched)", "#BDBDBD"),
         ('IoU of marking everything (dashed line)', THEME["background"]),
     ],
 )
 plt.show()
-for label, value, source in sota_references:
-    print(f"{label:<52} IoU {value:.2f} · {source}")
+show_table(
+    "The reference points, measured outside this notebook",
+    [{"name": label, "iou": value, "source": source} for label, value, source in sota_references],
+    ["iou", ("source", "source", "where the number comes from", "text")],
+    name_label="reference",
+    note="The papers report Dice; it is converted to IoU here.",
+)
 
 # %% [markdown]
 # <!-- callout: takeaway | Why it was not all for nothing -->
 # - **The limit you met is the patch, not the idea.** Every head today decides per 16 px patch, and the
-#   vessels are 4 to 20 px wide (section 2.4). A small U-Net that sees the pixels reaches IoU 0.58 on the same
-#   five complete masks, about twice our full-mask head (0.28 on our run). Choosing the cut on the training
-#   images alone lifts our head from 0.28 to 0.33, so part of the gap is also a default threshold.
+#   vessels are 4 to 20 px wide (section 2.4). The U-Net decides per pixel and, on our run, reached IoU 0.58
+#   on the same five complete masks, about twice the full-mask head (0.28). Choosing the cut on the training
+#   images, as the U-Net did, lifts that head to 0.33 on its own, so part of the gap is also the threshold.
 # - **Complete masks are what the U-Net needs.** Those five masks cost 15 to 25 hours of annotation. Trained
 #   on the strokes alone, the same U-Net marked almost the whole fundus (IoU 0.11 on our run), below the
 #   scribble head on foundation-model features (0.17). Cheap labels need the foundation model.

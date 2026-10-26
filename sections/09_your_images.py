@@ -323,9 +323,16 @@ def collect_strokes(stroke_pngs: list) -> list[dict]:
             it["scribbles"] = decode_strokes(strokes_png(it["auto"]), it["image"].shape[:2])
             it["stroke_source"] = "generated"
     n_strokes, minutes = stroke_effort(ladder)
-    print(
-        f"{len(ladder)} image(s) · {n_strokes[1]} thing strokes, {n_strokes[2]} background strokes · "
-        f"≈ {minutes:.1f} min at {specialised['annotation_effort']['seconds_per_stroke']} s per stroke"
+    seconds_per_stroke = specialised["annotation_effort"]["seconds_per_stroke"]
+    show_result(
+        "The strokes on your images",
+        {"thing": n_strokes[1], "background": n_strokes[2], "minutes": minutes},
+        [
+            ("thing", "thing strokes", "drawn on what you want", "text"),
+            ("background", "background strokes", "drawn on what you do not want", "text"),
+            ("minutes", "drawing time", "estimated from the stroke count", "min"),
+        ],
+        meta=f"{len(ladder)} image(s) · {seconds_per_stroke} s per stroke",
     )
     show_strokes(ladder)
     return ladder
@@ -511,22 +518,31 @@ def score_own_ladder(items: list[dict], preds: dict, sec: dict) -> dict:
 
 
 def show_own_ladder(items: list[dict], preds: dict, report: dict) -> None:
-    """The table of the three rungs, then one row of panels per image: strokes, the three masks, and the
+    """The card of the three rungs, then one row of panels per image: strokes, the three masks, and the
     ground truth when there is one."""
     has_truth = all(it["mask"] is not None for it in items)
-    print(
-        f"{'approach':<36}{'marks':>7}{'thing ✓':>9}{'bg ✓':>7}{'s':>6}"
-        + (f"{'IoU':>7}" if has_truth else "")
+    columns = [
+        ("marked", "marks", "share of the image the mask covers", "pct"),
+        ("thing_strokes_covered", "thing strokes ✓", "share of your thing strokes it covers", "pct"),
+        ("bg_strokes_spared", "background ✓", "share of your background strokes it avoids", "pct"),
+        *([("iou", "IoU", "overlap with the truth (0 to 1)", "iou")] if has_truth else []),
+        ("seconds", "time", "this session", "sec"),
+    ]
+    rows = [
+        {
+            "name": approach_names[k],
+            "colour": approach_colours.get(k),
+            **{c: (None if v != v else v) for c, v in report[k].items()},  # nan: no background stroke
+        }
+        for k in OWN_APPROACHES
+    ]
+    show_table(
+        "The three rungs on your images",
+        rows,
+        columns,
+        meta=f"{len(items)} image(s), averaged · {items[0]['source']}",
+        note="The truth is only known for our example, so IoU appears only there." if has_truth else None,
     )
-    for k in OWN_APPROACHES:
-        v = report[k]
-        print(
-            f"{approach_names[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
-            f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
-        )
-    print("marks = share of the image the mask covers")
-    print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
-    print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
     key = [*STROKE_KEY, "mask", *(["truth"] if has_truth else [])]
     for n, it in enumerate(items):
         panels = [(f"{it['name']}\nyour strokes", stroke_panel(it))]
@@ -649,11 +665,16 @@ RESULTS["own_images"]["disagreement"] = float(np.mean([d.mean() for d in own_dis
 DISAGREE = "#D81B60"  # pink: the rungs disagree (orange is kept for "invented" in the error maps)
 panels = []
 for it, d in zip(ladder_own, own_disagree, strict=True):
-    print(f"{it['name']}: the three rungs disagree on {d.mean():.0%} of the image")
     panels += [
         (f"{it['name']}\nyour strokes", stroke_panel(it)),
         (f"disagreement · {d.mean():.0%} of the image", overlay(it["image"], d, DISAGREE)),
     ]
+show_table(
+    "Where the three rungs disagree",
+    [{"name": it["name"], "share": float(d.mean())} for it, d in zip(ladder_own, own_disagree, strict=True)],
+    [("share", "disagree", "share of the image they differ on", "pct")],
+    name_label="image",
+)
 show_masks(
     panels,
     width=2.8,

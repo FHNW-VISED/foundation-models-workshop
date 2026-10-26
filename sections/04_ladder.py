@@ -147,13 +147,6 @@ def error_map(image: np.ndarray, pred: np.ndarray, item: dict) -> np.ndarray:
     return overlay(out, truth & ~p, THEME["truth"])
 
 
-def called_vessel(marked: float, truth_share: float | None = None) -> str:
-    """The "marked" share in plain words: how much of the fundus a mask calls vessel, next to how much really
-    is vessel (by default the evaluation images' share printed in section 2)."""
-    truth_share = fg_share if truth_share is None else truth_share
-    return f"calls {marked:.0%} of the fundus vessel (really vessel: {truth_share:.0%})"
-
-
 def rung_title(label: str, pred: np.ndarray, item: dict) -> str:
     """Panel title: what made the mask, then IoU, recall and the share of this fundus it calls vessel."""
     r = region(item)
@@ -191,7 +184,7 @@ def rung_report(preds: list[np.ndarray]) -> dict:
 # Nothing new to run: the next cell measures section 2's SAM-with-one-box masks with the numbers every rung
 # is compared on (the table in 4.3 explains each one). The last line answers "how much of the photo does the
 # mask call vessel?": a mask that calls 99 % of the fundus vessel, when about a tenth really is, has simply
-# painted the whole eye.
+# painted the whole eye. The "calls vessel" tile shows it next to the share that really is vessel.
 
 # %%
 # @title Score rung 0 { display-mode: "form" }
@@ -199,9 +192,12 @@ k_demo = next(i for i, it in enumerate(spec_eval) if it is demo)  # the section-
 ladder_preds = {"zero_shot": sam_box_masks}  # section 2.3: SAM, one box, per evaluation image
 ladder_report = {"zero_shot": rung_report(sam_box_masks)}
 v = ladder_report["zero_shot"]
-print(
-    f"zero-shot (SAM, one box) on {len(spec_eval)} held-out images · IoU {v['iou']:.3f} · recall "
-    f"{v['recall']:.3f} · precision {v['precision']:.3f}\n{called_vessel(v['marked'])}"
+show_result(
+    "Zero-shot (SAM, one box) on the held-out images",
+    v,
+    ["iou", "recall", "precision", "marked"],
+    meta=f"{len(spec_eval)} images",
+    truth_share=fg_share,
 )
 
 # %% [markdown]
@@ -225,10 +221,21 @@ scrib_train = [load_item(specialised, it) for it in specialised["fit"][:N_TRAIN_
 labelled = float(np.mean([(it["scribbles"] > 0)[region(it)].mean() for it in scrib_train]))
 scrib_meta = specialised["fit"][:N_TRAIN_SPEC]
 n_strokes = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in scrib_meta)
-print(
-    f"{len(scrib_train)} training images · {n_strokes} strokes · {labelled:.2%} of the fundus pixels "
-    f"labelled · ≈ {effort_minutes(n_strokes=n_strokes):.1f} min at "
-    f"{specialised['annotation_effort']['seconds_per_stroke']} s per stroke"
+show_result(
+    "The scribbles drawn for training",
+    {
+        "images": len(scrib_train),
+        "strokes": n_strokes,
+        "labelled": f"{labelled:.1%}",
+        "minutes": f"≈ {effort_minutes(n_strokes=n_strokes):.1f} min",
+    },
+    [
+        ("images", "images", "training images with strokes", "text"),
+        ("strokes", "strokes", "vessel and background together", "text"),
+        ("labelled", "labelled pixels", "share of the fundus with a label", "text"),
+        ("minutes", "drawing time", "what the strokes cost a person", "text"),
+    ],
+    meta=f"{specialised['annotation_effort']['seconds_per_stroke']} s per stroke assumed",
 )
 ex = scrib_train[0]
 thick = {v: ndi.binary_dilation(ex["scribbles"] == v, iterations=2) for v in (1, 2)}
@@ -325,7 +332,7 @@ def train_scribble_head(train_yourself: bool, unlabelled: int):
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
-# The head will see labels on fewer than two pixels in a hundred (see the printout above), and no vessel
+# The head will see labels on fewer than two pixels in a hundred (see the card above), and no vessel
 # will ever be called "background". Write two guesses:
 #
 # - Will it find more of the held-out vessels (recall) than SAM's box, or fewer?
@@ -348,7 +355,8 @@ scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_SCRIBBLE_HEAD, UN
 
 # %% [markdown]
 # This cell scores the scribble head on the evaluation images with the same numbers as rung 0. Compare its
-# "calls … vessel" share with the real one: everything above it is fundus the head paints by mistake.
+# "calls vessel" tile with the "really vessel" figure under it: everything above it is fundus the head paints
+# by mistake.
 
 # %%
 # @title Score the scribble head on the evaluation images { display-mode: "form" }
@@ -360,22 +368,26 @@ ladder_preds["scribbles"] = [
 ladder_report["scribbles"] = rung_report(ladder_preds["scribbles"])
 scrib_infer = round(time.monotonic() - t0, 1)
 v = ladder_report["scribbles"]
-print(
-    f"scribble head · IoU {v['iou']:.3f} · recall {v['recall']:.3f} · precision {v['precision']:.3f} · "
-    f"{scrib_infer} s on {DEVICE}\n{called_vessel(v['marked'])}"
+show_result(
+    "Scribble head on the held-out images",
+    v,
+    ["iou", "recall", "precision", "marked"],
+    meta=f"{len(spec_eval)} images · trained in {scrib_sec:.1f} s · scored in {scrib_infer} s on {DEVICE}",
+    truth_share=fg_share,
 )
 
 # %% [markdown]
 # ### 4.3 The ladder, side by side
 #
-# The next cell prints one row per rung with the annotation it needed, then draws each rung's error map on
+# The next cell shows one row per rung with the annotation it needed, then draws each rung's error map on
 # the demo image. The numbers:
 #
 # - **IoU:** overlap of the mask with the true vessels.
 # - **Recall:** of the true vessel pixels, the share the mask finds.
 # - **Precision:** of the pixels the mask marks, the share that really are vessel.
-# - **Called vessel:** the share of the fundus (the scored area) the mask calls vessel. Compare it with the
-#   last line, the share that really is vessel: far above it means the mask paints background too.
+# - **Calls vessel:** the share of the fundus (the scored area) the mask calls vessel. Compare it with the
+#   "really vessel" row under the table, the share that really is vessel: far above it means the mask paints
+#   background too.
 #
 # What to look for: which rung misses vessels ($\color{#2E7D32}{\blacksquare}$ green) and which invents them
 # ($\color{#E65100}{\blacksquare}$ orange).
@@ -404,14 +416,24 @@ RESULTS["scribbles_head"] = ladder_report["scribbles"] | {
     "infer_sec": scrib_infer,
 }
 
-print(f"{'approach':<36}{'IoU':>6}{'recall':>8}{'precis.':>8}{'called vessel':>15}   annotation (≈ minutes)")
-for k, v in ladder_report.items():
-    print(
-        f"{approach_names[k]:<36}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
-        f"{v['marked']:>15.0%}   {effort_text[k]} (≈ {effort[k]:.1f})"
-    )
-print(f"{'everything is foreground':<36}{RESULTS['specialised_everything_iou']:>6.3f}{'':>16}{1:>15.0%}")
-print(f"{'really vessel (the ground truth)':<36}{'':>22}{fg_share:>15.0%}")
+show_table(
+    "The ladder on the held-out images",
+    [
+        {
+            "name": approach_names[k],
+            "colour": approach_colours.get(k),
+            **v,
+            "annotation": f"{effort_text[k]} (≈ {effort[k]:.1f} min)",
+        }
+        for k, v in ladder_report.items()
+    ],
+    ["iou", "recall", "precision", "marked", ("annotation", "annotation", "what a person draws", "text")],
+    refs=[
+        {"name": "everything is foreground", "iou": RESULTS["specialised_everything_iou"], "marked": 1.0},
+        {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True},
+    ],
+    meta=f"{len(spec_eval)} images",
+)
 
 show_masks(
     [
@@ -482,7 +504,7 @@ show_masks(
 # %%
 # @title One-shot helper: prototypes from one annotated image { display-mode: "form" }
 def run_one_shot(image_index: int):
-    """Rung 1 from the annotated training image `image_index`: prints the numbers and draws the maps.
+    """Rung 1 from the annotated training image `image_index`: shows the numbers and draws the maps.
     Returns the annotated item, the similarity map of every evaluation image and the scoring seconds."""
     if not isinstance(image_index, int) or not 0 <= image_index < len(specialised["fit"]):
         raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(specialised['fit']) - 1}.")
@@ -503,12 +525,17 @@ def run_one_shot(image_index: int):
     RESULTS.setdefault("ladder", {})["one_shot"] = v["iou"]
     RESULTS.setdefault("ladder_detail", {})["one_shot"] = v
     RESULTS["one_shot"] = v | {"image": shot["name"], "infer_sec": proto_sec}
-    print(
-        f"one-shot prototype from training image {image_index} ({shot['name']}) · IoU {v['iou']:.3f} · "
-        f"recall {v['recall']:.3f} · precision {v['precision']:.3f} · {proto_sec} s on {DEVICE}\n"
-        f"{called_vessel(v['marked'])}"
+    show_table(
+        "One-shot prototype on the held-out images",
+        [{"name": approach_names["one_shot"], "colour": approach_colours.get("one_shot"), **v}],
+        ["iou", "recall", "precision", "marked"],
+        refs=[
+            {"name": "section 2: head on five complete masks", "iou": RESULTS["specialised_head_iou"]},
+            {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True},
+        ],
+        meta=f"prototype from training image {image_index} ({shot['name']}) · {len(spec_eval)} images · "
+        f"{proto_sec} s on {DEVICE}",
     )
-    print(f"for scale: the section-2 head on five complete masks · IoU {RESULTS['specialised_head_iou']:.3f}")
     show_masks(
         [
             (
