@@ -607,11 +607,20 @@ own_preds = run_own_ladder(ladder_own, N_OWN_CLICKS, OWN_BOX_PAD)
 # where the image is hard, and where one more stroke is worth the most.
 
 # %% [markdown]
+# <!-- diagram: s09-disagreement | The disagreement map, made and read -->
+# Left: three masks along one row of pixels, and the pixels where they do not all agree. Right: the two
+# shapes the map usually takes on your images, and what each one tells you.
+
+# %% [markdown]
 # <!-- callout: theory | Theory: the disagreement map -->
+# <details><summary>The same in words</summary>
+#
 # The map is <span style="color:#D81B60">■</span> pink on every pixel that **some** of the three masks mark
 # and **others** do not. A thin rim
 # along the thing means the rungs agree on *what* it is and differ on the edge. Whole patches mean they
 # disagree on what belongs to the thing.
+#
+# </details>
 
 # %% [markdown]
 # This helper cell defines `disagreement`: marked by some masks, not by all.

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 512" width="100%" font-family="Helvetica, Arial, sans-serif">
+<defs>
+<marker id="s03-recall-precision-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker>
+</defs>
+<rect x="0" y="0" width="960" height="512" fill="#FFFFFF"/>
+<text x="80" y="34" font-size="17" fill="#212121" text-anchor="start" font-weight="bold" >A · Hidden vessels found</text>
+<text x="80" y="57" font-size="14" fill="#616161" text-anchor="start" font-weight="normal" >400 hidden vessel pixels (in the ground truth, unpainted in the file)</text>
+<rect x="80" y="74" width="240" height="56" rx="6" fill="#6A1B9A" stroke="none" stroke-width="1.5"/>
+<rect x="320" y="74" width="560" height="56" rx="6" fill="#2E7D32" stroke="none" stroke-width="1.5"/>
+<text x="200" y="108" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold" >found: 120</text>
+<text x="600" y="108" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold" >missed: 280</text>
+<text x="880" y="164" font-size="18" fill="#212121" text-anchor="end" font-weight="bold" >found ÷ hidden = 120 ÷ 400 = 30 %</text>
+<line x1="80" y1="130" x2="80" y2="292" stroke="#616161" stroke-width="1.5" stroke-dasharray="4 5"/>
+<line x1="320" y1="130" x2="320" y2="292" stroke="#616161" stroke-width="1.5" stroke-dasharray="4 5"/>
+<rect x="102" y="198" width="196" height="28" rx="6" fill="#FFFFFF" stroke="none" stroke-width="1.5"/>
+<text x="200" y="218" font-size="14" fill="#616161" text-anchor="middle" font-weight="normal" >the same 120 pixels</text>
+<text x="350" y="248" font-size="17" fill="#212121" text-anchor="start" font-weight="bold" >B · Precision</text>
+<text x="350" y="270" font-size="14" fill="#616161" text-anchor="start" font-weight="normal" >150 pixels the model marked</text>
+<rect x="80" y="292" width="240" height="56" rx="6" fill="#6A1B9A" stroke="none" stroke-width="1.5"/>
+<rect x="320" y="292" width="60" height="56" rx="6" fill="#E65100" stroke="none" stroke-width="1.5"/>
+<text x="200" y="326" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold" >vessel: 120</text>
+<text x="350" y="326" font-size="16" fill="#FFFFFF" text-anchor="middle" font-weight="bold" >30</text>
+<text x="350" y="372" font-size="14" fill="#E65100" text-anchor="middle" font-weight="bold" >30 invented (not vessel)</text>
+<text x="880" y="372" font-size="18" fill="#212121" text-anchor="end" font-weight="bold" >vessel ÷ marked = 120 ÷ 150 = 80 %</text>
+<rect x="30" y="402" width="900" height="56" rx="9" fill="#ECEFF1" stroke="none" stroke-width="1.5"/>
+<text x="480" y="427" font-size="15" fill="#212121" text-anchor="middle" font-weight="bold" >Same 120 pixels, two different questions.</text>
+<text x="480" y="447" font-size="15" fill="#212121" text-anchor="middle" font-weight="normal" >A divides by what was hidden. B divides by what the model marked.</text>
+<text x="80" y="496" font-size="12" fill="#212121" text-anchor="start" font-weight="normal" ></text>
+<rect x="30" y="476" width="18" height="18" rx="3" fill="#6A1B9A" stroke="none" stroke-width="1.5"/>
+<text x="56" y="491" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >marked by the model</text>
+<rect x="250" y="476" width="18" height="18" rx="3" fill="#2E7D32" stroke="none" stroke-width="1.5"/>
+<text x="276" y="491" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >hidden vessel it missed</text>
+<rect x="500" y="476" width="18" height="18" rx="3" fill="#E65100" stroke="none" stroke-width="1.5"/>
+<text x="526" y="491" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >marked, but not a vessel</text>
+</svg>

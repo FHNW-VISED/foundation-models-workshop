@@ -217,6 +217,10 @@ print(
 #   pet. A vessel tree has no inside, and one click is ambiguous: this vessel? the whole tree? the eye?
 
 # %% [markdown]
+# <!-- diagram: s02-one-click-three-objects | One click, three possible objects -->
+# The click sits at the same spot in all three pictures; each picture is a different mask that contains it.
+
+# %% [markdown]
 # ### 2.1 SAM on vessels: click, box, or a word
 
 # %% [markdown]
@@ -587,10 +591,20 @@ show_clicks(
 # The head from section 1.4, trained the same way on the full masks of five retina images (the last time
 # training sees a full mask: a perfect vessel map costs an expert 3 to 5 hours per fundus). We train it
 # twice, on DINOv3 features at two resolutions:
+
+# %% [markdown]
+# <!-- diagram: s02-patch-vs-vessel | The same piece of retina at two resolutions -->
+# Both pictures show the same 64 × 64 px piece of a retina crop. Only the size of the squares the head gets
+# to label changes.
+
+# %% [markdown]
+# <details><summary>The same in words</summary>
 #
 # - **512 px long side**: each 16 px patch covers 32 × 32 pixels of the 1024 px crop.
 # - **1024 px long side**: each patch covers 16 × 16 pixels. Four times the patches, and about 16 times the
 #   cost, because attention compares every patch with every other.
+#
+# </details>
 
 # %% [markdown]
 # This collapsed cell trains (or loads) one head per resolution on the five fit images.

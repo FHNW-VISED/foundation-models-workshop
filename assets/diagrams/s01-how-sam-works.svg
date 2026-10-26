@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 452" width="100%" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="s01-sam-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker></defs>
+<defs><g id="s01-sam-cat"><ellipse cx="58" cy="72" rx="40" ry="23"/><circle cx="62" cy="36" r="21"/><polygon points="44,26 46,6 60,19"/><polygon points="80,26 78,6 64,19"/><ellipse cx="102" cy="58" rx="7" ry="22" transform="rotate(22 102 58)"/></g></defs>
+<rect width="960" height="452" fill="#FFFFFF"/>
+<g transform="translate(0 -34)">
+<clipPath id="s01-sam-clip-30-62"><rect x="30" y="62" width="120" height="104" rx="8"/></clipPath>
+<g clip-path="url(#s01-sam-clip-30-62)"><rect x="30" y="62" width="120" height="104" fill="#F5F0E6"/><rect x="30" y="124" width="120" height="42" fill="#D7CCC8"/><use href="#s01-sam-cat" x="30" y="64" fill="#8D6E63"/></g>
+<rect x="30" y="62" width="120" height="104" rx="8" fill="none" stroke="#424242" stroke-width="1.5"/>
+<text x="90" y="190" font-size="14" fill="#212121" font-weight="bold" text-anchor="middle">the photo</text>
+<path d="M154,114 H186" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<rect x="190" y="62" width="170" height="104" rx="10" fill="#ECEFF1" stroke="#424242" stroke-width="1.5"/>
+<text x="275" y="98" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">Image encoder</text>
+<text x="275" y="122" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">a big network</text>
+<text x="275" y="142" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">reads the whole photo</text>
+<rect x="190" y="178" width="170" height="28" rx="14" fill="#424242" stroke="#424242" stroke-width="1.5"/>
+<text x="275" y="197" font-size="13" fill="#FFFFFF" font-weight="bold" text-anchor="middle">runs ONCE per image</text>
+<path d="M364,114 H396" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<rect x="400" y="62" width="130" height="104" rx="10" fill="#FFFFFF" stroke="#424242" stroke-width="1.5"/>
+<rect x="412" y="74" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="430" y="74" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="448" y="74" width="16" height="16" rx="2" fill="#90A4AE"/>
+<rect x="466" y="74" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="484" y="74" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="502" y="74" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="412" y="92" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="430" y="92" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="448" y="92" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="466" y="92" width="16" height="16" rx="2" fill="#90A4AE"/>
+<rect x="484" y="92" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="502" y="92" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="412" y="110" width="16" height="16" rx="2" fill="#90A4AE"/>
+<rect x="430" y="110" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="448" y="110" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="466" y="110" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="484" y="110" width="16" height="16" rx="2" fill="#90A4AE"/>
+<rect x="502" y="110" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="412" y="128" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="430" y="128" width="16" height="16" rx="2" fill="#90A4AE"/>
+<rect x="448" y="128" width="16" height="16" rx="2" fill="#B0BEC5"/>
+<rect x="466" y="128" width="16" height="16" rx="2" fill="#CFD8DC"/>
+<rect x="484" y="128" width="16" height="16" rx="2" fill="#78909C"/>
+<rect x="502" y="128" width="16" height="16" rx="2" fill="#90A4AE"/>
+<text x="465" y="164" font-size="13" fill="#212121" font-weight="normal" text-anchor="middle"></text>
+<text x="465" y="190" font-size="14" fill="#212121" font-weight="bold" text-anchor="middle">image embedding</text>
+<text x="465" y="208" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">kept, then reused</text>
+<text x="30" y="262" font-size="14" fill="#00838F" font-weight="bold" text-anchor="start">your hint</text>
+<rect x="30" y="272" width="124" height="32" rx="8" fill="#E0F2F1" stroke="#00838F" stroke-width="1.5"/>
+<path d="M46,288 h12 M52,282 v12" stroke="#00838F" stroke-width="2.5"/>
+<text x="66" y="293" font-size="13" fill="#212121" font-weight="normal" text-anchor="start">click</text>
+<rect x="30" y="312" width="124" height="32" rx="8" fill="#E0F2F1" stroke="#00838F" stroke-width="1.5"/>
+<rect x="45" y="321" width="14" height="14" fill="none" stroke="#00838F" stroke-width="2"/>
+<text x="66" y="333" font-size="13" fill="#212121" font-weight="normal" text-anchor="start">box</text>
+<rect x="30" y="352" width="124" height="32" rx="8" fill="#E0F2F1" stroke="#00838F" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="40" y="375" font-size="18" fill="#00838F" font-weight="bold" text-anchor="start">“”</text>
+<text x="66" y="373" font-size="13" fill="#212121" font-weight="normal" text-anchor="start">word</text>
+<text x="98" y="373" font-size="12" fill="#616161" font-weight="normal" text-anchor="start">(SAM 3)</text>
+<path d="M158,336 H186" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<rect x="190" y="272" width="170" height="104" rx="10" fill="#ECEFF1" stroke="#424242" stroke-width="1.5"/>
+<text x="275" y="308" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">Prompt encoder</text>
+<text x="275" y="332" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">a small network</text>
+<text x="275" y="352" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">hint to numbers</text>
+<rect x="570" y="150" width="160" height="150" rx="10" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="2"/>
+<text x="650" y="204" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">Mask decoder</text>
+<text x="650" y="228" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">a small network</text>
+<text x="650" y="248" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">photo numbers</text>
+<text x="650" y="266" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">+ hint numbers</text>
+<rect x="570" y="312" width="160" height="28" rx="14" fill="#424242" stroke="#424242" stroke-width="1.5"/>
+<text x="650" y="331" font-size="13" fill="#FFFFFF" font-weight="bold" text-anchor="middle">runs for EVERY hint</text>
+<path d="M534,114 H552 V190 H566" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<path d="M364,324 H552 V262 H566" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<path d="M734,225 H772" fill="none" stroke="#424242" stroke-width="2" marker-end="url(#s01-sam-arrow)"/>
+<rect x="780" y="62" width="150" height="130" rx="8" fill="#FFFFFF" stroke="#424242" stroke-width="1.5"/>
+<use href="#s01-sam-cat" x="795" y="78" fill="#6A1B9A"/>
+<text x="855" y="212" font-size="14" fill="#6A1B9A" font-weight="bold" text-anchor="middle">mask</text>
+<text x="855" y="230" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">the pixels of one object</text>
+<rect x="780" y="262" width="150" height="40" rx="20" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+<text x="855" y="288" font-size="15" fill="#1565C0" font-weight="bold" text-anchor="middle">score 0.93</text>
+<text x="855" y="322" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">SAM's own guess of</text>
+<text x="855" y="340" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">how good the mask is</text>
+<rect x="30" y="398" width="900" height="72" rx="10" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1.5"/>
+<text x="48" y="424" font-size="14" fill="#212121" font-weight="bold" text-anchor="start">Why one hint gives one object:</text>
+<text x="266" y="424" font-size="14" fill="#212121" font-weight="normal" text-anchor="start">the decoder answers “which single thing contains this hint?” with one compact region.</text>
+<text x="48" y="452" font-size="14" fill="#212121" font-weight="bold" text-anchor="start">Why it feels instant:</text>
+<text x="266" y="452" font-size="14" fill="#212121" font-weight="normal" text-anchor="start">the big step runs once; every new click or box only re-runs the two small boxes.</text>
+<path d="M80,136 h16 M88,128 v16" stroke="#FFFFFF" stroke-width="6"/>
+<path d="M80,136 h16 M88,128 v16" stroke="#00838F" stroke-width="3"/>
+</g>
+</svg>

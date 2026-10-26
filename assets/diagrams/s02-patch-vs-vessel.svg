@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="100%" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="s02-patch-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker></defs>
+<rect width="960" height="470" fill="#FFFFFF"/>
+<text x="180" y="34" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">DINOv3 at 512 px</text>
+<text x="180" y="56" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">one square = 32 × 32 px of the crop</text>
+<text x="510" y="34" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">DINOv3 at 1024 px</text>
+<text x="510" y="56" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">one square = 16 × 16 px of the crop</text>
+<text x="180" y="82" font-size="12" fill="#616161" font-weight="normal" text-anchor="middle"></text>
+<text x="480" y="84" font-size="12" fill="#616161" font-weight="normal" text-anchor="middle">Same 64 × 64 px piece of retina in both pictures</text>
+<clipPath id="s02-patch-clip-30"><rect x="30" y="100" width="300" height="300" rx="8"/></clipPath><g clip-path="url(#s02-patch-clip-30)"><rect x="30" y="100" width="300" height="300" fill="#F3E7DF"/><g transform="translate(30 100) scale(4.6875)"><path d="M8,-4 C14,20 26,36 30,68" fill="none" stroke="#795548" stroke-width="10" stroke-linecap="round"/><path d="M17,26 C30,28 46,22 68,32" fill="none" stroke="#795548" stroke-width="4" stroke-linecap="round"/></g></g>
+<g stroke="#FFFFFF" stroke-width="2.5"><line x1="180.0" y1="100" x2="180.0" y2="400"/><line x1="30" y1="250.0" x2="330" y2="250.0"/></g>
+<rect x="30" y="100" width="300" height="300" rx="8" fill="none" stroke="#424242" stroke-width="1.5"/>
+<rect x="180.0" y="100.0" width="150.0" height="150.0" fill="none" stroke="#212121" stroke-width="4"/>
+<clipPath id="s02-patch-clip-360"><rect x="360" y="100" width="300" height="300" rx="8"/></clipPath><g clip-path="url(#s02-patch-clip-360)"><rect x="360" y="100" width="300" height="300" fill="#F3E7DF"/><g transform="translate(360 100) scale(4.6875)"><path d="M8,-4 C14,20 26,36 30,68" fill="none" stroke="#795548" stroke-width="10" stroke-linecap="round"/><path d="M17,26 C30,28 46,22 68,32" fill="none" stroke="#795548" stroke-width="4" stroke-linecap="round"/></g></g>
+<g stroke="#FFFFFF" stroke-width="2.5"><line x1="435.0" y1="100" x2="435.0" y2="400"/><line x1="360" y1="175.0" x2="660" y2="175.0"/><line x1="510.0" y1="100" x2="510.0" y2="400"/><line x1="360" y1="250.0" x2="660" y2="250.0"/><line x1="585.0" y1="100" x2="585.0" y2="400"/><line x1="360" y1="325.0" x2="660" y2="325.0"/></g>
+<rect x="360" y="100" width="300" height="300" rx="8" fill="none" stroke="#424242" stroke-width="1.5"/>
+<rect x="510.0" y="175.0" width="75.0" height="75.0" fill="none" stroke="#212121" stroke-width="4"/>
+<text x="180" y="424" font-size="13" fill="#212121" font-weight="normal" text-anchor="middle">thin branch (4 px) fills about 12 % of the outlined square</text>
+<text x="510" y="424" font-size="13" fill="#212121" font-weight="normal" text-anchor="middle">the same branch fills about 25 % of the outlined square</text>
+<text x="180" y="446" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">each square still gets one label: vessel or not</text>
+<text x="510" y="446" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">same rule: one label per square</text>
+<rect x="700" y="100" width="230" height="300" rx="10" fill="#ECEFF1" stroke="#424242" stroke-width="1.5"/>
+<text x="815" y="132" font-size="15" fill="#212121" font-weight="bold" text-anchor="middle">What doubling the</text>
+<text x="815" y="152" font-size="15" fill="#212121" font-weight="bold" text-anchor="middle">resolution does</text>
+<text x="815" y="190" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">4× the squares</text>
+<text x="815" y="212" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">so a finer grid</text>
+<text x="815" y="250" font-size="16" fill="#212121" font-weight="bold" text-anchor="middle">about 16× the cost</text>
+<text x="815" y="272" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">attention compares every</text>
+<text x="815" y="290" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">square with every other</text>
+<text x="815" y="328" font-size="13" fill="#795548" font-weight="bold" text-anchor="middle">vessels in the photo</text>
+<text x="815" y="348" font-size="13" fill="#616161" font-weight="normal" text-anchor="middle">thick one 10 px, thin one 4 px</text>
+<text x="815" y="372" font-size="12" fill="#616161" font-weight="normal" text-anchor="middle">(example widths)</text>
+</svg>

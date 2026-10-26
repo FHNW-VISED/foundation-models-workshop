@@ -16,6 +16,16 @@
 # <!-- callout: objective | Objective -->
 # Turn SAM pseudo-labels and Grad-CAM maps into training signal, and know when to distrust them.
 
+
+# %% [markdown]
+# <!-- diagram: s00-map-path2 | You are here: Path 2 -->
+# Where this section sits on the map of section 0.
+
+# %% [markdown]
+# <!-- diagram: s06-teacher-student | A teacher fills in the labels -->
+# Read left to right. Your strokes are the only human input. Every guess the teacher makes in step 3 is
+# trained on in step 4, right or wrong.
+
 # %% [markdown]
 # <!-- callout: theory | Theory: when pseudo-labels work -->
 # A pseudo-label works when the teacher's guesses are mostly right *and* its mistakes are not systematic.
@@ -99,12 +109,22 @@ def pseudo_numbers(masks: list[np.ndarray], items: list[dict]) -> dict:
 #
 # We take the scribbles of section 4 again: a few vessel strokes and a few background strokes on each of the
 # same five training images.
+
+# %% [markdown]
+# <!-- diagram: s06-sam-clicks | SAM from stroke clicks -->
+# Forty clicks are taken from your strokes and go to SAM together with the image. SAM's answer for every
+# pixel is the pseudo-label.
+
+# %% [markdown]
+# <details><summary>The same in words</summary>
 #
 # - Twenty clicks spread along the vessel strokes go in as "vessel", twenty along the background strokes as
 #   "not vessel".
 # - SAM's answer for every pixel is the pseudo-label.
 # - Only the strokes go in. The ground truth appears in the figure so you can judge the guesses, and never
 #   in training.
+#
+# </details>
 
 # %% [markdown]
 # This helper cell defines `sam_pseudo_labels`, which asks SAM for probability maps (or loads ours).
@@ -609,10 +629,20 @@ show_masks(
 # ### 6.3 Grad-CAM: where a classifier looks
 #
 # The second teacher does not segment at all.
+
+# %% [markdown]
+# <!-- diagram: s06-gradcam | Grad-CAM in three steps -->
+# Three steps from a yes/no classifier to a pseudo-mask. Look at step 3: the map has one value per patch, and
+# a vessel is thinner than a patch.
+
+# %% [markdown]
+# <details><summary>The same in words</summary>
 #
 # 1. We train a small classifier to answer one yes/no question.
 # 2. We ask it *where* in the image its "yes" came from. Grad-CAM turns that answer into a heat map.
 # 3. A threshold turns the heat map into a pseudo-mask.
+#
+# </details>
 
 # %% [markdown]
 # <!-- callout: theory | Theory: Grad-CAM, and why it fits this task poorly -->

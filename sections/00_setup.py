@@ -41,6 +41,12 @@
 # same hidden ground truth, then your own images.
 
 # %% [markdown]
+# <!-- diagram: s00-method-map | The map: three ways to learn from incomplete labels -->
+# Read it from the top: the cheap labels you start with, the naive baseline they lead to, and the three
+# families of fixes, each named by the one question it answers. The number on every box is the section where
+# you try it; sections 8 to 10 then compare them all and turn the numbers into rules.
+
+# %% [markdown]
 # ## 0. Setup & the question
 #
 # This cell detects Colab and the GPU, fixes the seed, creates the `RESULTS` dictionary every section writes

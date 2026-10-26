@@ -17,6 +17,11 @@
 # treat missing labels as unknown (write the masked loss), then tell the loss how many vessels hide among the
 # unpainted pixels (the PU loss).
 
+
+# %% [markdown]
+# <!-- diagram: s00-map-path1 | You are here: Path 1 -->
+# Where this section sits on the map of section 0.
+
 # %% [markdown]
 # <!-- callout: theory | Theory: the masked loss -->
 # A **masked loss** is the partial cross-entropy of 4.2: only the pixels that carry a label count, and an
@@ -25,7 +30,18 @@
 # - **Example, a thin vessel nobody painted.** Naive (section 3): its pixels count as background, so the
 #   loss punishes the head for calling them vessel. Masked: they are ignored, so nothing punishes it.
 # - **Catch:** if the known pixels are almost only vessel, "everything is vessel" scores a perfect zero. Some
-#   known background must stay.
+#   known background must stay. The picture below shows why.
+#
+# <details><summary>The same in words</summary>
+#
+# If the known pixels are almost only vessel, a head that says "vessel" everywhere is never wrong on a known
+# pixel, so its loss is zero. A few known background pixels are enough to catch it.
+#
+# </details>
+
+# %% [markdown]
+# <!-- diagram: s05-masked-catch | The catch of the masked loss -->
+# The same useless head in both columns. Only the background strokes can make it pay.
 
 # %% [markdown]
 # The next cell defines a training loop that takes any loss, a scoring report, a view of what the loss
@@ -133,15 +149,25 @@ def loss_view(item: dict, labels: np.ndarray, show_bg: bool = True) -> np.ndarra
 # ### 5.1 Three ways to read the same label file
 #
 # The next cell shows what each recipe tells the loss on one of the five training images of section 3. The
-# painted vessels are the same every time; the rest differs:
+# painted vessels are the same every time; the rest differs. The picture below shows the idea on a strip of
+# ten pixels, with a vessel nobody painted.
+#
+# <details><summary>The same in words</summary>
 #
 # - **Naive:** every unpainted pixel is a background target.
 # - **Masked:** unpainted pixels are ignored, except 3–5 background strokes per image (the annotator also
 #   drew a few strokes on clear background, as in section 4). The loss needs some known background.
 # - **PU:** every unpainted pixel counts, as "unlabelled".
 #
+# </details>
+#
 # What to look for: the dark areas of the third picture are free for the head to call vessel. No ground truth
 # goes in, only the painted vessels, the strokes and the fundus border.
+
+# %% [markdown]
+# <!-- diagram: s05-three-readings | Three ways to read the same label file -->
+# Follow the outlined pixels, a vessel nobody painted. The labels are the same in all three columns; only
+# what the loss makes of the unpainted pixels changes.
 
 # %%
 # @title What each recipe tells the loss { display-mode: "form" }
@@ -405,14 +431,25 @@ print(
 # The **prior** π is the share of fundus pixels that are vessel: (painted share of the fundus) ÷ (share of the
 # vessels the annotator painted). Example: painted 1.5 %, annotator did half, so π = 3 %.
 #
+# The picture below shows the three steps on 200 pixels. The formulas are in it, and in words here:
+#
+# <details><summary>The same in words</summary>
+#
 # 1. Vessel loss on the painted pixels, target "vessel": `L_v = mean_painted(−log p)`.
 # 2. Background loss. Calling every pixel "background" mixes π vessels with (1−π) background, so subtract
 #    the vessels: `L_b = ( mean_all(−log(1−p)) − π · mean_painted(−log(1−p)) ) / (1−π)`.
 # 3. Balance them: `L = ½·L_v + ½·max(L_b, 0)`. The max stops L_b dipping below zero when the head
 #    overfits the few painted vessels.
 #
+# </details>
+#
 # It assumes the painted vessels are a random sample of all vessels: true here, because we hid segments at
 # random.
+
+# %% [markdown]
+# <!-- diagram: s05-pu-loss | The PU loss in three steps -->
+# Read the three panels left to right. In step 2 the painted vessels stand in for every vessel, because they
+# are a random sample of all of them.
 
 # %% [markdown]
 # <!-- callout: go-deeper | Go deeper: where the PU loss comes from -->

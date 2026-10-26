@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 450" width="100%" font-family="Helvetica, Arial, sans-serif">
+<rect width="960" height="450" fill="#FFFFFF"/>
+<text x="40" y="34" font-size="17" font-weight="bold" fill="#212121">With a few background strokes</text>
+<text x="40" y="56" font-size="14" fill="#616161">as in 5.1</text>
+<text x="40" y="92" font-size="13" fill="#616161">Labels the masked loss keeps</text>
+<rect x="40" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="72" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="104" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="136" y="100" width="32" height="32" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="168" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="200" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="232" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="264" y="100" width="32" height="32" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="296" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="328" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="360" y="100" width="32" height="32" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="392" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="40" y="164" font-size="13" fill="#616161">A useless head: says "vessel" everywhere</text>
+<rect x="40" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="56.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="72" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="88.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="104" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="120.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="136" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="152.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="168" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="184.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="200" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="216.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="232" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="248.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="264" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="280.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="296" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="312.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="328" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="344.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="360" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="376.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="392" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="408.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<text x="40" y="238" font-size="13" fill="#616161">Loss at each pixel (ignored pixels count for nothing)</text>
+<line x1="40" y1="330" x2="424" y2="330" stroke="#757575" stroke-width="1.5"/>
+<rect x="78" y="328" width="20" height="2" fill="#424242"/>
+<rect x="110" y="328" width="20" height="2" fill="#424242"/>
+<rect x="142" y="260" width="20" height="70" fill="#424242"/>
+<rect x="206" y="328" width="20" height="2" fill="#424242"/>
+<rect x="270" y="260" width="20" height="70" fill="#424242"/>
+<rect x="366" y="260" width="20" height="70" fill="#424242"/>
+<text x="40" y="366" font-size="17" font-weight="bold" fill="#212121">Caught</text>
+<text x="40" y="388" font-size="14" fill="#212121">Wrong on the background strokes: the loss is high.</text>
+<text x="520" y="34" font-size="17" font-weight="bold" fill="#212121">Without them</text>
+<text x="520" y="56" font-size="14" fill="#616161">only painted vessels are known</text>
+<text x="520" y="92" font-size="13" fill="#616161">Labels the masked loss keeps</text>
+<rect x="520" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="552" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="584" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="616" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="648" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="680" y="100" width="32" height="32" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="712" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="744" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="776" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="808" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="840" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="872" y="100" width="32" height="32" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="520" y="164" font-size="13" fill="#616161">A useless head: says "vessel" everywhere</text>
+<rect x="520" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="536.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="552" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="568.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="584" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="600.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="616" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="632.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="648" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="664.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="680" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="696.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="712" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="728.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="744" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="760.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="776" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="792.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="808" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="824.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="840" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="856.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<rect x="872" y="172" width="32" height="32" fill="#F3E5F5" stroke="#FFFFFF" stroke-width="1.5"/>
+<circle cx="888.0" cy="188.0" r="7" fill="#6A1B9A"/>
+<text x="520" y="238" font-size="13" fill="#616161">Loss at each pixel (ignored pixels count for nothing)</text>
+<line x1="520" y1="330" x2="904" y2="330" stroke="#757575" stroke-width="1.5"/>
+<rect x="558" y="328" width="20" height="2" fill="#424242"/>
+<rect x="590" y="328" width="20" height="2" fill="#424242"/>
+<rect x="686" y="328" width="20" height="2" fill="#424242"/>
+<text x="520" y="366" font-size="17" font-weight="bold" fill="#212121">A perfect score</text>
+<text x="520" y="388" font-size="14" fill="#212121">Nothing to be wrong about: the loss is about 0.</text>
+<line x1="480" y1="20" x2="480" y2="400" stroke="#CFD8DC" stroke-width="1.5"/>
+<rect x="40" y="418" width="16" height="16" rx="2" fill="#00838F" stroke="#9E9E9E" stroke-width="1"/>
+<text x="64" y="431" font-size="13" fill="#212121">painted vessel</text>
+<rect x="240" y="418" width="16" height="16" rx="2" fill="#9E9E9E" stroke="#9E9E9E" stroke-width="1"/>
+<text x="264" y="431" font-size="13" fill="#212121">background stroke</text>
+<rect x="440" y="418" width="16" height="16" rx="2" fill="#E0E0E0" stroke="#9E9E9E" stroke-width="1"/>
+<text x="464" y="431" font-size="13" fill="#212121">ignored</text>
+<rect x="640" y="418" width="16" height="16" rx="2" fill="#F3E5F5" stroke="#9E9E9E" stroke-width="1"/>
+<circle cx="648" cy="426" r="4" fill="#6A1B9A"/>
+<text x="664" y="431" font-size="13" fill="#212121">head says vessel</text>
+</svg>

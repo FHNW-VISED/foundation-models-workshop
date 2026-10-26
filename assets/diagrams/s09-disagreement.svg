@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 268" width="100%" font-family="Helvetica, Arial, sans-serif">
+<rect width="960" height="268" fill="#FFFFFF"/>
+<defs>
+<marker id="s09-disagreement-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker>
+</defs>
+<text x="16" y="26" font-size="15" fill="#212121" font-weight="bold">One row of pixels, three masks</text>
+<text x="124" y="61" font-size="13" fill="#212121" text-anchor="end">box</text>
+<rect x="136" y="44" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="160" y="44" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="184" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="208" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="232" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="256" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="280" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="304" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="328" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="352" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="376" y="44" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="400" y="44" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="424" y="44" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="448" y="44" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<text x="124" y="95" font-size="13" fill="#212121" text-anchor="end">scribble head</text>
+<rect x="136" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="160" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="184" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="208" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="232" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="256" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="280" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="304" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="328" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="352" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="376" y="78" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="400" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="424" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="448" y="78" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<text x="124" y="129" font-size="13" fill="#212121" text-anchor="end">SAM clicks</text>
+<rect x="136" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="160" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="184" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="208" y="112" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="232" y="112" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="256" y="112" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="280" y="112" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="304" y="112" width="24" height="24" rx="0" fill="#6A1B9A" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="328" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="352" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="376" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="400" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="424" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="448" y="112" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<line x1="136" y1="155" x2="472" y2="155" stroke="#90A4AE" stroke-width="1"/>
+<text x="124" y="181" font-size="13" fill="#212121" font-weight="bold" text-anchor="end">disagreement</text>
+<rect x="136" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="160" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="184" y="164" width="24" height="24" rx="0" fill="#D81B60" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="208" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="232" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="256" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="280" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="304" y="164" width="24" height="24" rx="0" fill="#D81B60" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="328" y="164" width="24" height="24" rx="0" fill="#D81B60" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="352" y="164" width="24" height="24" rx="0" fill="#D81B60" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="376" y="164" width="24" height="24" rx="0" fill="#D81B60" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="400" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="424" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="448" y="164" width="24" height="24" rx="0" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="136" y="208" width="12" height="12" rx="2" fill="#6A1B9A"/>
+<text x="154" y="218" font-size="12" fill="#616161">marked by a mask</text>
+<rect x="276" y="208" width="12" height="12" rx="2" fill="#D81B60"/>
+<text x="294" y="218" font-size="12" fill="#616161">marked by some masks, not by all</text>
+<line x1="498" y1="40" x2="498" y2="250" stroke="#B0BEC5" stroke-width="1"/>
+<text x="520" y="26" font-size="15" fill="#212121" font-weight="bold">How to read the map</text>
+<ellipse cx="620" cy="104" rx="62" ry="40" fill="#D81B60"/>
+<ellipse cx="620" cy="104" rx="54" ry="33" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.5"/>
+<text x="524" y="178" font-size="14" fill="#212121" font-weight="bold">A thin rim</text>
+<text x="524" y="198" font-size="12" fill="#616161">they agree on what it is,</text>
+<text x="524" y="214" font-size="12" fill="#616161">and differ on the edge</text>
+<ellipse cx="878" cy="96" rx="34" ry="26" fill="#D81B60"/>
+<ellipse cx="826" cy="108" rx="50" ry="34" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.5"/>
+<text x="744" y="178" font-size="14" fill="#212121" font-weight="bold">Whole parts</text>
+<text x="744" y="198" font-size="12" fill="#616161">they disagree on what belongs</text>
+<text x="744" y="214" font-size="12" fill="#616161">to the thing: draw a stroke there</text>
+<rect x="520" y="236" width="12" height="12" rx="2" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.2"/>
+<text x="538" y="246" font-size="12" fill="#616161">all three agree</text>
+<rect x="650" y="236" width="12" height="12" rx="2" fill="#D81B60"/>
+<text x="668" y="246" font-size="12" fill="#616161">disagreement</text>
+</svg>
