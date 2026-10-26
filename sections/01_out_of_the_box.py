@@ -280,10 +280,12 @@ show_masks(panels, width=2.6)
 # %% [markdown]
 # **How the head works.** Each patch gets one score from its 384 feature numbers `f`:
 #
-# `score = w · f + b` (384 weights + 1 bias = 385 parameters). Score above 0: the patch is "pet"; below 0:
-# "background".
+# `score = w · f + b` (384 weights + 1 bias = 385 parameters), the same `w` and `b` for every patch (a
+# "1 × 1 convolution"). Score above 0: the patch is "pet"; below 0: "background".
 #
-# The "1 × 1 convolution" is this same formula applied to every patch of the grid.
+# A sigmoid `σ` squeezes the score into a probability `p = σ(score)` between 0 and 1 (score 2.2 gives
+# p = 0.90, score 0 gives 0.5), so "score above 0" and "p above 0.5" say the same thing. The per-patch map is
+# then upsampled to the image.
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -385,6 +387,51 @@ if head_sec > 60:
     print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
 
 # %% [markdown]
+# This cell runs the head you just trained on one training pet and shows each step (patches, one probability
+# per patch, the upsampled map, the final mask), then works through one patch by hand.
+
+# %%
+# @title The linear head step by step on one pet { display-mode: "form" }
+hx = train_items[0]
+hfeat = features_for(PETS, hx, PETS["feat_side"])  # [384, h, w]: 384 numbers per patch
+dev = hfeat.device
+with torch.no_grad():
+    hp = {k: v.to(dev) for k, v in head_full5.items()}
+    hz = (hfeat - hp["feat_mean"].view(-1, 1, 1)) / hp["feat_std"].view(-1, 1, 1)
+    hscore = F.conv2d(hz[None], hp["weight"], hp["bias"])[0, 0]  # w·f + b, one score per patch
+    hprob = torch.sigmoid(hscore)
+    hup = F.interpolate(hprob[None, None], size=hx["mask"].shape, mode="bilinear", align_corners=False)[0, 0]
+gh, gw = hprob.shape
+py, px = np.unravel_index(int(hprob.argmax()), hprob.shape)  # the most pet-like patch
+f_vec, w_vec = hz[:, py, px], hp["weight"].reshape(-1)
+f_head = ", ".join(f"{v:.2f}" for v in f_vec[:4].tolist())
+dot, bias = float((w_vec * f_vec).sum()), float(hp["bias"])
+total, p_patch = float(hscore[py, px]), float(hprob[py, px])
+print(f"patch (row {py}, col {px}) · f = [{f_head}, … 384 numbers]")
+print(f"w · f + b = {dot:.2f} + ({bias:.2f}) = {total:.2f} → p = σ({total:.2f}) = {p_patch:.2f}")
+
+prob_cmap = mpl.colors.LinearSegmentedColormap.from_list("prob", ["#FFFFFF", THEME["works"]])
+H, W = hx["mask"].shape
+fig, axes = plt.subplots(1, 4, figsize=(11.6, 3))
+axes[0].imshow(hx["image"])
+axes[0].vlines(np.arange(0, W + 1, W / gw), 0, H, colors="white", linewidths=0.4)
+axes[0].hlines(np.arange(0, H + 1, H / gh), 0, W, colors="white", linewidths=0.4)
+cell_box = plt.Rectangle((px * W / gw, py * H / gh), W / gw, H / gh, fill=False, ec=THEME["scribble"], lw=2)
+axes[0].add_patch(cell_box)
+axes[0].set_title("1 · image cut into patches", fontsize=9)
+axes[1].imshow(hprob.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1, interpolation="nearest")
+axes[1].add_patch(plt.Rectangle((px - 0.5, py - 0.5), 1, 1, fill=False, ec=THEME["scribble"], lw=2))
+axes[1].set_title("2 · one p per patch (white 0, violet 1)", fontsize=9)
+axes[2].imshow(hup.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1)
+axes[2].set_title("3 · upsampled to the image", fontsize=9)
+axes[3].imshow(overlay(hx["image"], predict_head(head_full5, hfeat, hx["mask"].shape), THEME["works"]))
+axes[3].set_title("4 · p > 0.5 → pet", fontsize=9)
+for ax in axes:
+    ax.axis("off")
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
 # This cell scores the head on the same evaluation pets as SAM, keeps the mean IoU, and shows three held-out
 # pets with the head's mask next to the ground truth.
 
@@ -412,28 +459,6 @@ for it, pred, v in list(zip(PETS_EVAL, head_preds, head_ious, strict=True))[:3]:
     panels += [
         (f"head · IoU {v:.2f}", overlay(it["image"], pred, THEME["works"])),
         ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
-    ]
-show_masks(panels, width=2.6)
-
-# %% [markdown]
-# This cell shows the raw score `w · f + b` per 16 × 16 patch of three held-out pets, where the mask above
-# is only its sign: violet = pet-like (above 0), orange = background-like, white = undecided.
-
-# %%
-# @title Head score per patch, as a heatmap { display-mode: "form" }
-cmap = mpl.colors.LinearSegmentedColormap.from_list("score", [THEME["fails"], "#FFFFFF", THEME["works"]])
-panels = []
-for it in PETS_EVAL[:3]:
-    feat = features_for(PETS, it, PETS["feat_side"])
-    h = {k: v.to(feat.device) for k, v in head_full5.items()}
-    with torch.no_grad():
-        z = (feat - h["feat_mean"].view(-1, 1, 1)) / h["feat_std"].view(-1, 1, 1)
-        score = F.conv2d(z[None], h["weight"], h["bias"])[0, 0].cpu().numpy()
-    rgb = (cmap(0.5 + 0.5 * score / (np.abs(score).max() + 1e-9))[..., :3] * 255).astype(np.uint8)
-    blocks = np.repeat(np.repeat(rgb, 16, 0), 16, 1)  # one 16 px block per patch
-    panels += [
-        (it["name"], it["image"]),
-        (f"score per patch · {score.min():.1f} to {score.max():.1f}", blocks),
     ]
 show_masks(panels, width=2.6)
 

@@ -178,23 +178,6 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q18.** 🟡 Look at the third panel. The masked recipe tells the loss about few pixels, almost all vessel:
-#
-# - Which pixels may the head call vessel without any penalty?
-# - What would the loss do if you also removed the background strokes?
-
-# %% [markdown]
-# <details><summary>What to look for</summary>
-#
-# Every dark pixel in the third panel: the hidden vessels, which is the point, but also all the background
-# between the strokes, including the background right next to every vessel. The strokes sit on clear
-# background away from the vessels, so they say little about where a vessel ends.
-#
-# Without them the loss only hears "vessel": the trivial solution of the Theory, shown with a fake head below.
-#
-# </details>
-
-# %% [markdown]
 # ### 5.2 Write the masked loss
 
 # %% [markdown]
@@ -297,10 +280,10 @@ t0 = time.monotonic()
 path_reports = {APPROACH_NAMES["masked"]: path_report(masked_head)}
 masked_infer = round(time.monotonic() - t0, 1)
 earlier_heads = {"naive": naive_head}
-if "balanced_head" in globals():  # made by the 🔴 Q12 cell of section 3; skipped there = no such row here
+if "balanced_head" in globals():  # made by the 🔴 Q11 cell of section 3; skipped there = no such row here
     earlier_heads["naive_balanced"] = balanced_head
 else:
-    print("ℹ️ No balanced naive head (the 🔴 Q12 cell of section 3 was skipped): its row is left out.")
+    print("ℹ️ No balanced naive head (the 🔴 Q11 cell of section 3 was skipped): its row is left out.")
 for key, tensors in earlier_heads.items():
     path_reports[APPROACH_NAMES[key]] = path_report(tensors)
 path_reports["full masks (section 2)"] = path_report(full_head)
@@ -351,10 +334,10 @@ path_chart(list(PATH_COLOURS))
 # <!-- callout: your-turn | Your turn: compare the heads on one image -->
 # - Run the next cell: the hidden vessels each head found on a training image, then the error maps of
 #   section 4 on the held-out demo image (violet found, orange false alarm, green missed). No new training.
-# - Then set `LOOK_IMAGE` to 1, 2, … and run it again, to answer Q19.
+# - Then set `LOOK_IMAGE` to 1, 2, … and run it again, to answer Q17.
 
 # %%
-# Q19 — hidden vessels found on a training image, then error maps on the held-out demo image
+# Q17 — hidden vessels found on a training image, then error maps on the held-out demo image
 LOOK_IMAGE = 0  # try 1, 2, ...
 if not isinstance(LOOK_IMAGE, int) or not 0 <= LOOK_IMAGE < len(miss_train):
     raise SystemExit(f"LOOK_IMAGE must be a whole number from 0 to {len(miss_train) - 1}.")
@@ -384,17 +367,21 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q19.** 🟡 Compare the naive and the masked head:
+# **Q17.** 🟡 Compare the naive and the masked head:
 #
-# - Which hidden vessels does the masked head recover that the naive head missed?
+# - Which hidden vessels does the masked head recover that the naive head missed? Think back to the third
+#   panel of 5.1: which pixels may it call vessel without any penalty?
 # - On the held-out image, what did each head pay for what it found? Compare the orange.
 # - Does that hold on another training image?
+# - What would the loss do if you also removed the background strokes?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
 # The masked head was never told that a hidden vessel is background, so it treats a vessel-looking patch as
-# a vessel wherever it is: it finds most of the hidden vessels, the ones the naive head dropped.
+# a vessel wherever it is: it finds most of the hidden vessels, the ones the naive head dropped. Every dark
+# pixel in the third panel of 5.1 is free in this way: the hidden vessels, which is the point, but also all
+# the background between the strokes, including the background right next to every vessel.
 #
 # The price shows on the held-out image. The only background the loss heard about is a handful of strokes
 # far from any vessel, so nothing told it where a vessel ends: the area around each vessel, and sometimes
@@ -403,6 +390,9 @@ show_masks(
 # Compare the "marked" column: the naive head is too stingy, the masked head is often too generous, and IoU
 # alone may rank them either way. Both failures come from what the loss was told about the unpainted
 # pixels, in opposite directions.
+#
+# Without the background strokes the loss would only hear "vessel": the trivial solution of the Theory, shown
+# with a fake head below.
 #
 # </details>
 
@@ -464,7 +454,7 @@ print(
 #   the head on the PU labels of 5.1 (seconds) and prints its numbers next to the other heads.
 
 # %%
-# Q20 — a PU-inspired loss: painted vessels + unlabelled pixels + one guess about the annotator
+# Q18 — a PU-inspired loss: painted vessels + unlabelled pixels + one guess about the annotator
 LABELLED_SHARE = 1 - MISSING["hidden_fraction"]  # the annotator's "I did about half"; try 0.3, 0.8
 if not isinstance(LABELLED_SHARE, (int, float)) or not 0 < LABELLED_SHARE <= 1:
     raise SystemExit("LABELLED_SHARE must be a number above 0 and at most 1, e.g. 0.5.")
@@ -517,7 +507,7 @@ print_reports(
 path_chart([APPROACH_NAMES["naive"], APPROACH_NAMES["masked"], APPROACH_NAMES["pu"]])
 
 # %% [markdown]
-# **Q20.** 🔴 Train again with a smaller and a larger `LABELLED_SHARE`. Which way does the head move:
+# **Q18.** 🔴 Train again with a smaller and a larger `LABELLED_SHARE`. Which way does the head move:
 #
 # - on recall?
 # - on the marked share?
@@ -541,7 +531,7 @@ path_chart([APPROACH_NAMES["naive"], APPROACH_NAMES["masked"], APPROACH_NAMES["p
 # </details>
 
 # %% [markdown]
-# **Q21.** 🟡 The masked head rests on one assumption: the hidden vessels look like the painted ones, because
+# **Q19.** 🟡 The masked head rests on one assumption: the hidden vessels look like the painted ones, because
 # we hid segments at random. Name a real annotation habit that breaks it. What would the masked head learn
 # then?
 

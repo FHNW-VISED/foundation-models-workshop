@@ -204,7 +204,7 @@ except ImportError:  # no IPython: plain text
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (2 min) -->
-# **Q36.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
+# **Q33.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
 # section 9). Which of the principles above would have changed what you did first, and what number would you
 # measure to check it?
 #
@@ -212,7 +212,7 @@ except ImportError:  # no IPython: plain text
 # - The cell prints them next to the principle you picked and checks nothing.
 
 # %%
-# Q36 — your problem and your first step (leave "" to skip)
+# Q33 — your problem and your first step (leave "" to skip)
 MY_PROBLEM = ""  # e.g. "cracks in drone photos of bridges"
 MY_PRINCIPLE = 0  # the number of the principle above that changes your plan (1–6), or 0 for none
 MY_FIRST_STEP = ""  # e.g. "one box on 20 images, compared with the 'everything' line"
@@ -262,21 +262,7 @@ else:
 #    next on a new problem, including your own images (sections 8 and 9).
 
 # %% [markdown]
-# <!-- callout: takeaway | When you see X, do Y: the whole workshop -->
-# - **When** one box scores about the same as "mark everything", or the structure is thinner than a 16 px
-#   patch **→** compare with the "everything" line, trust clDice over IoU, and try a larger input
-#   (sections 1 and 2).
-# - **When** labels are partly missing, or you only have strokes **→** treat an unlabelled pixel as unknown,
-#   turn strokes into pseudo-labels or SAM prompts, and compare with the thickened strokes alone
-#   (sections 3 and 5 to 7).
-# - **When** two approaches differ by less than their spread, or a method needs strokes on every one of
-#   thousands of new images **→** call it a tie and choose by annotation minutes; train a head once
-#   (section 8).
-# - **When** there is no ground truth **→** look where the approaches disagree, add a stroke there, and
-#   label a small test set before deciding (section 9).
-#
-# The same six questions carry over to any task:
-#
+# <!-- callout: go-deeper | Go deeper · six questions for any task -->
 # - Is the out-of-the-box result above the "everything" line?
 # - Is the structure smaller than a 16 px patch?
 # - What do the gaps in the labels mean?
@@ -285,8 +271,7 @@ else:
 # - How many minutes does every new image cost?
 
 # %% [markdown]
-# ### 10.3 Where to go next
-#
+# <!-- callout: go-deeper | Go deeper · where to go next -->
 # - **Label a small test set first**: a few fully annotated images turn every later decision into a
 #   measurement, as the hidden ground truth did here.
 # - **Let the model choose the next stroke**: draw where the approaches disagree (section 9), retrain, repeat.
