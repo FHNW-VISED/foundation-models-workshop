@@ -49,6 +49,36 @@ td:first-child{color:var(--muted);font-style:italic;width:40%}
 </header>
 
 <section>
+<p class="muted">Round 2 · afternoon · <a href="https://github.com/FHNW-VISED/foundation-models-workshop/pull/28">PR #28</a> (stacked on #27 and #26)</p>
+<h2>Round 2: shorter, PU on the main path, a legend on every plot</h2>
+<p>An audit agent first compared every section with the accepted proposal: about 310 participant-minutes with every optional part, 265 on the main path, against 175. You picked the cuts. The full notebook now runs on a laptop CPU in 238 s.</p>
+<div class="status"><span class="pill ok">just check green</span><span class="pill ok">full CPU run OK</span><span class="pill">not merged</span><span class="pill">v08 · Q1–Q23</span></div>
+<div class="fig">
+<div class="toggle" role="group" aria-label="Measure">
+<button id="m-q" aria-pressed="true">Questions</button>
+<button id="m-f" aria-pressed="false">Figures</button>
+<button id="m-w" aria-pressed="false">Words of text</button>
+</div>
+<div class="bars" id="cut-bars"></div>
+<p class="muted">The audit's minute estimate after the cuts is about 185, with ±15 % because it is counted, not timed with a stopwatch.</p>
+</div>
+<p>On a real run, the core lesson holds. Of the vessels the annotator never painted, each head finds:</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Head</th><th>Hidden vessels found</th><th>Precision</th><th>Held-out IoU</th></tr></thead>
+<tbody>
+<tr><td>naive: missing = background</td><td>6 %</td><td>0.65</td><td>0.25</td></tr>
+<tr><td>masked: missing = unknown</td><td>92 %</td><td>0.16</td><td>0.15</td></tr>
+<tr><td>PU: missing = unlabelled</td><td>70 %</td><td>0.31</td><td>0.20</td></tr>
+</tbody></table></div>
+<ol class="todo">
+<li>Request SAM 3 access on huggingface.co/facebook/sam3. Your token works, but your account is not yet on Meta's approved list, so the download returns 403.</li>
+<li>Revoke the token you pasted in chat and make a new one. Put it in Colab's 🔑 Secrets as <code>HF_TOKEN</code>.</li>
+<li>Merge in order: #26, then #27, then #28. Retarget #28 to main before deleting #27's branch.</li>
+<li>Run it once in Colab. The "Show ground truth" button and the coffee break, now before 5.3, are the two things to look at.</li>
+</ol>
+</section>
+
+<section>
 <h2>What is left for you</h2>
 <ol class="todo">
 <li>Open the notebook in Colab on a T4 and try the playground in section 1: click the pet, shift-click the floor, drag a box. It is tested only with Colab faked, never in a real browser.</li>
@@ -133,6 +163,18 @@ td:first-child{color:var(--muted);font-style:italic;width:40%}
                      :"pet pixels now. The 18,368 px band is drawn grey and left out of IoU and out of the heads' loss.";
   }
   bo.addEventListener("click",function(){show(true)}); bn.addEventListener("click",function(){show(false)});
+  var cut={q:[38,23],f:[71,45],w:[21795,17752]}, cb=document.getElementById("cut-bars"), ids={q:"m-q",f:"m-f",w:"m-w"};
+  function drawCut(k){
+    cb.innerHTML=""; var v=cut[k], mx=v[0];
+    [["PR #26",v[0]],["PR #28",v[1]]].forEach(function(r){
+      var d=document.createElement("div"); d.className="bar";
+      d.innerHTML='<span>'+r[0]+'</span><div class="track" role="img" aria-label="'+r[0]+': '+r[1]+'"><div class="seg-sam" style="width:'+(r[1]/mx*100)+'%"></div></div><span>'+r[1].toLocaleString("en")+'</span>';
+      cb.appendChild(d);
+    });
+    Object.keys(ids).forEach(function(x){document.getElementById(ids[x]).setAttribute("aria-pressed", x===k)});
+  }
+  Object.keys(ids).forEach(function(k){document.getElementById(ids[k]).addEventListener("click",function(){drawCut(k)})});
+  drawCut("q");
   var rows=[["before",2.2,7.0],["after",2.2,1.3]], max=9.5, el=document.getElementById("bars");
   rows.forEach(function(r){
     var d=document.createElement("div"); d.className="bar";
