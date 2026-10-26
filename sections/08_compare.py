@@ -4,9 +4,10 @@
 # Every section since 2 ended with its own small table, each against a different neighbour. Here they all
 # sit in one table, scored on the same held-out images against the same hidden ground truth.
 #
-# The question becomes the one you face on a real project: not "which approach has the highest number" but
+# The question is the one you face on a real project: not "which approach has the highest number" but
 # "which approach would I pay for". A recipe can win on accuracy and lose on annotation hours, or win on
-# average and fail badly on one image in five.
+# average and fail badly on one image in five. Three pictures follow the table: a trade-off plot, a violin
+# plot, and the winner's best and worst images.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
@@ -39,17 +40,15 @@
 # - Training minutes are paid once. The per-image column is what every *new* image costs.
 
 # %% [markdown]
-# This helper cell collects each approach's held-out predictions, numbers, seconds, annotation minutes and a
-# sentence on how it scales.
+# This helper cell gathers every approach's predictions, seconds, annotation minutes and scaling note.
 
 # %%
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
 approach_colours |= {"full_masks": THEME["works"]}
 approach_names |= {"full_masks": "full masks: complete maps (section 2)"}
-ALL_APPROACHES = [  # the short names Q33 accepts
+ALL_APPROACHES = [  # the short names Q19 accepts
     "zero_shot",
     "one_shot",
-    "one_shot_sam",
     "scribbles",
     "naive",
     "masked",
@@ -62,8 +61,7 @@ ALL_APPROACHES = [  # the short names Q33 accepts
 ]
 COMPARE_LABEL = {  # readable names for figure titles and the table
     "zero_shot": "zero-shot box",
-    "one_shot": "prototype",
-    "one_shot_sam": "prototype → SAM",
+    "one_shot": "one-shot (go-deeper)",
     "scribbles": "scribble head",
     "naive": "naive (gaps = bg)",
     "masked": "masked loss",
@@ -73,26 +71,28 @@ COMPARE_LABEL = {  # readable names for figure titles and the table
     "sam_clicks": "SAM from clicks",
     "sam_boxes": "SAM from boxes",
     "full_masks": "full masks",
+    "sam3_text": "SAM 3 from a word",
 }
-# A 🔴 part you skipped must not break this section: its row is left out, with one note.
-skipped = {}
-if "one_shot_sam" not in ladder_report or "proto_sam_sec" not in globals():
-    skipped["one_shot_sam"] = "the 'prototype → SAM clicks' cell of section 4 was not run"
-if approach_names["pu"] not in path_reports or "pu_head" not in RESULTS:
-    skipped["pu"] = "the PU cell of section 5.3 was not run"
-compare_order = [k for k in ALL_APPROACHES if k not in skipped]
+# An optional extra row: section 7's SAM 3 phrase, only if that cell ran (it needs SAM 3 access).
+has_sam3 = (
+    isinstance(RESULTS.get("sam3_text"), dict)
+    and "sam3_preds" in globals()
+    and len(sam3_preds) == len(spec_eval)
+)
+compare_order = [*ALL_APPROACHES, *(["sam3_text"] if has_sam3 else [])]
 compare_reports = (  # mean IoU, clDice, recall, precision, marked share and held-out predictions per approach
-    {k: ladder_report[k] | {"held_preds": ladder_preds[k]} for k in ladder_report}
-    | {k: path_reports[approach_names[k]] for k in ("naive", "masked", "pu") if k not in skipped}
+    {k: ladder_report[k] | {"held_preds": ladder_preds[k]} for k in ("zero_shot", "one_shot", "scribbles")}
+    | {k: path_reports[approach_names[k]] for k in ("naive", "masked", "pu")}
     | {k: path2_report[k] | {"held_preds": path2_preds[k]} for k in ("sam_pseudo", "gradcam_pseudo")}
     | {k: path3_report[k] | {"held_preds": path3_preds[k]} for k in ("sam_clicks", "sam_boxes")}
     | {"full_masks": path_reports["full masks (section 2)"]}
+    | ({"sam3_text": RESULTS["sam3_text"] | {"held_preds": sam3_preds}} if has_sam3 else {})
 )
 compare_seconds = {  # training + pseudo-labels + inference, as recorded by each section in this session
     "zero_shot": RESULTS["specialised_zero_shot_seconds"] / len(LADDER),  # the box: 1 of section 2's prompts
-    "one_shot": proto_sec,
+    "one_shot": RESULTS["one_shot"]["infer_sec"],
     "full_masks": spec_heads[side][1] + RESULTS["scribbles_head"]["infer_sec"],  # same head, same features
-} | {
+} | ({"sam3_text": RESULTS["sam3_text"]["infer_sec"]} if has_sam3 else {}) | {
     k: sum(float(RESULTS[entry].get(part, 0.0)) for part in ("train_sec", "pseudo_sec", "infer_sec"))
     for k, entry in {
         "scribbles": "scribbles_head",
@@ -104,16 +104,14 @@ compare_seconds = {  # training + pseudo-labels + inference, as recorded by each
         "sam_clicks": "sam_direct_clicks",
         "sam_boxes": "sam_direct_boxes",
     }.items()
-    if k not in skipped
 }
-if "one_shot_sam" not in skipped:
-    compare_seconds["one_shot_sam"] = proto_sec + proto_sam_sec
 compare_effort = (  # annotation minutes for this run (section 4's effort_minutes and its assumptions)
     RESULTS["ladder_effort_min"]
     | RESULTS["path1_effort_min"]
     | RESULTS["path2_effort_min"]
     | RESULTS["path3_effort_min"]
     | {"full_masks": round(effort_minutes(n_full_masks=len(spec_train)), 2)}
+    | {"sam3_text": 0.0}  # a phrase typed once; no strokes
 )
 compare_per_image = {  # annotation minutes for every *new* image; trained heads need none
     k: 0.0 for k in compare_order
@@ -124,8 +122,7 @@ compare_per_image = {  # annotation minutes for every *new* image; trained heads
 }
 SCALES = {
     "zero_shot": "a box on every new image, SAM per image, nothing to train",
-    "one_shot": "one complete mask once; new images cost one feature pass",
-    "one_shot_sam": "one complete mask once; SAM per new image, clicks picked automatically",
+    "one_shot": "one complete mask once (go-deeper); new images cost one feature pass",
     "scribbles": "minutes of strokes once; new images cost one feature pass",
     "naive": "half-painted maps once (hours); new images cost one feature pass",
     "masked": "half-painted maps plus a few strokes once; new images cost one feature pass",
@@ -135,14 +132,13 @@ SCALES = {
     "sam_clicks": "strokes on every new image, SAM per image; the clicking never stops",
     "sam_boxes": "strokes on every new image, SAM per box; the clicking never stops",
     "full_masks": "hours of painting per training image; new images cost one feature pass",
+    "sam3_text": "one phrase for every image, SAM 3 per image; no strokes at all",
 }
 use_cldice = "cldice" in specialised.get("metric_extras", [])
 print(f"{len(compare_order)} approaches, each scored on the same {len(spec_eval)} held-out images:")
 for k in compare_order:
     print(f"  {k:<16}{approach_names[k]}")
-for k, why in skipped.items():
-    print(f"note: '{k}' is left out of this section, {why}. Run it to add the row.")
-cost =specialised["annotation_effort"]
+cost = specialised["annotation_effort"]
 print(
     f"effort assumptions ({specialised['name']}): {cost['seconds_per_stroke']} s per stroke, click or box · "
     f"{cost['hours_per_full_mask'][0]}–{cost['hours_per_full_mask'][-1]} h per complete mask "
@@ -152,8 +148,11 @@ print(
 # %% [markdown]
 # ### 8.1 Look first, then predict
 #
-# This cell shows every approach on one held-out image next to its hidden ground truth (green), each title in
-# the approach's colour: look for who finds the thin vessels, who paints blobs and who misses most.
+# This cell shows every approach's mask on one held-out image, next to the image and its hidden ground truth.
+#
+# What to look for: who follows the thin vessels, who paints blobs, who marks almost nothing. Violet is
+# always a model's mask and green is the ground truth. A title's colour is the approach's colour in the
+# charts below.
 
 # %%
 # @title All approaches on one held-out image { display-mode: "form" }
@@ -166,8 +165,8 @@ gallery = [
 ]
 for k in compare_order:
     pred = compare_reports[k]["held_preds"][k_show] & region(it_show)
-    colour = approach_colours[k]
-    gallery.append((f"{COMPARE_LABEL[k]}\n{k}", overlay(it_show["image"], pred, colour), colour))
+    shown = overlay(it_show["image"], pred, THEME["works"])
+    gallery.append((f"{COMPARE_LABEL[k]}\n{k}", shown, approach_colours[k]))
 g_cols = 5
 g_rows = -(-len(gallery) // g_cols)
 fig, axes = plt.subplots(g_rows, g_cols, figsize=(2.6 * g_cols, 2.9 * g_rows))
@@ -176,12 +175,12 @@ for ax in np.ravel(axes):
 for ax, (title, img, colour) in zip(np.ravel(axes), gallery, strict=False):
     ax.imshow(img)
     ax.set_title(title, fontsize=8, color=colour)
-plt.tight_layout()
+add_key(fig, ["mask", "truth"], "title colour = the approach's colour in the charts below")
 plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction (1 min) -->
-# **Q33.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
+# **Q19.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
 # the **steadiest** (the smallest spread of IoU from image to image)?
 #
 # - Choose your two picks from the dropdowns in the next cell and run it; leave them blank to skip. The
@@ -189,17 +188,16 @@ plt.show()
 #   they landed.
 
 # %%
-# Q33 — your two predictions (pick from the dropdowns, or leave blank to skip)
-MY_WINNER = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
-MY_STEADIEST = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
+# Q19 — your two predictions (pick from the dropdowns, or leave blank to skip)
+MY_WINNER = ""  # @param ["", "zero_shot", "one_shot", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
+MY_STEADIEST = ""  # @param ["", "zero_shot", "one_shot", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
 for label, pick in (("MY_WINNER", MY_WINNER), ("MY_STEADIEST", MY_STEADIEST)):
     if not isinstance(pick, str) or (pick and pick not in ALL_APPROACHES):
         raise SystemExit(f'{label} must be "" or one of: {", ".join(ALL_APPROACHES)}.')
 print(f"your picks · highest IoU: {MY_WINNER or '(none)'} · steadiest: {MY_STEADIEST or '(none)'}")
 
 # %% [markdown]
-# This helper cell defines `spread`, the population standard deviation of one approach's per-image IoUs
-# (divided by the number of images, as in the theory box above).
+# This helper cell defines `spread`, the standard deviation of one approach's per-image IoUs.
 
 # %%
 # @title spread: the standard deviation of the per-image IoU { display-mode: "form" }
@@ -212,8 +210,8 @@ def spread(per_image_iou: list[float]) -> float:
 # %% [markdown]
 # ### 8.2 The table
 #
-# This cell scores every approach image by image against the hidden ground truth and shows the table sorted
-# by IoU (best value of each column in bold), then where your two picks landed.
+# This cell scores every approach image by image against the hidden ground truth and shows the table,
+# sorted by IoU, then where your two picks landed. The best value of each column is in bold.
 
 # %%
 # @title Score every approach and show the table { display-mode: "form" }
@@ -301,8 +299,10 @@ def comparison_html(rows: list[dict]) -> str:
         f"<tr>{head}</tr>{''.join(lines)}</table>"
         '<div style="font-size:12px;color:#616161;margin:2px 0 6px">recall = share of the true vessel pixels '
         "found · ± spread = std of the per-image IoU · worst = lowest per-image IoU · effort min = "
-        "annotation minutes once · /new img = annotation minutes per new image · bold = best of its column"
-        "</div>"
+        "annotation minutes once · /new img = annotation minutes per new image · bold = best of its column · "
+        "the colour chip is the approach's colour in the charts below"
+        + (" · clDice = how well the mask follows the vessel centre lines (section 2.2)" if use_cldice else "")
+        + "</div>"
         '<details style="background:#F5F5F5;border-left:6px solid #616161;border-radius:6px;padding:8px 12px;'
         'color:#616161;font-size:13px"><summary><b>🔍 How each one scales</b></summary>'
         f'<ul style="margin:6px 0">{scales}</ul></details>'
@@ -330,16 +330,18 @@ if MY_WINNER in by_spread:
 if MY_STEADIEST in by_spread:
     rank = by_spread.index(MY_STEADIEST) + 1
     print(f"your steadiness pick {MY_STEADIEST} ranks {rank} of {len(by_spread)}")
-for pick in {MY_WINNER, MY_STEADIEST} - {"", *by_spread}:
-    print(f"(your pick {pick} was left out: {skipped.get(pick, 'not run')})")
 if not (MY_WINNER or MY_STEADIEST):
-    print("no prediction written in Q33; fine, but next time guess first: it is the cheapest lesson here")
+    print("no prediction written in Q19; fine, but next time guess first: it is the cheapest lesson here")
 
 # %% [markdown]
 # ### 8.3 The trade-off in one picture
 #
-# This cell draws the table: IoU against annotation minutes on the left (log scale, with a bar for each
-# spread), compute seconds on the right.
+# This cell draws the table twice. On the left, each approach is a dot: how much annotation it needed
+# (log scale) against how well it did (IoU), with a bar for its spread. On the right, the seconds each
+# approach took.
+#
+# What to look for: the dots near the top-left are accurate and cheap. A short bar is a steady approach. The
+# dashed line is the score of marking everything, so a dot near it has learned almost nothing.
 
 # %%
 # @title Trade-off plot: accuracy against annotation, and compute { display-mode: "form" }
@@ -372,6 +374,7 @@ for r in comparison:
 ax.axhline(
     RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--", label='IoU of "everything"'
 )
+ax.plot([], [], "o", color="#616161", label="dot = mean IoU, bar = ± spread")
 ax.set_xscale("log")
 ax.set_xlim(right=ax.get_xlim()[1] * 4)  # room for the labels of the right-most points
 ax.set_xlabel("annotation effort, ≈ minutes (log scale)")
@@ -384,7 +387,7 @@ bx.barh(names, [r["seconds"] for r in ranked][::-1], color=[approach_colours[k] 
 bx.set_xlabel(f"seconds, training + inference ({DEVICE})")
 bx.tick_params(axis="y", labelsize=7)
 bx.set_title("Compute (sorted by IoU, best at the top)")
-plt.tight_layout()
+add_key(fig, None, "colour = approach · left: higher is more accurate, further left is cheaper · right: shorter bar is faster")
 plt.show()
 
 # %% [markdown]
@@ -392,16 +395,11 @@ plt.show()
 # - **Top-left** would be the dream (accurate and nearly free; on thin structures nobody is there),
 #   **bottom-left** is cheap and weak, and the **far right** is the complete-mask head, hours away.
 # - **The vertical bar is the spread**: a slightly lower dot with a much shorter bar can be the safer choice.
-
-# %% [markdown]
-# <!-- callout: go-deeper | More on reading the trade-off plot -->
-# - **Same x position** is the fairest comparison: same annotation, different use of it (the scribble head,
-#   the two pseudo-label heads and the direct SAM recipes all start from the same kind of strokes).
-# - **Far right**: the log axis hides how far away the complete-mask head is.
+# - **Dots at the same x** are the fairest comparison: the same strokes, used in different ways.
 # - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
 
 # %% [markdown]
-# **Q34.** 🟡 Pick one approach for each situation and name the column that decided it.
+# **Q20.** 🟡 Pick one approach for each situation and name the column that decided it.
 #
 # - (a) A screening study of 1,000 new images next month.
 # - (b) One difficult image a clinician needs today.
@@ -411,14 +409,11 @@ plt.show()
 #
 # <details><summary>A possible answer</summary>
 #
-# - (a) A thousand images make the **/new img** column decisive. Strokes or a box on every image multiply
-#   their minutes by a thousand; a trained head pays its annotation once and then costs a feature pass per
-#   image. Among the heads, pick by IoU and spread.
-# - (b) For one image today the per-image rows are the natural candidates: no training, a minute of
-#   strokes, and you check the result yourself. Compare them with the thickened-strokes line before
-#   trusting SAM's share of the work.
-# - (c) When misses cost more than false alarms, IoU is the wrong column. Look at **recall** and at
-#   **worst**, and accept a head that over-marks if a person checks its output.
+# - (a) **/new img** decides. Strokes or a box on every image cost 1,000 times their minutes; a trained
+#   head pays its annotation once. Among the heads, pick by IoU and spread.
+# - (b) One image today: a per-image row needs no training. Compare it with the thickened-strokes line.
+# - (c) IoU is the wrong column. Rank by **recall** and **worst**, and accept an over-marking head if a
+#   person checks it.
 #
 # The IoU winner can win none of the three. That is the point of a table with more than one column.
 #
@@ -426,7 +421,7 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 4 min: defend a row -->
-# Use your Q34 answers. **A** defends one row for situation (a), **B** defends another row for situation
+# Use your Q20 answers. **A** defends one row for situation (a), **B** defends another row for situation
 # (c), one minute each, naming the column that decides. Then swap: attack the other's row.
 #
 # - Which column did the defence rest on, and which column of the same row would hurt it most?
@@ -436,9 +431,8 @@ plt.show()
 # %% [markdown]
 # <details><summary>What pairs usually find</summary>
 #
-# - A good defence names a column, not a row: **/new img** for (a), **recall** or **worst** for (c).
-# - Every row has a weak column (hours of painting, clicking on every image, an over-marking habit), and the
-#   attacker's job is to find it.
+# - A good defence names a column: **/new img** for (a), **recall** or **worst** for (c).
+# - Every row has a weak column (hours of painting, clicking on every image, over-marking). Find it.
 # - Two rows whose IoUs differ by less than their spread are a tie: choose by the cheaper column.
 #
 # </details>
@@ -446,8 +440,11 @@ plt.show()
 # %% [markdown]
 # ### 8.4 Who is steady, and who fails on some images
 #
-# This cell draws one dot per held-out image and a violin around the dots for each approach (a wide violin
-# means the IoU varies a lot; the short bar is the median image).
+# This cell draws, for each approach, one dot per held-out image and a violin around the dots. The bar is the
+# median image, and approaches are sorted by mean IoU, best on the left.
+#
+# What to look for: a tall violin means the approach is good on some images and bad on others. Compare two
+# approaches with the same mean: the one with the lower bottom dots is the riskier one.
 
 # %%
 # @title Violin plot: each approach's IoU over the held-out images { display-mode: "form" }
@@ -464,16 +461,19 @@ for x, r in enumerate(ranked):
     ax.plot([x - 0.3, x + 0.3], [np.median(vals)] * 2, color=colour, lw=2.5, zorder=4)
 line_all = RESULTS["specialised_everything_iou"]
 ax.axhline(line_all, color=THEME["background"], ls="--", label='mean IoU of "everything"')
+ax.plot([], [], "o", ms=3, color="#616161", label="dot = one held-out image")
+ax.plot([], [], "-", lw=2.5, color="#616161", label="bar = median image")
 ax.set_xticks(range(len(ranked)), [r["approach"] for r in ranked], rotation=45, ha="right", fontsize=7)
 ax.set_ylabel("IoU on one held-out image")
-ax.set_title("Per-image IoU, best mean on the left (dot = one image, bar = median)")
+ax.set_title("Per-image IoU, best mean on the left")
 ax.legend(fontsize=7, frameon=False, loc="upper right")
-plt.tight_layout()
+add_key(fig, None, "colour = approach, as in the table · wide or tall violin = unsteady")
 plt.show()
 
 # %% [markdown]
-# This cell shows the IoU winner's **worst**, **typical** (median) and **best** held-out image as error maps
-# (violet = found, orange = false alarm, green = missed).
+# This cell shows the IoU winner on its **worst**, **typical** (median) and **best** held-out image, as error
+# maps. What to look for: what the winner invents (orange) and what it misses (green) when it fails, against
+# when it works.
 
 # %%
 # @title Worst, typical and best image of the IoU winner { display-mode: "form" }
@@ -483,8 +483,8 @@ panels = []
 w_picks = (("worst", w_order[0]), ("typical (median)", w_order[len(w_order) // 2]), ("best", w_order[-1]))
 for tag, n in w_picks:
     it_n, pred_n = spec_eval[n], compare_reports[winner]["held_preds"][n]
-    panels.append((f"{winner} · {tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
-show_masks(panels, width=3.4)
+    panels.append((f"{winner}\n{tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
+show_masks(panels, width=3.4, legend=["found", "invented", "missed", "unscored"])
 
 # %% [markdown]
 # <!-- callout: takeaway | When you see X, do Y: choosing an approach -->

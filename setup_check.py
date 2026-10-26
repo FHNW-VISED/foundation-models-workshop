@@ -244,6 +244,8 @@ else:
 
 # %%
 # @title Model helpers { display-mode: "form" }
+from fnmatch import fnmatch
+
 from huggingface_hub import HfApi, snapshot_download
 
 DINO_ID = "timm/vit_small_patch16_dinov3.lvd1689m"
@@ -251,6 +253,9 @@ DINO_LICENCE = "DINOv3 License (Meta)"
 SAM_ID = "facebook/sam2.1-hiera-small"
 SAM_LICENCE = "Apache-2.0"
 SAM3_ID = "facebook/sam3"
+# The SAM 3 repo is 6.9 GB because it also holds a second copy of the weights (sam3.pt, 3.45 GB). The
+# notebook needs only the config, the tokenizer files and model.safetensors, about 3.5 GB.
+SAM3_FILES = ["*.json", "*.txt", "model.safetensors", "*.model"]
 
 
 MODEL_DONE = ".fm-complete.json"  # written last; the main notebook looks for it (see sections/00_setup.py)
@@ -294,11 +299,19 @@ def mark_cached(folder: Path) -> None:
     (folder / MODEL_DONE).write_text(json.dumps(meta, indent=1))
 
 
-def verify_snapshot(repo_id: str, folder: Path, token: str | None) -> tuple[int, int]:
-    """Re-hash the weight files against the Hub's sha256; delete bad ones so a re-run fetches them again."""
+def verify_snapshot(
+    repo_id: str, folder: Path, token: str | None, patterns: list[str] | None = None
+) -> tuple[int, int]:
+    """Re-hash the downloaded weight files against the Hub's sha256; bad ones are deleted for a re-run.
+
+    `patterns` is the list given to `snapshot_download`: files outside it were never downloaded, so skip them.
+    """
     try:
         info = HfApi().model_info(repo_id, files_metadata=True, token=token)
-        expected = {s.rfilename: s.lfs.sha256 for s in info.siblings if s.lfs}
+        wanted = [
+            s for s in info.siblings if patterns is None or any(fnmatch(s.rfilename, p) for p in patterns)
+        ]
+        expected = {s.rfilename: s.lfs.sha256 for s in wanted if s.lfs}
     except Exception:  # noqa: BLE001 - offline: nothing to compare with; the marker still records the hashes
         expected = {}
     checked, bad = 0, 0
@@ -356,7 +369,8 @@ def load_sam(folder: Path) -> None:
 
 # %%
 # @title Download and check the two models { display-mode: "form" }
-HF_TOKEN = os.environ.get("HF_TOKEN")  # only matters for SAM 3; DINOv3 and SAM 2.1 need no account
+# Only SAM 3 needs a token, and only after Meta approved your access. DINOv3 and SAM 2.1 need no account.
+HF_TOKEN = os.environ.get("HF_TOKEN")
 if IN_COLAB and HF_TOKEN is None:
     try:
         from google.colab import userdata
@@ -371,9 +385,16 @@ cache_model("SAM 2.1 hiera-small", SAM_ID, SAM_LICENCE, load_sam)
 # %% [markdown]
 # ## 6. Optional: SAM 3
 #
-# SAM 3 is gated on Hugging Face: Meta approves access per account. The workshop never requires it. This
-# cell caches it only if you already have access and a token in Colab's Secrets panel under `HF_TOKEN`;
-# otherwise it says so and moves on.
+# SAM 3 lets you segment with a word ("the retinal vessels") in the main notebook. The workshop never
+# requires it. It is gated on Hugging Face, and Meta approves each account by hand. To use it:
+#
+# 1. Request access at huggingface.co/facebook/sam3 and wait for Meta's approval email.
+# 2. Create a read token at huggingface.co/settings/tokens.
+# 3. In Colab, open 🔑 Secrets (left bar), add a secret named `HF_TOKEN` with that token and switch on
+#    "Notebook access".
+# 4. Run this cell. It downloads only the files the notebook needs (about 3.5 GB).
+#
+# Without a token, or while the approval is pending, the cell says so and moves on.
 
 # %%
 # @title Cache SAM 3 if you have access { display-mode: "form" }
@@ -383,7 +404,7 @@ elif HF_TOKEN is None:
     record(
         "SAM 3 (optional)",
         None,
-        "no HF_TOKEN in Colab's Secrets panel, so not tried. SAM 2.1 is enough.",
+        "no HF_TOKEN in Colab's 🔑 Secrets, so not tried. SAM 2.1 is enough.",
         "⏭️",
     )
 else:
@@ -392,13 +413,20 @@ else:
         if is_cached(folder):
             record("SAM 3 (optional)", True, f"{SAM3_ID} · already cached")
         else:
-            snapshot_download(SAM3_ID, local_dir=folder, token=HF_TOKEN)  # plain files, no symlinks
-            checked, bad = verify_snapshot(SAM3_ID, folder, HF_TOKEN)
+            # plain files, no symlinks, and not the duplicate sam3.pt
+            snapshot_download(SAM3_ID, local_dir=folder, token=HF_TOKEN, allow_patterns=SAM3_FILES)
+            checked, bad = verify_snapshot(SAM3_ID, folder, HF_TOKEN, SAM3_FILES)
             if not bad:
                 mark_cached(folder)
             record("SAM 3 (optional)", not bad, f"{SAM3_ID} cached ({checked} weight files checked)")
     except Exception as err:  # noqa: BLE001 - optional: never a ❌
-        msg = f"not available for this account ({type(err).__name__}). SAM 2.1 is enough."
+        if "403" in str(err) or "authorized" in str(err) or type(err).__name__ == "GatedRepoError":
+            msg = (
+                "403: this account is not in the authorized list yet. Meta has not approved your request at "
+                f"huggingface.co/{SAM3_ID}; run this cell again after the approval email. SAM 2.1 is enough."
+            )
+        else:
+            msg = f"not available for this account ({type(err).__name__}). SAM 2.1 is enough."
         record("SAM 3 (optional)", None, msg, icon="⏭️")
 
 # %% [markdown]

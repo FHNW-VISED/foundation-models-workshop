@@ -16,13 +16,17 @@
 # %% [markdown]
 # This cell draws the whole story in one picture: the pets one box got almost right, the same box on the
 # specialised task, and the best approach of every path on the same hidden ground truth.
+#
+# What to look for: the gap between the two one-box bars (where it fell short), then how far each path climbs
+# back towards the complete-masks bar at the bottom, and how far each bar sits above the dashed line (marking
+# everything).
 
 # %%
 # @title The story in one picture { display-mode: "form" }
 table = {r["approach"]: r for r in RESULTS["comparison_table"]}  # section 8's rows, by short name
 everything_iou = RESULTS["specialised_everything_iou"]
 PATHS = {  # the rows of section 8, grouped the way the notebook introduced them
-    "ladder (section 4)": ("one_shot", "one_shot_sam", "scribbles"),
+    "ladder (section 4)": ("scribbles",),
     "path 1 (section 5)": ("naive", "masked", "pu"),
     "path 2 (section 6)": ("sam_pseudo", "gradcam_pseudo"),
     "path 3 (section 7)": ("sam_clicks", "sam_boxes"),
@@ -44,17 +48,17 @@ for y, v in enumerate(values):
 ax.axvline(everything_iou, color=THEME["background"], ls="--", label='IoU of "everything" (specialised task)')
 ax.set_xlim(0, 1.08)
 ax.set_xlabel("mean IoU on the held-out images")
-ax.set_title("Where it worked, where it fell short, how far each path got back")
+ax.set_title("Where it worked, where it fell short,\nhow far each path got back")
 ax.tick_params(axis="y", labelsize=8)
 ax.legend(fontsize=7, frameon=False, loc="lower right")
-plt.tight_layout()
+add_key(fig, None, "bar colour = the approach's colour in section 8 (violet = the pets) · number = mean IoU")
 plt.show()
 
 # %% [markdown]
 # ### 10.1 The principles, from your numbers
 #
-# The next cell writes six rules as cards, each with the evidence from your session (a rule with your own
-# number attached tells you how strongly to believe it), and says so where a lesson did not hold in your run.
+# The next cell writes six rules as cards. Each carries a number from your own session, which tells you how
+# strongly to believe it, and says so where a lesson did not hold in your run.
 
 # %%
 # @title Principles from this run { display-mode: "form" }
@@ -84,8 +88,7 @@ def p_resolution() -> str:
         rule = "Check the resolution first: a patch feature describes a 16 px block, not a pixel."
     fact = (
         f"The same head on complete masks scored IoU {a['iou']:.2f} at {lo} px and {b['iou']:.2f} at {hi} px "
-        f"(clDice {a['cldice']:.2f} → {b['cldice']:.2f}); on pets the same kind of head scored "
-        f"{RESULTS['pets_head_iou']:.2f}."
+        f"on pets the same kind of head scored {RESULTS['pets_head_iou']:.2f}."
     )
     if b["iou"] - a["iou"] < 0.05:
         return f"{rule} {fact} More pixels helped little, so the limit is the patch: plan for cheap labels."
@@ -111,7 +114,7 @@ def p_missing_is_unknown() -> str:
 def p_cheapest_baseline() -> str:
     """Section 7: compare SAM with the hints alone."""
     alone = RESULTS["sam_direct_strokes_alone"]
-    sam_rows = [k for k in ("zero_shot", "one_shot_sam", "sam_clicks", "sam_boxes") if k in table]
+    sam_rows = [k for k in ("zero_shot", "sam_clicks", "sam_boxes") if k in table]
     best = max(sam_rows, key=lambda k: table[k]["iou"])
     gain = table[best]["iou"] - alone["iou"]
     rule = "Compare the foundation model with the cheapest baseline built from the same hints."
@@ -203,7 +206,30 @@ except ImportError:  # no IPython: plain text
         print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
 
 # %% [markdown]
-# This helper cell defines `show_my_plan`, which prints what you wrote next to the principle you picked.
+# ### 10.2 Your framework: six questions for any task
+#
+# The six principles are the same six questions, asked in the order you would meet them on a new problem.
+# Each one has a number you can measure in an afternoon.
+
+# %% [markdown]
+# <!-- callout: takeaway | Six questions to ask on any new task -->
+# 1. **Is the out-of-the-box result above the "everything" line?** Run one box on about 20 images and compare
+#    with marking everything. If not, plan to adapt (sections 1 and 2).
+# 2. **Is the structure smaller than a 16 px patch?** Train the same head at two input sizes. If the larger
+#    one barely helps, buy cheap labels, not a bigger model (section 2).
+# 3. **What do the gaps in the labels mean?** Unlabelled is unknown, not background. Tell the loss, and
+#    score recall on the hidden part (sections 3 and 5).
+# 4. **Does the model beat the hints alone?** Thicken your strokes with no model and compare (section 7).
+# 5. **Which mistake costs most?** A missed structure or a false alarm decides whether you rank by recall,
+#    precision or IoU (section 8).
+# 6. **How many minutes does every new image cost?** Strokes once is cheap, strokes on every image is not
+#    (section 8).
+#
+# Answer them in this order, write each answer as a number, and keep the table. That table is your
+# experiment.
+
+# %% [markdown]
+# This helper cell defines `show_my_plan`, which prints your plan next to the principle you picked.
 
 
 # %%
@@ -224,18 +250,17 @@ def show_my_plan(problem: str, principle: int, first_step: str) -> None:
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (2 min) -->
-# **Q38.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
-# section 9). Which of the principles above would have changed what you did first, and what number would you
-# measure to check it?
+# **Q23.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
+# section 9). Which of the six questions would you ask first, and what number would you measure to answer it?
 #
 # - Write the problem and your first step on Monday, as a rule with a number, in the form of the next cell
 #   (for example "one box on 20 images, compared with the 'everything' line").
 # - The cell prints them next to the principle you picked and checks nothing.
 
 # %%
-# @title Q38 — your problem and your first step (leave empty to skip) { display-mode: "form" }
+# @title Q23 — your problem and your first step (leave empty to skip) { display-mode: "form" }
 MY_PROBLEM = ""  # @param {type:"string"}
-# The number of the principle above that changes your plan (1 to 6), or 0 for none.
+# The number of the question or principle above that changes your plan (1 to 6), or 0 for none.
 MY_PRINCIPLE = 0  # @param {type:"slider", min:0, max:6, step:1}
 MY_FIRST_STEP = ""  # @param {type:"string"}
 show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
@@ -246,13 +271,11 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 # Take cracks in drone photos of bridges. They are thin, like vessels, so principle 2 changes the plan.
 #
 # 1. Run one box and one feature head on ten images at two input sizes.
-# 2. See whether the larger size moves clDice at all.
-# 3. If it does not, the patch is the limit: spend the first afternoon on strokes for twenty images, not
-#    on a bigger model.
+# 2. See whether the larger size moves IoU at all.
+# 3. If it does not, the patch is the limit: spend the first afternoon on strokes for twenty images.
 #
-# The number to measure is the gap between the head and the "everything" line on a small test set you
-# label completely, a few images, once. A different problem gives a different first step; what carries
-# over is writing the step with the number that would prove it wrong.
+# The number to measure is the gap between the head and the "everything" line on a few images you label
+# completely. What carries over is writing the step with the number that would prove it wrong.
 #
 # </details>
 
@@ -262,7 +285,7 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 # - Which one would you most like to check on your own data next week?
 
 # %% [markdown]
-# ### 10.2 What you can do now
+# ### 10.3 What you can do now
 
 # %% [markdown]
 # At the end you can:
@@ -275,23 +298,12 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 #    next on a new problem, including your own images (sections 8 and 9).
 
 # %% [markdown]
-# <!-- callout: go-deeper | Go deeper · six questions for any task -->
-# - Is the out-of-the-box result above the "everything" line?
-# - Is the structure smaller than a 16 px patch?
-# - What do the gaps in the labels mean?
-# - Does the model beat the hints alone?
-# - Which mistake costs most?
-# - How many minutes does every new image cost?
-
-# %% [markdown]
 # <!-- callout: go-deeper | Go deeper · where to go next -->
 # - **Label a small test set first**: a few fully annotated images turn every later decision into a
 #   measurement, as the hidden ground truth did here.
 # - **Let the model choose the next stroke**: draw where the approaches disagree (section 9), retrain, repeat.
 # - **A light decoder instead of a linear head**: a small upsampling decoder on the same frozen features
 #   comes before any fine-tuning.
-# - **The 🔴 parts you skipped**: PU loss (5), Grad-CAM peaks as clicks (6), SAM 3 from a word (7), extra
-#   strokes (9).
 # - **Sources**: [DINOv3](https://github.com/facebookresearch/dinov3) ·
 #   [SAM 2](https://github.com/facebookresearch/sam2) ·
 #   [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)

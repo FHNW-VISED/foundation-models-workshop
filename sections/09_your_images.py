@@ -25,9 +25,8 @@
 #   an NDA.
 
 # %% [markdown]
-# This helper cell defines the tools of this section: shrinking an image, our example images, picking your
-# images, a drawing canvas with two pens, and the code that turns a drawing (or a PNG you painted elsewhere)
-# into a stroke map: 0 nothing, 1 the thing, 2 background, as in section 4.
+# This helper cell defines image picking, the drawing canvas and the stroke decoding (0 nothing, 1 the thing,
+# 2 background, as in section 4).
 
 # %%
 # @title Your images: example, canvas, picking images, stroke decoding { display-mode: "form" }
@@ -197,16 +196,33 @@ def save_strokes(k, data_url: str) -> None:
     own_strokes[k] = decode_strokes(base64.b64decode(data_url.split(",", 1)[1]), own[k]["image"].shape[:2])
 
 
+STROKE_KEY = [("thing stroke", THEME["scribble"]), ("background stroke", THEME["background"])]
+
+
+def stroke_panel(it: dict) -> np.ndarray:
+    """The image with its strokes, thickened to stay visible: the thing in teal, the background in grey."""
+    grow = max(1, max(it["image"].shape[:2]) // 256)
+    thick = {v: ndi.binary_dilation(it["scribbles"] == v, iterations=grow) for v in (1, 2)}
+    drawn = overlay(it["image"], thick[2], THEME["background"], 0.9)
+    return overlay(drawn, thick[1], THEME["scribble"], 0.9, dim=False)
+
+
+def stroke_targets(strokes: np.ndarray, region: np.ndarray) -> np.ndarray:
+    """Training targets from strokes: 1 the thing, 0 background, -1 (ignored) everywhere you drew nothing.
+    e.g. strokes [[1, 0, 2]] -> [[1, -1, 0]]"""
+    targets = np.full(strokes.shape, -1, np.int8)
+    targets[strokes == 2] = 0
+    targets[strokes == 1] = 1
+    targets[~np.asarray(region, bool)] = -1
+    return targets
+
+
 def show_strokes(items: list[dict]) -> None:
-    """Each image next to its strokes: the thing in teal, background in grey, thickened for the figure."""
+    """Each image next to its strokes."""
     panels = []
     for it in items:
-        grow = max(1, max(it["image"].shape[:2]) // 256)
-        thick = {v: ndi.binary_dilation(it["scribbles"] == v, iterations=grow) for v in (1, 2)}
-        drawn = overlay(it["image"], thick[2], THEME["background"], 0.9)
-        drawn = overlay(drawn, thick[1], THEME["scribble"], 0.9, dim=False)
-        panels += [(it["name"], it["image"]), (f"strokes · {it['stroke_source']}", drawn)]
-    show_masks(panels, width=2.6)
+        panels += [(it["name"], it["image"]), (f"strokes · {it['stroke_source']}", stroke_panel(it))]
+    show_masks(panels, width=2.6, legend=STROKE_KEY, note="strokes are drawn thicker so you can see them")
 
 
 def pick_images(ask_upload: bool, use_example: bool, my_images: list) -> list[dict]:
@@ -340,9 +356,8 @@ if IN_COLAB:
 # Nothing here is mandatory.
 
 # %% [markdown]
-# This cell uploads your images only if `ASK_UPLOAD` is ticked (in Colab), shrinks each one to at most
-# 1024 px on its long side, and shows them. Tick `USE_EXAMPLE` to keep our example even if you listed
-# images.
+# This cell uploads your images if `ASK_UPLOAD` is ticked (in Colab), shrinks them to at most 1024 px, and
+# shows them. Tick `USE_EXAMPLE` to keep our example.
 
 # %%
 # @title Choose your images { display-mode: "form" }
@@ -368,8 +383,7 @@ own = pick_images(ASK_UPLOAD, USE_EXAMPLE, MY_IMAGES)
 # drawing is optional: an image you do not save keeps its generated strokes.
 
 # %% [markdown]
-# This cell draws one canvas per image; the save button sends your strokes, as a small PNG, to this Colab
-# kernel, where they become a stroke map.
+# This cell draws one canvas per image. The save button sends your strokes to this Colab session.
 
 # %%
 # @title Draw your strokes on a canvas { display-mode: "form" }
@@ -389,8 +403,10 @@ if not IN_COLAB:
 #    in the order above (`""` skips one). Any size works.
 
 # %% [markdown]
-# This "collect strokes" cell gathers the strokes of every image (your PNGs, then the canvas, then the
-# generated strokes for the example), counts them and shows them.
+# This cell gathers the strokes of every image, counts them, and shows them next to the photos.
+#
+# What to look for: teal strokes on the thing, grey strokes on what you do not want. If an image shows none,
+# the next cells use our generated strokes for it.
 
 # %%
 # @title Collect your strokes { display-mode: "form" }
@@ -421,9 +437,7 @@ sam_playground(own, "Your images: click, box, or a word", text_prompt=True)
 #   one SAM prompt per image (Path 3, section 7.1).
 
 # %% [markdown]
-# This helper cell defines the three rungs on a list of images, plus the only check we have without a ground
-# truth (how much of your thing strokes a mask covers, and how much of your background strokes it spares),
-# and the table and panels that show them.
+# This helper cell defines the three rungs, a stroke check (no ground truth needed) and the panels.
 
 # %%
 # @title The ladder on your images: three rungs, scoring, panels { display-mode: "form" }
@@ -455,7 +469,7 @@ def own_ladder(items: list[dict], n_clicks: int, box_pad: float, feat_side: int,
     t0 = time.monotonic()
     feats = [dino.features(it["image"], min(feat_side, max(it["image"].shape[:2]))) for it in items]
     # the rung's supervision: your strokes only; every unlabelled pixel is ignored (-1)
-    labels = [scribble_targets(it["scribbles"], region(it)) for it in items]
+    labels = [stroke_targets(it["scribbles"], region(it)) for it in items]
     head, train_sec = train_head(feats, labels, steps)
     pairs = zip(feats, items, strict=True)
     preds["scribbles"] = [predict_head(head, f, it["image"].shape[:2]) for f, it in pairs]
@@ -506,24 +520,24 @@ def show_own_ladder(items: list[dict], preds: dict, report: dict) -> None:
             f"{approach_names[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
             f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
         )
+    print("marks = share of the image the mask covers")
     print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
     print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
+    key = [*STROKE_KEY, "mask", *(["truth"] if has_truth else [])]
     for n, it in enumerate(items):
-        panels = [
-            (f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9))
-        ]
+        panels = [(f"{it['name']}\nyour strokes", stroke_panel(it))]
         for k in OWN_APPROACHES:
             r_n = region(it)
-            tag = f" · IoU {iou(preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
-            title = f"{approach_names[k].split(':')[0]}{tag}"
-            panels.append((title, overlay(it["image"], preds[k][n], approach_colours[k])))
+            tag = f"\nIoU {iou(preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
+            shown = overlay(it["image"], preds[k][n], THEME["works"])
+            panels.append((f"{approach_names[k].split(':')[0]}{tag}", shown))
         if has_truth:
-            panels.append(("ground truth · scoring only", overlay(it["image"], it["mask"], THEME["truth"])))
-        show_masks(panels, width=2.6)
+            panels.append(("ground truth\n(scoring only)", overlay(it["image"], it["mask"], THEME["truth"])))
+        show_masks(panels, width=2.6, legend=key)
 
 
 def run_own_ladder(items: list[dict], n_clicks: int, box_pad: float) -> dict:
-    """Q35: the three rungs on `items`, the table and the panels. Stores RESULTS["own_images"] and
+    """Q21: the three rungs on `items`, the table and the panels. Stores RESULTS["own_images"] and
     RESULTS["own_images_ok"]. Returns the masks per approach (one per image)."""
     if not isinstance(n_clicks, int) or not 1 <= n_clicks <= 50:
         raise SystemExit("N_OWN_CLICKS must be a whole number from 1 to 50.")
@@ -554,10 +568,11 @@ def run_own_ladder(items: list[dict], n_clicks: int, box_pad: float) -> dict:
 # and outside), or more like the vessels (thin, scattered, a texture)?
 #
 # - Write down which of the three rungs you expect to give the cleanest mask, and which the worst.
-# - Then run the next cell (seconds on a T4, much slower on CPU): it shows each image with the three masks
-#   in the approach colours of sections 4 and 7, and the IoU on the example.
+# - Then run the next cell (seconds on a T4, much slower on CPU). Each row is one image: your strokes, the
+#   three masks in violet, and on the example the ground truth in green with the IoU.
+# - What to look for: where the three violet masks differ, and which one respects your strokes.
 #
-# **Q35.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
+# **Q21.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
 # Where a rung failed, was it:
 #
 # - SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too much)?
@@ -565,7 +580,7 @@ def run_own_ladder(items: list[dict], n_clicks: int, box_pad: float) -> dict:
 # - your strokes (a part of the thing you never touched)?
 
 # %%
-# @title Q35 — the ladder on your images: box, scribble head, SAM clicks { display-mode: "form" }
+# @title Q21 — the ladder on your images: box, scribble head, SAM clicks { display-mode: "form" }
 # Clicks per kind (thing / background) and image, spread along your strokes.
 N_OWN_CLICKS = 10  # @param {type:"slider", min:1, max:50, step:1}
 # Zero-shot box: your thing strokes' bounding box, grown by this share of the long side.
@@ -574,129 +589,77 @@ own_preds = run_own_ladder(ladder_own, N_OWN_CLICKS, OWN_BOX_PAD)
 
 # %% [markdown]
 # <!-- callout: go-deeper | How to read the stroke checks and the masks -->
-# - The two percentages are the only "score" you get on a real problem before anyone labels a test set, and
-#   they are weak. SAM's clicks sit *on* your strokes and the head was trained on them, so both should
-#   respect them. A low number means the approach ignored what you drew.
-# - The masks matter more. For a compact, photo-like thing, expect the three rungs to agree, as on the
-#   pets in section 1: the box alone is often enough.
-# - For a thin, scattered or textural thing, expect section 2 again. SAM's box grabs a region, the clicks
-#   give one blob or several, and the head draws the thing at patch resolution but in all the right places.
-# - If your strokes covered only one part of the thing, both the head and the clicks tend to stop at that
-#   part. Information you did not give is information no rung has.
+# - The two percentages are weak checks: SAM's clicks sit on your strokes and the head trained on them, so
+#   both should respect them. A low number means the approach ignored what you drew.
+# - The masks matter more. A compact thing makes the rungs agree, as on the pets. A thin or textural thing
+#   brings section 2 back: a box grabs a region, the head draws at patch resolution.
 
 # %% [markdown]
 # ### 9.4 No ground truth: look where they disagree
 #
-# Without a ground truth, run two or three different approaches and look at the pixels where they
-# disagree. That is where the image is hard, and where one more stroke is worth the most.
+# Without a ground truth, run two or three approaches and look at the pixels where they disagree. That is
+# where the image is hard, and where one more stroke is worth the most.
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the disagreement map -->
-# The map is `True` on every pixel that **some** of the masks mark and **others** do not. Three masks over
-# four pixels:
-#
-# ```
-# mask A      1 1 0 0
-# mask B      1 0 1 0
-# mask C      1 1 1 0
-# disagree    0 1 1 0
-# ```
-#
-# - **Low, a thin rim** along the thing: the rungs agree on *what* it is and differ only on the exact edge.
-# - **High, whole patches**: they disagree on what belongs to the thing. That is where the next stroke pays.
+# The map is pink on every pixel that **some** of the three masks mark and **others** do not. A thin rim
+# along the thing means the rungs agree on *what* it is and differ on the edge. Whole patches mean they
+# disagree on what belongs to the thing.
 
 # %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 2 min): the disagreement map -->
-# Fill `my_disagreement`.
-#
-# - **In:** a list of boolean masks of the same image.
-# - **Out:** a boolean map, `True` where they do not all agree (some mark the pixel, some do not).
-# - **Hint:** `np.stack` puts the masks on a new first axis; `.any(0)` and `.all(0)` reduce along it.
-#
-# The cell checks your version on the three play masks above and continues with ours if you skip it.
-
+# This helper cell defines `disagreement`: marked by some masks, not by all.
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_disagreement(masks: list[np.ndarray]) -> np.ndarray:
-    """Reference: marked by some, not by all."""
+# @title disagreement: marked by some masks, not by all { display-mode: "form" }
+def disagreement(masks: list[np.ndarray]) -> np.ndarray:
+    """True where at least one mask marks the pixel and at least one does not.
+    e.g. three 1×4 masks [1, 1, 0, 0], [1, 0, 1, 0], [1, 1, 1, 0] -> [False, True, True, False]"""
     stack = np.stack([np.asarray(m, bool) for m in masks])
     return stack.any(0) & ~stack.all(0)
 
 
-# %%
-# ✍️ YOUR CODE
-def my_disagreement(masks: list[np.ndarray]) -> np.ndarray:
-    """Boolean map, same shape as each mask: True where the masks disagree (at least one marks the pixel and
-    at least one does not).
-    e.g. three 1×4 masks [1, 1, 0, 0], [1, 0, 0, 0], [1, 1, 0, 1] -> [False, True, False, True]"""
-    ...
-
-
-_play_masks = [np.array([[1, 1, 0, 0]], bool), np.array([[1, 0, 1, 0]], bool), np.array([[1, 1, 1, 0]], bool)]
-disagreement = use(
-    my_disagreement,
-    reference=_ref_disagreement,
-    check=lambda f: np.asarray(f(_play_masks)).astype(int),
-    name="disagreement",
-)
-print("play example · three masks over four pixels → disagreement:", disagreement(_play_masks).astype(int))
-
 # %% [markdown]
-# This cell computes the disagreement map of the three rungs on each of your images, prints the share of
-# the image it covers, and shows it in orange next to your strokes.
+# This cell computes the disagreement of the three rungs on each of your images and shows it in pink.
+#
+# What to look for: a thin pink rim, or whole pink parts, and whether the pink sits on your strokes.
 
 # %%
 # @title Disagreement map of the three rungs { display-mode: "form" }
 own_disagree = [disagreement([own_preds[k][n] for k in OWN_APPROACHES]) for n in range(len(ladder_own))]
 RESULTS["own_images"]["disagreement"] = float(np.mean([d.mean() for d in own_disagree]))
+DISAGREE = "#D81B60"  # pink: the rungs disagree (orange is kept for "invented" in the error maps)
 panels = []
 for it, d in zip(ladder_own, own_disagree, strict=True):
     print(f"{it['name']}: the three rungs disagree on {d.mean():.0%} of the image")
     panels += [
-        (f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9)),
-        (f"disagreement · {d.mean():.0%}", overlay(it["image"], d, THEME["fails"])),
+        (f"{it['name']}\nyour strokes", stroke_panel(it)),
+        (f"disagreement · {d.mean():.0%} of the image", overlay(it["image"], d, DISAGREE)),
     ]
-show_masks(panels, width=2.8)
+show_masks(
+    panels,
+    width=2.8,
+    legend=[*STROKE_KEY, ("some rungs mark it, others do not", DISAGREE)],
+)
 
 # %% [markdown]
-# **Q36.** 🟡 Where is the orange?
+# **Q22.** 🟡 Where is the pink?
 #
 # - Along the boundary of the thing?
 # - On whole parts of it?
 # - On something in the background that looks similar?
 #
 # If you could add only two more strokes per image, where would you put them, and with which pen? On the
-# example, compare the retina's orange with the pets'.
+# example, compare the retina's pink with the pets'. To test your answer, draw those strokes on the canvas
+# of 9.2, save, and run the cells from the stroke collection again.
 #
 # <details><summary>What to look for</summary>
 #
-# - A thin orange rim means the rungs agree on *what* it is and differ only on the exact edge: SAM's sharp
-#   boundary against the head's 16 px squares. That is a resolution question, and more strokes will not
-#   fix it.
-# - Whole orange parts mean they disagree on what belongs to the thing: usually a part you never stroked,
-#   or a background region that looks like it. That is exactly where the next stroke pays.
-# - Put a thing stroke on a missed part, or a background stroke on a false alarm. This is the idea behind
-#   interactive annotation and active learning: let the models show you where to look.
-#
-# </details>
-
-# %% [markdown]
-# **Q37.** 🔴 Test your answer to Q36.
-#
-# 1. Draw your two extra strokes per image on the canvas of 9.2. Draw over the old ones; they stay until
-#    you press clear. On the example, a saved canvas replaces the generated strokes, so draw a full set.
-# 2. Save, and run the cells from the stroke collection to here again.
-# 3. Did the disagreement shrink where you drew? Did the head change elsewhere too?
-#
-# <details><summary>What to look for</summary>
-#
-# - SAM from clicks changes only on the image you drew on, near the new clicks.
-# - The head changes on every image, because it learns one rule from all the strokes together. A
-#   background stroke on a false alarm in one image can remove similar false alarms in another, or, if the
-#   two regions really are the same kind of thing, remove true parts too.
-# - That is the trade-off of section 8 in miniature: a trained head pays annotation once and spreads it
-#   everywhere, for better and for worse; direct prompting stays local.
+# - A thin pink rim: the rungs agree on *what* it is, and differ on the exact edge (SAM's sharp boundary
+#   against the head's 16 px squares). More strokes will not fix that.
+# - Whole pink parts: they disagree on what belongs to the thing, usually a part you never stroked. That is
+#   where the next stroke pays.
+# - After redrawing, SAM from clicks changes only near the new clicks. The head changes on every image,
+#   because it learns one rule from all strokes: a trained head spreads annotation everywhere.
 #
 # </details>
 
@@ -713,12 +676,12 @@ show_masks(panels, width=2.8)
 # %% [markdown]
 # <details><summary>What pairs usually find</summary>
 #
-# - Compact, everyday objects (a mug, a pet, a car, a leaf on a plain background) make all three rungs
-#   agree, and the zero-shot box is often already the mask you would keep.
-# - Thin, repeated, textural or specialist things (cracks, cells, vessels, roads from above, defects) make
-#   them disagree, and the trained head or many small prompts start to matter.
-# - The sign to look for is the one from section 2: if the thing is not an "object" with a clear inside
-#   and outside, or is much smaller than a 16 px patch, plan for strokes.
+# - Compact, everyday objects (a mug, a pet, a leaf on a plain background) make the rungs agree, and the
+#   zero-shot box is often the mask you would keep.
+# - Thin or textural things (cracks, cells, vessels, defects) make them disagree, and the trained head or
+#   many small prompts start to matter.
+# - The sign from section 2: no clear inside and outside, or smaller than a 16 px patch, means plan for
+#   strokes.
 #
 # </details>
 
