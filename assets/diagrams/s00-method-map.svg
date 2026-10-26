@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="100%" font-family="Helvetica, Arial, sans-serif">
+<rect width="960" height="600" fill="#FFFFFF"/>
+<defs>
+<marker id="s00-method-map-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker>
+<marker id="s00-method-map-p1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4527A0"/></marker>
+<marker id="s00-method-map-p2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0D47A1"/></marker>
+<marker id="s00-method-map-p3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5D4037"/></marker>
+</defs>
+<text x="16" y="28" font-size="18" fill="#212121" font-weight="bold">Learning from incomplete labels: three families, and the question each one answers</text>
+<text x="16" y="50" font-size="13" fill="#616161">The number on each box is the section of this notebook that tries it.</text>
+<rect x="674" y="40" width="11" height="11" rx="2" fill="#00838F"/>
+<text x="690" y="50" font-size="12" fill="#616161">drawn by a person</text>
+<rect x="808" y="40" width="11" height="11" rx="2" fill="#6A1B9A" opacity="0.55"/>
+<text x="824" y="50" font-size="12" fill="#616161">guessed by a model</text>
+<rect x="16" y="64" width="236" height="98" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="30" y="89" font-size="15" fill="#212121" font-weight="bold">What you start with</text>
+<text x="30" y="112" font-size="13" fill="#212121">A frozen foundation model:</text>
+<text x="30" y="129" font-size="13" fill="#212121">DINOv3 features, SAM prompts.</text>
+<text x="30" y="150" font-size="12" fill="#616161">Labels that took minutes, not hours.</text>
+<line x1="254" y1="113.0" x2="268" y2="113.0" stroke="#424242" stroke-width="1.6" marker-end="url(#s00-method-map-ink)"/>
+<rect x="274" y="64" width="216" height="98" rx="8" fill="#FFFFFF" stroke="#B0BEC5" stroke-width="1.5"/>
+<path d="M290,114 C304,106 312,98 316,82 M308,102 C318,102 328,106 336,112" fill="none" stroke="#B0BEC5" stroke-width="3" stroke-linecap="round"/><path d="M290,114 C298,110 302,107 306,103" fill="none" stroke="#00838F" stroke-width="4" stroke-linecap="round"/><path d="M324,106 L334,111" stroke="#00838F" stroke-width="4" stroke-linecap="round"/>
+<text x="350" y="89" font-size="15" fill="#212121" font-weight="bold">Incomplete</text>
+<text x="350" y="109" font-size="13" fill="#212121">some pixels labelled,</text>
+<text x="350" y="126" font-size="13" fill="#212121">the rest unknown</text>
+<text x="288" y="150" font-size="12" fill="#616161">strokes, half a mask · 3, 4, 5</text>
+<rect x="501" y="64" width="216" height="98" rx="8" fill="#FFFFFF" stroke="#B0BEC5" stroke-width="1.5"/>
+<path d="M517,114 C531,106 539,98 543,82 M535,102 C545,102 555,106 563,112" fill="none" stroke="#B0BEC5" stroke-width="3" stroke-linecap="round"/><rect x="514" y="78" width="52" height="40" rx="3" fill="none" stroke="#00838F" stroke-width="2.2"/>
+<text x="577" y="89" font-size="15" fill="#212121" font-weight="bold">Inexact</text>
+<text x="577" y="109" font-size="13" fill="#212121">coarse: a box, or one</text>
+<text x="577" y="126" font-size="13" fill="#212121">label for a whole tile</text>
+<text x="515" y="150" font-size="12" fill="#616161">a box, tile labels · 4.1, 6.3, 7.2</text>
+<rect x="728" y="64" width="216" height="98" rx="8" fill="#FFFFFF" stroke="#B0BEC5" stroke-width="1.5"/>
+<path d="M744,114 C758,106 766,98 770,82 M762,102 C772,102 782,106 790,112" fill="none" stroke="#B0BEC5" stroke-width="3" stroke-linecap="round"/><path d="M746,116 C756,112 764,106 768,96" fill="none" stroke="#6A1B9A" stroke-width="7" stroke-linecap="round" opacity="0.55"/><ellipse cx="782" cy="90" rx="8" ry="6" fill="#6A1B9A" opacity="0.55"/>
+<text x="804" y="89" font-size="15" fill="#212121" font-weight="bold">Inaccurate</text>
+<text x="804" y="109" font-size="13" fill="#212121">full, but sometimes</text>
+<text x="804" y="126" font-size="13" fill="#212121">wrong: noisy labels</text>
+<text x="742" y="150" font-size="12" fill="#616161">a teacher's guesses · 6</text>
+<rect x="16" y="176" width="456" height="44" rx="8" fill="#ECEFF1" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="30" y="194" font-size="14" fill="#212121" font-weight="bold">Floor · 3 · the naive baseline</text>
+<text x="30" y="211" font-size="13" fill="#616161">Unpainted pixel = background, so it learns to miss them.</text>
+<rect x="488" y="176" width="456" height="44" rx="8" fill="#ECEFF1" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="502" y="194" font-size="14" fill="#212121" font-weight="bold">Reference · 2.4 · a head on complete masks</text>
+<text x="502" y="211" font-size="13" fill="#616161">About 4 h of painting per image: a reference, not an option.</text>
+<line x1="164.0" y1="241" x2="788.0" y2="241" stroke="#424242" stroke-width="1.6"/>
+<rect x="284" y="226" width="392" height="26" rx="4" fill="#FFFFFF"/>
+<text x="480" y="246" font-size="15" fill="#212121" font-weight="bold" text-anchor="middle">Three ways up from the floor. What do you change?</text>
+<line x1="164.0" y1="241" x2="164.0" y2="269" stroke="#4527A0" stroke-width="2" marker-end="url(#s00-method-map-p1)"/>
+<line x1="476.0" y1="254" x2="476.0" y2="269" stroke="#0D47A1" stroke-width="2" marker-end="url(#s00-method-map-p2)"/>
+<line x1="788.0" y1="241" x2="788.0" y2="269" stroke="#5D4037" stroke-width="2" marker-end="url(#s00-method-map-p3)"/>
+<rect x="16" y="272" width="296" height="294" rx="10" fill="#EDE7F6" stroke="#4527A0" stroke-width="1.8"/>
+<path d="M16,312 V282 a10,10 0 0 1 10,-10 H302 a10,10 0 0 1 10,10 V312 Z" fill="#4527A0"/>
+<text x="30" y="299" font-size="19" fill="#FFFFFF" font-weight="bold">Change the loss?</text>
+<text x="298" y="298" font-size="13" fill="#FFFFFF" text-anchor="end">Path 1</text>
+<text x="30" y="333" font-size="15" fill="#4527A0" font-weight="bold">Learn from less</text>
+<text x="30" y="353" font-size="13" fill="#212121">Keep the label file as it is. Tell the</text>
+<text x="30" y="370" font-size="13" fill="#212121">loss what an unpainted pixel means.</text>
+<rect x="28" y="382" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#4527A0" stroke-width="1" stroke-opacity="0.45"/>
+<text x="38" y="397.5" font-size="13" fill="#4527A0" font-weight="bold">4.2</text>
+<text x="68" y="397.5" font-size="13" fill="#212121">scribbles: only painted pixels count</text>
+<rect x="28" y="409" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#4527A0" stroke-width="1" stroke-opacity="0.45"/>
+<text x="38" y="424.5" font-size="13" fill="#4527A0" font-weight="bold">5.2</text>
+<text x="68" y="424.5" font-size="13" fill="#212121">masked loss: gap = unknown</text>
+<rect x="28" y="436" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#4527A0" stroke-width="1" stroke-opacity="0.45"/>
+<text x="38" y="451.5" font-size="13" fill="#4527A0" font-weight="bold">5.3</text>
+<text x="68" y="451.5" font-size="13" fill="#212121">PU loss: a share π of the gap is vessel</text>
+<line x1="30" y1="493" x2="298" y2="493" stroke="#4527A0" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="30" y="511" font-size="12" fill="#616161" font-weight="bold">Starts from:</text>
+<text x="108" y="511" font-size="12" fill="#616161">incomplete labels, as they are</text>
+<text x="30" y="530" font-size="12" fill="#616161" font-weight="bold">Pays with:</text>
+<text x="108" y="530" font-size="12" fill="#616161">a guess about what the gaps hold</text>
+<text x="30" y="549" font-size="12" fill="#616161" font-weight="bold">Known as:</text>
+<text x="108" y="549" font-size="12" fill="#616161">partial losses, PU learning</text>
+<rect x="328" y="272" width="296" height="294" rx="10" fill="#E3F2FD" stroke="#0D47A1" stroke-width="1.8"/>
+<path d="M328,312 V282 a10,10 0 0 1 10,-10 H614 a10,10 0 0 1 10,10 V312 Z" fill="#0D47A1"/>
+<text x="342" y="299" font-size="19" fill="#FFFFFF" font-weight="bold">Fill in the labels?</text>
+<text x="610" y="298" font-size="13" fill="#FFFFFF" text-anchor="end">Path 2</text>
+<text x="342" y="333" font-size="15" fill="#0D47A1" font-weight="bold">Recover supervision</text>
+<text x="342" y="353" font-size="13" fill="#212121">A teacher model guesses the gaps,</text>
+<text x="342" y="370" font-size="13" fill="#212121">the head trains on its guesses.</text>
+<rect x="340" y="382" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#0D47A1" stroke-width="1" stroke-opacity="0.45"/>
+<text x="350" y="397.5" font-size="13" fill="#0D47A1" font-weight="bold">6.1</text>
+<text x="380" y="397.5" font-size="13" fill="#212121">SAM, prompted by stroke clicks</text>
+<rect x="340" y="409" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#0D47A1" stroke-width="1" stroke-opacity="0.45"/>
+<text x="350" y="424.5" font-size="13" fill="#0D47A1" font-weight="bold">6.2</text>
+<text x="380" y="424.5" font-size="13" fill="#212121">keep only the sure guesses</text>
+<rect x="340" y="436" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#0D47A1" stroke-width="1" stroke-opacity="0.45"/>
+<text x="350" y="451.5" font-size="13" fill="#0D47A1" font-weight="bold">6.3</text>
+<text x="380" y="451.5" font-size="13" fill="#212121">Grad-CAM of a tile classifier</text>
+<line x1="342" y1="493" x2="610" y2="493" stroke="#0D47A1" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="342" y="511" font-size="12" fill="#616161" font-weight="bold">Starts from:</text>
+<text x="420" y="511" font-size="12" fill="#616161">incomplete or inexact labels</text>
+<text x="342" y="530" font-size="12" fill="#616161" font-weight="bold">Pays with:</text>
+<text x="420" y="530" font-size="12" fill="#616161">the teacher's mistakes (noisy labels)</text>
+<text x="342" y="549" font-size="12" fill="#616161" font-weight="bold">Known as:</text>
+<text x="420" y="549" font-size="12" fill="#616161">pseudo-labels, self-training, CAM</text>
+<rect x="640" y="272" width="296" height="294" rx="10" fill="#FFF8E1" stroke="#5D4037" stroke-width="1.8"/>
+<path d="M640,312 V282 a10,10 0 0 1 10,-10 H926 a10,10 0 0 1 10,10 V312 Z" fill="#5D4037"/>
+<text x="654" y="299" font-size="19" fill="#FFFFFF" font-weight="bold">Skip training?</text>
+<text x="922" y="298" font-size="13" fill="#FFFFFF" text-anchor="end">Path 3</text>
+<text x="654" y="333" font-size="15" fill="#5D4037" font-weight="bold">Skip specialist training</text>
+<text x="654" y="353" font-size="13" fill="#212121">No head. A person's marks become</text>
+<text x="654" y="370" font-size="13" fill="#212121">SAM's prompts on that same image.</text>
+<rect x="652" y="382" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#5D4037" stroke-width="1" stroke-opacity="0.45"/>
+<text x="662" y="397.5" font-size="13" fill="#5D4037" font-weight="bold">4.1</text>
+<text x="692" y="397.5" font-size="13" fill="#212121">one box, zero-shot</text>
+<rect x="652" y="409" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#5D4037" stroke-width="1" stroke-opacity="0.45"/>
+<text x="662" y="424.5" font-size="13" fill="#5D4037" font-weight="bold">7.1</text>
+<text x="692" y="424.5" font-size="13" fill="#212121">clicks on the strokes</text>
+<rect x="652" y="436" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#5D4037" stroke-width="1" stroke-opacity="0.45"/>
+<text x="662" y="451.5" font-size="13" fill="#5D4037" font-weight="bold">7.2</text>
+<text x="692" y="451.5" font-size="13" fill="#212121">one box per stroke</text>
+<rect x="652" y="463" width="272" height="22" rx="6" fill="#FFFFFF" stroke="#5D4037" stroke-width="1" stroke-opacity="0.45"/>
+<text x="662" y="478.5" font-size="13" fill="#5D4037" font-weight="bold">7.4</text>
+<text x="692" y="478.5" font-size="13" fill="#212121">SAM 3: a word as the prompt</text>
+<line x1="654" y1="493" x2="922" y2="493" stroke="#5D4037" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="654" y="511" font-size="12" fill="#616161" font-weight="bold">Starts from:</text>
+<text x="732" y="511" font-size="12" fill="#616161">a few marks on each image</text>
+<text x="654" y="530" font-size="12" fill="#616161" font-weight="bold">Pays with:</text>
+<text x="732" y="530" font-size="12" fill="#616161">a person marking every new image</text>
+<text x="654" y="549" font-size="12" fill="#616161" font-weight="bold">Known as:</text>
+<text x="732" y="549" font-size="12" fill="#616161">promptable, zero-shot segmentation</text>
+<text x="16" y="588" font-size="12" fill="#616161">Not on this workshop's map: fine-tuning the foundation model itself, and letting the model choose where to draw next (active learning).</text>
+</svg>

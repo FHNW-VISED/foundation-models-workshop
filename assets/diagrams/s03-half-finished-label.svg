@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 510" width="100%" font-family="Helvetica, Arial, sans-serif">
+<defs>
+<marker id="s03-half-finished-label-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker>
+</defs>
+<rect x="0" y="0" width="960" height="510" fill="#FFFFFF"/>
+<text x="30" y="38" font-size="17" fill="#212121" text-anchor="start" font-weight="bold" >1  The full vessel tree</text>
+<rect x="30" y="64" width="280" height="270" rx="9" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="340" y="38" font-size="17" fill="#212121" text-anchor="start" font-weight="bold" >2  Cut into segments, hide half</text>
+<rect x="340" y="64" width="280" height="270" rx="9" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="650" y="38" font-size="17" fill="#212121" text-anchor="start" font-weight="bold" >3  The label file that is saved</text>
+<rect x="650" y="64" width="280" height="270" rx="9" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<g transform="translate(30,66)">
+<path d="M140,235 Q142,200 140,170" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M140,170 Q110,140 80,115" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M140,170 Q170,140 200,115" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q60,90 45,55" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q85,85 100,50" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M200,115 Q190,85 175,50" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M200,115 Q215,85 235,70" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M235,70 Q245,50 250,30" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(340,66)">
+<path d="M140,235 Q142,200 140,170" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M140,170 Q110,140 80,115" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="9 7"/>
+<path d="M140,170 Q170,140 200,115" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q60,90 45,55" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q85,85 100,50" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="9 7"/>
+<path d="M200,115 Q190,85 175,50" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M200,115 Q215,85 235,70" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="9 7"/>
+<path d="M235,70 Q245,50 250,30" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="9 7"/>
+<circle cx="140" cy="170" r="6" fill="#FAFAFA" stroke="none" stroke-width="1.5"/>
+<circle cx="80" cy="115" r="6" fill="#FAFAFA" stroke="none" stroke-width="1.5"/>
+<circle cx="200" cy="115" r="6" fill="#FAFAFA" stroke="none" stroke-width="1.5"/>
+<circle cx="235" cy="70" r="6" fill="#FAFAFA" stroke="none" stroke-width="1.5"/>
+<circle cx="161" cy="203" r="11" fill="#FFFFFF" stroke="#00838F" stroke-width="1.5"/>
+<text x="161" y="208" font-size="13" fill="#00838F" text-anchor="middle" font-weight="bold" >1</text>
+<circle cx="90" cy="141" r="11" fill="#FFFFFF" stroke="#2E7D32" stroke-width="1.5"/>
+<text x="90" y="146" font-size="13" fill="#2E7D32" text-anchor="middle" font-weight="bold" >2</text>
+<circle cx="190" cy="141" r="11" fill="#FFFFFF" stroke="#00838F" stroke-width="1.5"/>
+<text x="190" y="146" font-size="13" fill="#00838F" text-anchor="middle" font-weight="bold" >3</text>
+<circle cx="41" cy="87" r="11" fill="#FFFFFF" stroke="#00838F" stroke-width="1.5"/>
+<text x="41" y="92" font-size="13" fill="#00838F" text-anchor="middle" font-weight="bold" >4</text>
+<circle cx="70" cy="84" r="11" fill="#FFFFFF" stroke="#2E7D32" stroke-width="1.5"/>
+<text x="70" y="89" font-size="13" fill="#2E7D32" text-anchor="middle" font-weight="bold" >5</text>
+<circle cx="170" cy="84" r="11" fill="#FFFFFF" stroke="#00838F" stroke-width="1.5"/>
+<text x="170" y="89" font-size="13" fill="#00838F" text-anchor="middle" font-weight="bold" >6</text>
+<circle cx="238" cy="89" r="11" fill="#FFFFFF" stroke="#2E7D32" stroke-width="1.5"/>
+<text x="238" y="94" font-size="13" fill="#2E7D32" text-anchor="middle" font-weight="bold" >7</text>
+<circle cx="262" cy="52" r="11" fill="#FFFFFF" stroke="#2E7D32" stroke-width="1.5"/>
+<text x="262" y="57" font-size="13" fill="#2E7D32" text-anchor="middle" font-weight="bold" >8</text>
+</g>
+<g transform="translate(650,66)">
+<path d="M140,235 Q142,200 140,170" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M140,170 Q110,140 80,115" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5"/>
+<path d="M140,170 Q170,140 200,115" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q60,90 45,55" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M80,115 Q85,85 100,50" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5"/>
+<path d="M200,115 Q190,85 175,50" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M200,115 Q215,85 235,70" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5"/>
+<path d="M235,70 Q245,50 250,30" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5"/>
+</g>
+<text x="790.0" y="322" font-size="14" fill="#616161" text-anchor="middle" font-weight="normal" >everything else: 0 = background</text>
+<line x1="318" y1="199.0" x2="332" y2="199.0" stroke="#424242" stroke-width="2" marker-end="url(#s03-half-finished-label-arrow)"/>
+<line x1="628" y1="199.0" x2="642" y2="199.0" stroke="#424242" stroke-width="2" marker-end="url(#s03-half-finished-label-arrow)"/>
+<text x="30" y="360.0" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >Ground truth: every vessel traced.</text>
+<text x="30" y="378.9" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >An expert needs 3 to 5 hours.</text>
+<text x="340" y="360.0" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >Cut at the junctions, then hide</text>
+<text x="340" y="378.9" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >a random half (here 4 of 8).</text>
+<text x="650" y="360.0" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >Painted vessels = 1. The file stores</text>
+<text x="650" y="378.9" font-size="14" fill="#212121" text-anchor="start" font-weight="normal" >every other pixel as background.</text>
+<rect x="30" y="420" width="900" height="44" rx="9" fill="#ECEFF1" stroke="none" stroke-width="1.5"/>
+<text x="480" y="448" font-size="15" fill="#212121" text-anchor="middle" font-weight="bold" >Nothing in the file says “I stopped here”: a hidden vessel looks exactly like background.</text>
+<path d="M30,490  L64,490" fill="none" stroke="#00838F" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round"/>
+<text x="72" y="495" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >painted (in the file)</text>
+<path d="M240,490  L274,490" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round"/>
+<text x="282" y="495" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >true vessel (ground truth)</text>
+<path d="M490,490  L524,490" fill="none" stroke="#2E7D32" stroke-width="5" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="9 7"/>
+<text x="532" y="495" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >hidden by us</text>
+<path d="M640,490  L674,490" fill="none" stroke="#2E7D32" stroke-width="2" stroke-linecap="butt" stroke-linejoin="round" stroke-dasharray="2 5"/>
+<text x="682" y="495" font-size="13" fill="#616161" text-anchor="start" font-weight="normal" >where a hidden vessel is (not in the file)</text>
+</svg>

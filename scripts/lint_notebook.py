@@ -276,6 +276,28 @@ def check_settings(files: list[Path]) -> None:
                 )
 
 
+DIAGRAM_MARKER_RE = re.compile(r"^<!--\s*diagram:\s*([\w-]+)\s*\|\s*(\S.*?)\s*-->\s*$")
+
+
+def check_diagram(where: str, src: str) -> bool:
+    """A diagram cell: marker on the first line with a name and a title, and the SVG in assets/diagrams."""
+    first = src.strip().partition("\n")[0]
+    if not first.startswith("<!-- diagram"):
+        if "<!-- diagram" in src:
+            fail(where, "diagram marker must be the first line of its own markdown cell")
+        return False
+    m = DIAGRAM_MARKER_RE.match(first)
+    if not m:
+        fail(where, "diagram marker needs a name and a title: <!-- diagram: name | Title -->")
+        return True
+    svg = ROOT / "assets" / "diagrams" / f"{m.group(1)}.svg"
+    if not svg.is_file():
+        fail(where, f"diagram {svg.relative_to(ROOT)} does not exist")
+    elif '"""' in svg.read_text():
+        fail(where, f"{svg.name} contains three double quotes")
+    return True
+
+
 def main() -> int:
     files = sorted(SECTIONS.glob("[0-9][0-9]_*.py"))
     on_disk = {f"sections/{p.name}" for p in files}
@@ -322,7 +344,7 @@ def main() -> int:
                         if not re.search(r"\be\.g\.", doc):
                             fail(where, f"✍️ {fn.name} docstring needs an example return 'e.g. …' (N-050)")
                 continue
-            is_callout = check_callouts(where, src)
+            is_callout = check_callouts(where, src) or check_diagram(where, src)
             if not is_callout and re.search(r"\bstyle\s*=", src):  # the build owns callout HTML
                 fail(where, "markdown uses style= — Colab strips it; use a callout marker (N-025, N-034)")
             for line in src.splitlines():

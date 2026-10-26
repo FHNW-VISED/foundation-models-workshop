@@ -212,7 +212,14 @@ except ImportError:  # no IPython: plain text
 # Each one has a number you can measure in an afternoon.
 
 # %% [markdown]
+# <!-- diagram: s10-six-questions | Six questions for a new task -->
+# Follow the arrows: each card is one question, the number that answers it, and what to do with the answer.
+# The section sign points to where this notebook measured it.
+
+# %% [markdown]
 # <!-- callout: takeaway | Six questions to ask on any new task -->
+# <details><summary>The same in words</summary>
+#
 # 1. **Is the out-of-the-box result above the "everything" line?** Run one box on about 20 images and compare
 #    with marking everything. If not, plan to adapt (sections 1 and 2).
 # 2. **Is the structure smaller than a 16 px patch?** Train the same head at two input sizes. If the larger
@@ -224,6 +231,8 @@ except ImportError:  # no IPython: plain text
 #    precision or IoU (section 8).
 # 6. **How many minutes does every new image cost?** Strokes once is cheap, strokes on every image is not
 #    (section 8).
+#
+# </details>
 #
 # Answer them in this order, write each answer as a number, and keep the table. That table is your
 # experiment.

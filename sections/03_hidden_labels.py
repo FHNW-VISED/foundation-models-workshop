@@ -115,6 +115,11 @@ def show_keyed(panels: list[tuple[str, np.ndarray]], key: list[tuple[str, str]],
 # $\color{#2E7D32}{\blacksquare}$ green (hidden) vessels in the
 # fourth together make the full ground truth in the second.
 
+# %% [markdown]
+# <!-- diagram: s03-half-finished-label | How a half-finished label file is made -->
+# Read left to right: the full tree, the same tree cut into numbered segments with a random half hidden, and
+# the file the annotator saves. In that file a hidden vessel is stored exactly like background.
+
 # %%
 # @title Hide half of the vessel segments and look at the result { display-mode: "form" }
 missing_labels = specialised["missing_labels"]  # {"hidden_fraction": 0.5, "unit": ...}: never hard-coded here
@@ -153,11 +158,19 @@ show_keyed(
 # the usual *recall*, counted on the hidden pixels only. **Precision** = of the pixels the model marks, the
 # share that really are vessel.
 #
+# <details><summary>The same in words</summary>
+#
 # - Hidden vessels found: 400 hidden vessel pixels, the model marks 120 of them: 120 ÷ 400 = 30%.
 # - Precision: the model marked 150 pixels in total and 120 are vessels: 120 ÷ 150 = 80%.
 #
+# </details>
+#
 # IoU mixes the two into one number. Here we want them apart, because the question is how many hidden
 # vessels the model finds.
+
+# %% [markdown]
+# <!-- diagram: s03-recall-precision | Hidden vessels found and precision, with the same 120 pixels -->
+# The same 120 correctly marked pixels answer two questions. Look at what each one divides by.
 
 # %% [markdown]
 # This helper defines the two numbers above and the picture of what a head found and missed.
@@ -428,6 +441,8 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: theory | Theory: why missing = background goes wrong -->
+# <details><summary>The same in words</summary>
+#
 # 1. The annotator painted about half of the vessels and stopped (the label file of 3.1).
 # 2. The plain loss reads every unpainted pixel as "background", hidden vessels included.
 # 3. So the head sees look-alike vessel patches with opposite labels (the picture above).
@@ -437,7 +452,14 @@ plt.show()
 # 6. The head misses vessels, even painted ones. What it marks is mostly the clearest vessels, so it is
 #    mostly right: it looks precise.
 #
+# </details>
+#
 # Check this against your guess and the numbers above.
+
+# %% [markdown]
+# <!-- diagram: s03-missing-is-background | Why missing = background makes the head stingy -->
+# Two patches that look the same get opposite targets, so the head settles on 50 % for both, right on the
+# threshold.
 
 # %% [markdown]
 # This cell shows the naive head on its typical training image (the median by hidden vessels found).

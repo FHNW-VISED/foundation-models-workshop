@@ -12,6 +12,11 @@
 # one annotated image, waits in a go-deeper box at the end.
 
 # %% [markdown]
+# <!-- diagram: s04-ladder-rungs | The three rungs: what a person draws, what the model does, the cost -->
+# Read each column top to bottom. The model's input is the only thing that changes, and the cost bars are
+# drawn to scale.
+
+# %% [markdown]
 # The next cell draws what the model receives at each rung, with the time that annotation costs.
 #
 # What to look for: the input is the only thing that changes, and one complete mask costs hours where a few
@@ -64,6 +69,8 @@ show_masks(
 
 # %% [markdown]
 # <!-- callout: theory | Theory: what each rung tells the model -->
+# <details><summary>The same in words</summary>
+#
 # - **Rung 0 · zero-shot** (section 2): SAM gets the image and one box, and nothing about the task. It
 #   returns its best guess of "the object": on the retina, the eye or one thick vessel.
 # - **Rung 2 · scribbles:** strokes on some vessels and some background in a few images; everything else is
@@ -71,6 +78,8 @@ show_masks(
 # - **Rung 1 · one-shot:** one image with a complete vessel mask. It is the go-deeper box at the end of the
 #   section; its row joins the table when you run it.
 # - **Cost:** one complete mask takes hours, one scribble seconds.
+#
+# </details>
 
 # %% [markdown]
 # <!-- callout: go-deeper | Go deeper: where the rungs come from -->
@@ -239,11 +248,20 @@ show_masks(
 #
 # `L = −(1/|S|) · Σ_{i∈S} [ y_i·log p_i + (1−y_i)·log(1−p_i) ]`
 #
+# <details><summary>The same in words</summary>
+#
 # - A vessel stroke says y = 1, a background stroke says y = 0.
 # - An unlabelled pixel is not in S: it adds nothing. In code it is a target of `-1`, which `train_head`
 #   already skips (it has skipped the fundus border that way since section 2).
 # - In section 3 the unpainted pixels were targets of `0`: a thin vessel nobody painted counted as a
 #   "background" error.
+#
+# </details>
+
+# %% [markdown]
+# <!-- diagram: s04-partial-loss | Partial cross-entropy: only the stroked pixels are in the sum -->
+# The same small image twice. On the left every pixel is in the loss. On the right only the stroked pixels
+# are, so a vessel nobody stroked is skipped.
 
 # %% [markdown]
 # This helper turns a stroke map into training targets.
@@ -420,10 +438,14 @@ show_masks(
 # Someone spends an afternoon tracing every vessel of **one** training image. That mask is all this rung
 # may use. No training, just one mean per class:
 #
+# <details><summary>The same in words</summary>
+#
 # 1. Cut the annotated image into 16 px patches; DINOv3 gives one feature vector per patch.
 # 2. Average the vessel patches into a vessel prototype, the background patches into a background prototype.
 # 3. For a new image, score every patch: `cos(feature, vessel) − cos(feature, background)`.
 # 4. Upsample the scores to pixels and mark those above 0.
+#
+# </details>
 #
 # Before you run the next cell, guess: will the prototype mark more of the fundus than SAM's box, or less?
 # Will it find the thin vessels, or only the thick ones?
@@ -433,6 +455,10 @@ show_masks(
 #
 # The prototype is as coarse as a 16 px patch, like the section-2 head, and it depends on *which* example
 # you annotated: with one image, a lucky or unlucky choice is the whole training set.
+
+# %% [markdown]
+# <!-- diagram: s04-one-shot-recipe | The one-shot prototype recipe in four steps -->
+# The recipe of the box above, drawn. The numbers in the picture are made up to show the arithmetic.
 
 # %% [markdown]
 # This helper builds the prototypes from one annotated image and scores every evaluation image.

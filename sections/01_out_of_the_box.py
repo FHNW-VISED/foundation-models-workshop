@@ -230,6 +230,12 @@ print(
 sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, default_text="dog")
 
 # %% [markdown]
+# <!-- diagram: s01-how-sam-works | How SAM turns a hint into a mask -->
+# Read left to right. The big image encoder reads the photo once; each hint (a click, a box or, with SAM 3,
+# a word) goes through a small prompt encoder; the mask decoder combines the two and returns a mask with a
+# score.
+
+# %% [markdown]
 # <!-- callout: theory | Theory: the three tools -->
 # - **SAM** (Segment Anything) is *promptable*. You give it an image and a hint (a click, a box on a pet);
 #   it returns the mask of the object under the hint. Nothing is trained: it learnt "what an object is" from
@@ -247,9 +253,19 @@ sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, defau
 # hundred images. The whole workshop uses one metric, **IoU** (intersection over union):
 #
 # `IoU = |pred ∩ truth| / |pred ∪ truth|`
+
+# %% [markdown]
+# <!-- diagram: s01-iou | IoU: pixels in both masks divided by pixels in either -->
+# Count the pixels both masks mark (80), count the pixels either mask marks (120), then divide.
+
+# %% [markdown]
+# <details><summary>The same in words</summary>
 #
 # - Example: the predicted mask and the true mask each cover 100 pixels and share 80. The union is 120
 #   pixels, so IoU = 80 / 120 = 0.67.
+#
+# </details>
+#
 # - 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
 # - On the pets, both masks are first cut to the scored area, so the $\color{#E0E0E0}{\blacksquare}$ grey
 #   "not sure" band counts for nothing.
@@ -373,6 +389,13 @@ show_masks(
 # ### 1.4 A linear head on five pets
 
 # %% [markdown]
+# <!-- diagram: s01-patches-to-mask | From 16 px patches to a mask: DINOv3 and a linear head -->
+# Follow the outlined square from the photo to the final mask: its 384 numbers become one score, then one
+# value p for that square. The same steps run for every square.
+
+# %% [markdown]
+# <details><summary>The same in words</summary>
+#
 # **How the head works.** Each patch gets one score from its 384 feature numbers `f`:
 #
 # `score = w · f + b` (384 weights + 1 bias = 385 parameters), the same `w` and `b` for every patch (a
@@ -381,6 +404,8 @@ show_masks(
 # A sigmoid `σ` squeezes the score into a probability `p = σ(score)` between 0 and 1 (score 2.2 gives
 # p = 0.90, score 0 gives 0.5), so "score above 0" and "p above 0.5" say the same thing. The per-patch map is
 # then upsampled to the image.
+#
+# </details>
 #
 # Training uses a **balanced loss**: pet pixels and background pixels each get half of the total weight, so
 # a small pet is not drowned out by the floor.

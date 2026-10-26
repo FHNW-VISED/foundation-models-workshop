@@ -393,12 +393,21 @@ add_key(fig, None, "colour = approach · left: higher is more accurate, further 
 plt.show()
 
 # %% [markdown]
+# <!-- diagram: s08-reading-tradeoff | How to read the trade-off plot -->
+# A sketch of the two panels above, not your numbers: where the good corner is, what a long bar means, and
+# which dots are a fair comparison.
+
+# %% [markdown]
 # <!-- callout: note | Reading the plot -->
+# <details><summary>The same in words</summary>
+#
 # - **Top-left** would be the dream (accurate and nearly free; on thin structures nobody is there),
 #   **bottom-left** is cheap and weak, and the **far right** is the complete-mask head, hours away.
 # - **The vertical bar is the spread**: a slightly lower dot with a much shorter bar can be the safer choice.
 # - **Dots at the same x** are the fairest comparison: the same strokes, used in different ways.
 # - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
+#
+# </details>
 
 # %% [markdown]
 # **Q20.** 🟡 Pick one approach for each situation and name the column that decided it.

@@ -1,0 +1,271 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 592" width="100%" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="s05-pu-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker><pattern id="s05-pu-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#FFFFFF"/><line x1="0" y1="0" x2="0" y2="6" stroke="#9E9E9E" stroke-width="2"/></pattern></defs>
+<rect width="960" height="592" fill="#FFFFFF"/>
+<text x="30" y="30" font-size="16" font-weight="bold" fill="#212121">The example: 200 pixels of fundus</text>
+<rect x="30" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="44" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="55" width="11" height="11" fill="#FFFFFF" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="55" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="66" width="11" height="11" fill="#00838F" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="66" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="77" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="88" width="11" height="11" fill="#FFFFFF" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="88" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="99" width="11" height="11" fill="#00838F" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="99" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="110" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="121" width="11" height="11" fill="#FFFFFF" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="121" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="132" width="11" height="11" fill="#00838F" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="132" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="30" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="41" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="52" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="63" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="74" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="85" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="107" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="118" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="129" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="140" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="151" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="162" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="173" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="184" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="195" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="206" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="217" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="228" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="239" y="143" width="11" height="11" fill="#FAFAFA" stroke="#CFD8DC" stroke-width="1"/>
+<rect x="96" y="121" width="11" height="11" fill="#FAFAFA" stroke="#2E7D32" stroke-width="2.5"/>
+<rect x="173" y="55" width="11" height="11" fill="#FAFAFA" stroke="#2E7D32" stroke-width="2.5"/>
+<rect x="228" y="88" width="11" height="11" fill="#FAFAFA" stroke="#2E7D32" stroke-width="2.5"/>
+<text x="275" y="62" font-size="14" fill="#212121"><tspan fill="#00838F" font-weight="bold">3 painted</tspan> vessel pixels = 1.5 % of the fundus</text>
+<text x="275" y="86" font-size="14" fill="#212121"><tspan fill="#2E7D32" font-weight="bold">3 hidden</tspan> vessel pixels (outlined): nobody painted them</text>
+<text x="275" y="110" font-size="14" fill="#212121">The loss cannot tell hidden vessels from the 194 background pixels.</text>
+<text x="275" y="134" font-size="14" fill="#212121">The annotator says "about half painted", so the vessel share is <tspan font-weight="bold">π = 3 %</tspan>.</text>
+<line x1="30" y1="170" x2="930" y2="170" stroke="#CFD8DC" stroke-width="1.5"/>
+<circle cx="45" cy="198" r="15" fill="#4527A0"/><text x="45" y="204" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">1</text>
+<text x="70" y="204" font-size="16" font-weight="bold" fill="#212121">Vessel loss</text>
+<text x="30" y="236" font-size="14" fill="#212121">Use only the painted pixels,</text>
+<text x="30" y="256" font-size="14" fill="#212121">target "vessel".</text>
+<rect x="30" y="320" width="30" height="30" rx="3" fill="#00838F"/>
+<rect x="64" y="320" width="30" height="30" rx="3" fill="#00838F"/>
+<rect x="98" y="320" width="30" height="30" rx="3" fill="#00838F"/>
+<text x="140" y="340" font-size="14" fill="#616161">3 pixels</text>
+<line x1="75" y1="356" x2="75" y2="386" stroke="#424242" stroke-width="1.5" marker-end="url(#s05-pu-arrow)"/>
+<rect x="30" y="392" width="215" height="46" rx="8" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.5"/>
+<text x="42" y="411" font-size="13" fill="#212121">How far is the score from</text>
+<text x="42" y="429" font-size="13" fill="#212121">"vessel", on average?</text>
+<rect x="30" y="510" width="235" height="40" rx="8" fill="#ECEFF1"/>
+<text x="42" y="535" font-size="13" font-family="Menlo, Consolas, Courier New, monospace" fill="#212121">L_v = mean_painted(-log p)</text>
+<line x1="270" y1="188" x2="270" y2="520" stroke="#CFD8DC" stroke-width="1"/>
+<circle cx="300" cy="198" r="15" fill="#4527A0"/><text x="300" y="204" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">2</text>
+<text x="325" y="204" font-size="16" font-weight="bold" fill="#212121">Background loss</text>
+<text x="285" y="232" font-size="14" fill="#212121">Score every pixel as background, then take</text>
+<text x="285" y="251" font-size="14" fill="#212121">out the vessels that are hiding in the mix.</text>
+<text x="285" y="282" font-size="13" fill="#616161">every pixel scored as background</text>
+<rect x="285" y="290" width="296" height="30" fill="#9E9E9E"/>
+<rect x="581" y="290" width="27.0" height="30" fill="#00838F"/>
+<rect x="608.0" y="290" width="27.0" height="30" fill="#2E7D32"/>
+<text x="433.0" y="310" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">true background (1 - π)</text>
+<text x="635" y="342" font-size="13" fill="#212121" text-anchor="end">π of vessels: painted + hidden</text>
+<text x="285" y="386" font-size="13" fill="#616161">minus π × the painted vessels scored as background</text>
+<rect x="581" y="394" width="54" height="30" fill="#00838F"/>
+<rect x="285" y="394" width="296" height="30" fill="none" stroke="#BDBDBD" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="433.0" y="414" font-size="13" fill="#616161" text-anchor="middle">painted vessels stand in for all of them</text>
+<line x1="608.0" y1="339" x2="608.0" y2="380" stroke="none"/>
+<text x="285" y="462" font-size="13" fill="#616161">what is left, divided by (1 - π)</text>
+<rect x="285" y="470" width="350" height="30" fill="#9E9E9E"/>
+<text x="460.0" y="490" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">background only, back to a full average</text>
+<rect x="285" y="350" width="0" height="0"/>
+<rect x="285" y="510" width="360" height="40" rx="8" fill="#ECEFF1"/>
+<text x="295" y="535" font-size="12.5" font-family="Menlo, Consolas, Courier New, monospace" fill="#212121">L_b = (all_as_bg - π*painted_as_bg) / (1 - π)</text>
+<text x="285" y="290" font-size="1" fill="none">.</text>
+<line x1="675" y1="188" x2="675" y2="520" stroke="#CFD8DC" stroke-width="1"/>
+<circle cx="705" cy="198" r="15" fill="#4527A0"/><text x="705" y="204" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">3</text>
+<text x="730" y="204" font-size="16" font-weight="bold" fill="#212121">Balance, clip at zero</text>
+<text x="690" y="236" font-size="14" fill="#212121">Half vessel loss, half background</text>
+<text x="690" y="256" font-size="14" fill="#212121">loss. L_b may never go below 0.</text>
+<rect x="690" y="276" width="110" height="40" rx="8" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.5"/>
+<text x="745" y="301" font-size="14" text-anchor="middle" fill="#212121">½ × L_v</text>
+<text x="815" y="301" font-size="18" text-anchor="middle" fill="#212121">+</text>
+<rect x="830" y="276" width="100" height="40" rx="8" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="1.5"/>
+<text x="880" y="301" font-size="14" text-anchor="middle" fill="#212121">½ × L_b</text>
+<line x1="710" y1="420" x2="910" y2="420" stroke="#757575" stroke-width="1.5"/>
+<text x="706" y="424" font-size="12" fill="#616161" text-anchor="end">0</text>
+<path d="M710,370 C770,385 810,415 840,445 S900,456 910,450" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-dasharray="5 4"/>
+<path d="M710,370 C770,385 810,415 822,420 L910,420" fill="none" stroke="#6A1B9A" stroke-width="2.5"/>
+<text x="910" y="368" font-size="13" fill="#616161" text-anchor="end">dashed: L_b as computed</text>
+<text x="910" y="385" font-size="13" fill="#6A1B9A" text-anchor="end">solid: max(L_b, 0)</text>
+<text x="910" y="472" font-size="12" fill="#616161" text-anchor="end">it dips when the head overfits</text>
+<text x="910" y="487" font-size="12" fill="#616161" text-anchor="end">the few painted vessels</text>
+<rect x="690" y="510" width="240" height="40" rx="8" fill="#ECEFF1"/>
+<text x="700" y="535" font-size="13" font-family="Menlo, Consolas, Courier New, monospace" fill="#212121">L = ½·L_v + ½·max(L_b, 0)</text>
+<text x="30" y="580" font-size="13" fill="#616161">Bars are not to scale: π is only 3 %, drawn wider so you can see it. Colours as before: teal = painted, green = hidden vessel, grey = background.</text>
+</svg>

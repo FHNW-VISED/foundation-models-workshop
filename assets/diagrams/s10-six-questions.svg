@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 372" width="100%" font-family="Helvetica, Arial, sans-serif">
+<rect width="960" height="372" fill="#FFFFFF"/>
+<defs>
+<marker id="s10-six-questions-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker>
+</defs>
+<text x="16" y="26" font-size="17" fill="#212121" font-weight="bold">Six questions for a new task, in the order you meet them</text>
+<text x="16" y="47" font-size="13" fill="#616161">Each one is answered by a number you can measure in an afternoon.</text>
+<rect x="16" y="62" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="40" cy="88" r="14" fill="#212121"/>
+<text x="40" y="93" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">1</text>
+<text x="64" y="86" font-size="14" fill="#212121" font-weight="bold">Out of the box: above the</text>
+<text x="64" y="104" font-size="14" fill="#212121" font-weight="bold">“everything” line?</text>
+<text x="32" y="132" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="92" y="132" font-size="12" fill="#616161">one box on ~20 images vs</text>
+<text x="92" y="148" font-size="12" fill="#616161">marking every pixel</text>
+<line x1="32" y1="162" x2="290" y2="162" stroke="#B0BEC5" stroke-width="1"/>
+<text x="32" y="184" font-size="12.5" fill="#212121">No: plan to adapt.</text>
+<text x="294" y="86" font-size="12" fill="#616161" text-anchor="end">§ 1, 2</text>
+<line x1="309" y1="131.0" x2="331" y2="131.0" stroke="#424242" stroke-width="1.6" marker-end="url(#s10-six-questions-ink)"/>
+<rect x="335" y="62" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="359" cy="88" r="14" fill="#212121"/>
+<text x="359" y="93" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">2</text>
+<text x="383" y="86" font-size="14" fill="#212121" font-weight="bold">Is the structure smaller</text>
+<text x="383" y="104" font-size="14" fill="#212121" font-weight="bold">than a 16 px patch?</text>
+<text x="351" y="132" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="411" y="132" font-size="12" fill="#616161">the same head at two</text>
+<text x="411" y="148" font-size="12" fill="#616161">input sizes</text>
+<line x1="351" y1="162" x2="609" y2="162" stroke="#B0BEC5" stroke-width="1"/>
+<text x="351" y="184" font-size="12.5" fill="#212121">Bigger barely helps: buy cheap labels.</text>
+<text x="613" y="86" font-size="12" fill="#616161" text-anchor="end">§ 2</text>
+<line x1="628" y1="131.0" x2="650" y2="131.0" stroke="#424242" stroke-width="1.6" marker-end="url(#s10-six-questions-ink)"/>
+<rect x="654" y="62" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="678" cy="88" r="14" fill="#212121"/>
+<text x="678" y="93" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">3</text>
+<text x="702" y="86" font-size="14" fill="#212121" font-weight="bold">What do the gaps in</text>
+<text x="702" y="104" font-size="14" fill="#212121" font-weight="bold">the labels mean?</text>
+<text x="670" y="132" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="730" y="132" font-size="12" fill="#616161">recall on the part</text>
+<text x="730" y="148" font-size="12" fill="#616161">nobody labelled</text>
+<line x1="670" y1="162" x2="928" y2="162" stroke="#B0BEC5" stroke-width="1"/>
+<text x="670" y="184" font-size="12.5" fill="#212121">Unknown, not background: tell the loss.</text>
+<text x="932" y="86" font-size="12" fill="#616161" text-anchor="end">§ 3, 5</text>
+<rect x="16" y="220" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="40" cy="246" r="14" fill="#212121"/>
+<text x="40" y="251" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">4</text>
+<text x="64" y="244" font-size="14" fill="#212121" font-weight="bold">Does the model beat</text>
+<text x="64" y="262" font-size="14" fill="#212121" font-weight="bold">the hints alone?</text>
+<text x="32" y="290" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="92" y="290" font-size="12" fill="#616161">your strokes, thickened,</text>
+<text x="92" y="306" font-size="12" fill="#616161">with no model</text>
+<line x1="32" y1="320" x2="290" y2="320" stroke="#B0BEC5" stroke-width="1"/>
+<text x="32" y="342" font-size="12.5" fill="#212121">No: the strokes did the work.</text>
+<text x="294" y="244" font-size="12" fill="#616161" text-anchor="end">§ 7</text>
+<line x1="309" y1="289.0" x2="331" y2="289.0" stroke="#424242" stroke-width="1.6" marker-end="url(#s10-six-questions-ink)"/>
+<rect x="335" y="220" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="359" cy="246" r="14" fill="#212121"/>
+<text x="359" y="251" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">5</text>
+<text x="383" y="244" font-size="14" fill="#212121" font-weight="bold">Which mistake</text>
+<text x="383" y="262" font-size="14" fill="#212121" font-weight="bold">costs most?</text>
+<text x="351" y="290" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="411" y="290" font-size="12" fill="#616161">the cost of one miss vs</text>
+<text x="411" y="306" font-size="12" fill="#616161">one false alarm</text>
+<line x1="351" y1="320" x2="609" y2="320" stroke="#B0BEC5" stroke-width="1"/>
+<text x="351" y="342" font-size="12.5" fill="#212121">Rank by recall, precision or IoU.</text>
+<text x="613" y="244" font-size="12" fill="#616161" text-anchor="end">§ 8</text>
+<line x1="628" y1="289.0" x2="650" y2="289.0" stroke="#424242" stroke-width="1.6" marker-end="url(#s10-six-questions-ink)"/>
+<rect x="654" y="220" width="290" height="138" rx="8" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<circle cx="678" cy="246" r="14" fill="#212121"/>
+<text x="678" y="251" font-size="14" fill="#FFFFFF" font-weight="bold" text-anchor="middle">6</text>
+<text x="702" y="244" font-size="14" fill="#212121" font-weight="bold">What does every new</text>
+<text x="702" y="262" font-size="14" fill="#212121" font-weight="bold">image cost?</text>
+<text x="670" y="290" font-size="12" fill="#616161" font-weight="bold">Measure:</text>
+<text x="730" y="290" font-size="12" fill="#616161">minutes per image, times</text>
+<text x="730" y="306" font-size="12" fill="#616161">the images to come</text>
+<line x1="670" y1="320" x2="928" y2="320" stroke="#B0BEC5" stroke-width="1"/>
+<text x="670" y="342" font-size="12.5" fill="#212121">A head pays once; prompting pays per image.</text>
+<text x="932" y="244" font-size="12" fill="#616161" text-anchor="end">§ 8</text>
+<path d="M799.0,202 V209.5 H161.0 V217" fill="none" stroke="#424242" stroke-width="1.6" marker-end="url(#s10-six-questions-ink)"/>
+</svg>

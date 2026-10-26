@@ -10,6 +10,9 @@ same sources give byte-identical notebooks.
 Callouts (N-034, SPEC L-001): a markdown cell whose first line is `<!-- callout: kind | Title -->` becomes a
 hidden form code cell (`# @title`) that displays the box, and the box HTML is also saved as that cell's
 output, so it shows before anything runs. Colab cuts text inside markdown tables, so boxes are never tables.
+
+Diagrams: a markdown cell whose first line is `<!-- diagram: name | Title -->` becomes the same kind of hidden
+cell, showing `assets/diagrams/name.svg` inline with the rest of the cell (markdown) as its caption.
 """
 
 from __future__ import annotations
@@ -44,6 +47,8 @@ KINDS = {
 }
 BANNER_BG = "#4A148C"
 CALLOUT_KINDS = ("banner", *KINDS)
+DIAGRAMS = ROOT / "assets" / "diagrams"
+DIAGRAM_RE = re.compile(r"^<!--\s*diagram:\s*([\w-]+)\s*(?:\|\s*(.*?))?\s*-->\s*$")
 MARKER_RE = re.compile(r"^<!--\s*callout:\s*([\w-]+)\s*(?:\|\s*(.*?))?\s*-->\s*$")
 # A title "starts with an emoji" when its first character is in the symbol / pictograph blocks.
 EMOJI_START_RE = re.compile(
@@ -111,6 +116,47 @@ def callout_cell(kind: str, title: str, body: str, where: str) -> nbformat.Noteb
     return cell
 
 
+def parse_diagram(source: str) -> tuple[str, str, str] | None:
+    """(name, title, caption) if the cell's first line is a diagram marker, else None."""
+    first, _, body = source.partition("\n")
+    m = DIAGRAM_RE.match(first.strip())
+    if not m:
+        return None
+    return m.group(1), (m.group(2) or "").strip(), body.strip("\n")
+
+
+def diagram_html(name: str, caption: str, where: str) -> str:
+    """The SVG of `name` scaled to the cell width, with the caption rendered under it."""
+    path = DIAGRAMS / f"{name}.svg"
+    if not path.is_file():
+        sys.exit(f"{where}: diagram {path.relative_to(ROOT)} does not exist")
+    svg = re.sub(r"<\?xml[^>]*\?>\s*", "", path.read_text()).strip()
+    cap = render_body(caption) if caption else ""
+    cap = f'<div style="font-size:0.9em;color:#424242;margin-top:6px">{cap}</div>' if cap else ""
+    return (
+        '<div style="background:#FFFFFF;border-radius:6px;padding:10px 12px;margin:6px 0;max-width:980px">'
+        f'<div style="width:100%">{svg}</div>{cap}</div>'
+    )
+
+
+def diagram_cell(name: str, title: str, caption: str, where: str) -> nbformat.NotebookNode:
+    """The hidden form code cell that draws the diagram, with its HTML saved as the output."""
+    box = diagram_html(name, caption, where)
+    if '"""' in box or box.endswith("\\"):
+        sys.exit(f"{where}: diagram {name} cannot contain three double quotes or end with a backslash")
+    src = f'# @title {title}\nfrom IPython.display import HTML, display\ndisplay(HTML(r"""{box}"""))'
+    cell = nbformat.v4.new_code_cell(src)
+    cell.metadata["cellView"] = "form"
+    cell.outputs = [
+        nbformat.v4.new_output(
+            "display_data",
+            data={"text/html": box, "text/plain": "<IPython.core.display.HTML object>"},
+            metadata={},
+        )
+    ]
+    return cell
+
+
 def section_files() -> list[Path]:
     files = sorted(p for p in SECTIONS.glob("[0-9][0-9]_*.py"))
     if not files:
@@ -125,8 +171,11 @@ def assemble(sources: list[Path], out: Path) -> Path:
         nb = jupytext.read(path, fmt="py:percent")
         for k, cell in enumerate(nb.cells):
             marker = parse_marker(cell.source) if cell.cell_type == "markdown" else None
+            diagram = parse_diagram(cell.source) if cell.cell_type == "markdown" else None
             if marker:
                 cell = callout_cell(*marker, where=f"{path.name} cell {k}")
+            elif diagram:
+                cell = diagram_cell(*diagram, where=f"{path.name} cell {k}")
             cell.id = f"{path.stem[:50]}-{k}"  # deterministic ids: same sources -> byte-identical .ipynb
             cell.metadata.pop("lines_to_next_cell", None)
             cell.metadata["section"] = path.stem

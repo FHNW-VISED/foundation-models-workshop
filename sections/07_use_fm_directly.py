@@ -13,6 +13,15 @@
 # Prompt the foundation model directly with scribble points and boxes, no training, and know when that beats
 # training a head.
 
+
+# %% [markdown]
+# <!-- diagram: s00-map-path3 | You are here: Path 3 -->
+# Where this section sits on the map of section 0.
+
+# %% [markdown]
+# <!-- diagram: s07-prompt-every-image | Train once, or prompt every image -->
+# Paths 1 and 2 pay for strokes once and then run alone. Path 3 pays for strokes on every image.
+
 # %% [markdown]
 # <!-- callout: theory | Theory: what a SAM prompt says -->
 # Section 2.3 showed that many scattered clicks make SAM answer with one big region. Two things are new here:
@@ -465,6 +474,10 @@ else:
     except Exception as err:  # noqa: BLE001 - an optional extension must never stop the notebook
         RESULTS["sam3_note"] = f"SAM 3 loaded but failed: {type(err).__name__}: {err}"
         print(f"⚠️ SAM 3 loaded but did not run here ({type(err).__name__}: {err}). It is optional; carry on.")
+
+# %% [markdown]
+# <!-- diagram: s07-three-prompts | Three ways to prompt SAM -->
+# What SAM is given in each recipe of this section, and how each one usually goes wrong.
 
 # %% [markdown]
 # Want to try this on a photo of your own? Section 9 lets you draw the strokes yourself.

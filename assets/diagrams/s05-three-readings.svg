@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="100%" font-family="Helvetica, Arial, sans-serif">
+<rect width="960" height="470" fill="#FFFFFF"/>
+<text x="40" y="36" font-size="18" font-weight="bold" fill="#212121">Naive</text>
+<text x="40" y="58" font-size="14" fill="#616161">unpainted = background</text>
+<text x="40" y="92" font-size="13" fill="#616161">What is really there</text>
+<rect x="40" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="67" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="94" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="121" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="148" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="175" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="202" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="229" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="256" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="283" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<text x="40" y="164" font-size="13" fill="#616161">What the loss is told</text>
+<rect x="40" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="67" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="94" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="121" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="148" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="175" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="202" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="229" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="256" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="283" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="202" y="172" width="54" height="27" fill="none" stroke="#2E7D32" stroke-width="3" rx="3"/>
+<line x1="229" y1="203" x2="229" y2="250" stroke="#424242" stroke-width="1.5" marker-end="url(#s05-tr-arrow)"/>
+<text x="219" y="236" font-size="13" text-anchor="end" fill="#616161">the hidden vessel</text>
+<rect x="40" y="260" width="270" height="150" rx="10" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="54" y="286" font-size="13" fill="#616161">Pull towards "background"</text>
+<rect x="54" y="296" width="242" height="16" rx="8" fill="#ECEFF1"/>
+<rect x="54" y="296" width="242" height="16" rx="8" fill="#424242"/>
+<text x="54" y="344" font-size="17" font-weight="bold" fill="#212121">Punished</text>
+<text x="54" y="368" font-size="14" fill="#212121">Told it is background,</text>
+<text x="54" y="388" font-size="14" fill="#212121">so the head is pushed away.</text>
+<text x="345" y="36" font-size="18" font-weight="bold" fill="#212121">Masked</text>
+<text x="345" y="58" font-size="14" fill="#616161">unpainted = ignored</text>
+<text x="345" y="92" font-size="13" fill="#616161">What is really there</text>
+<rect x="345" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="372" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="399" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="426" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="453" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="480" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="507" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="534" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="561" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="588" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<text x="345" y="164" font-size="13" fill="#616161">What the loss is told</text>
+<rect x="345" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="372" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="399" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="426" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="453" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="480" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="507" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="534" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="561" y="172" width="27" height="27" fill="#E0E0E0" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="588" y="172" width="27" height="27" fill="#9E9E9E" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="507" y="172" width="54" height="27" fill="none" stroke="#2E7D32" stroke-width="3" rx="3"/>
+<line x1="534" y1="203" x2="534" y2="250" stroke="#424242" stroke-width="1.5" marker-end="url(#s05-tr-arrow)"/>
+<text x="524" y="236" font-size="13" text-anchor="end" fill="#616161">the hidden vessel</text>
+<rect x="345" y="260" width="270" height="150" rx="10" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="359" y="286" font-size="13" fill="#616161">Pull towards "background"</text>
+<rect x="359" y="296" width="242" height="16" rx="8" fill="#ECEFF1"/>
+<text x="359" y="344" font-size="17" font-weight="bold" fill="#212121">Ignored</text>
+<text x="359" y="368" font-size="14" fill="#212121">No loss, no push.</text>
+<text x="359" y="388" font-size="14" fill="#212121">Nothing is said about it.</text>
+<text x="650" y="36" font-size="18" font-weight="bold" fill="#212121">PU</text>
+<text x="650" y="58" font-size="14" fill="#616161">unpainted = unlabelled</text>
+<text x="650" y="92" font-size="13" fill="#616161">What is really there</text>
+<rect x="650" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="677" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="704" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="731" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="758" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="785" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="812" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="839" y="100" width="27" height="27" fill="#2E7D32" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="866" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<rect x="893" y="100" width="27" height="27" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1"/>
+<text x="650" y="164" font-size="13" fill="#616161">What the loss is told</text>
+<rect x="650" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="663.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="677" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="704" y="172" width="27" height="27" fill="#00838F" stroke="#FFFFFF" stroke-width="1.5"/>
+<rect x="731" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="744.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="758" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="771.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="785" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="798.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="812" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="825.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="839" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="852.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="866" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="879.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="893" y="172" width="27" height="27" fill="#FAFAFA" stroke="#FFFFFF" stroke-width="1.5"/>
+<text x="906.5" y="190.5" font-size="14" text-anchor="middle" fill="#616161">?</text>
+<rect x="812" y="172" width="54" height="27" fill="none" stroke="#2E7D32" stroke-width="3" rx="3"/>
+<line x1="839" y1="203" x2="839" y2="250" stroke="#424242" stroke-width="1.5" marker-end="url(#s05-tr-arrow)"/>
+<text x="829" y="236" font-size="13" text-anchor="end" fill="#616161">the hidden vessel</text>
+<rect x="650" y="260" width="270" height="150" rx="10" fill="#FAFAFA" stroke="#B0BEC5" stroke-width="1.5"/>
+<text x="664" y="286" font-size="13" fill="#616161">Pull towards "background"</text>
+<rect x="664" y="296" width="242" height="16" rx="8" fill="#ECEFF1"/>
+<rect x="664" y="296" width="96" height="16" rx="8" fill="#424242"/>
+<text x="664" y="344" font-size="17" font-weight="bold" fill="#212121">Partly forgiven</text>
+<text x="664" y="368" font-size="14" fill="#212121">Pushed down like the rest,</text>
+<text x="664" y="388" font-size="14" fill="#212121">then paid back with the vessel share π.</text>
+<rect x="40" y="428" width="16" height="16" fill="#00838F" stroke="#9E9E9E" stroke-width="1" rx="2"/>
+<text x="64" y="441" font-size="13" fill="#212121">painted vessel</text>
+<rect x="180" y="428" width="16" height="16" fill="#2E7D32" stroke="#9E9E9E" stroke-width="1" rx="2"/>
+<text x="204" y="441" font-size="13" fill="#212121">real vessel (outlined: nobody painted it)</text>
+<rect x="510" y="428" width="16" height="16" fill="#9E9E9E" stroke="#9E9E9E" stroke-width="1" rx="2"/>
+<text x="534" y="441" font-size="13" fill="#212121">background label</text>
+<rect x="670" y="428" width="16" height="16" fill="#E0E0E0" stroke="#9E9E9E" stroke-width="1" rx="2"/>
+<text x="694" y="441" font-size="13" fill="#212121">ignored</text>
+<rect x="770" y="428" width="16" height="16" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="1" rx="2"/>
+<text x="794" y="441" font-size="13" fill="#212121">unlabelled (?)</text>
+<defs><marker id="s05-tr-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#424242"/></marker></defs>
+</svg>
