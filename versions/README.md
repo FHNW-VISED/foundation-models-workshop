@@ -17,3 +17,4 @@ Never edit a version folder.
 | v08 | 2026-10-26 | Simone review round 2: cuts, PU on main path, legends N-059, playground truth toggle | 46a0986 |
 | v09 | 2026-10-26 | AMLD only: SDS 2027 mention removed | 2a2f8b1 |
 | v10 | 2026-10-26 | AMLD only + colour swatches next to every colour named in text (N-059) | 3625d93 |
+| v11 | 2026-10-26 | SAM 3 downloads itself into the cache when HF_TOKEN is set | 6d44a0d |
