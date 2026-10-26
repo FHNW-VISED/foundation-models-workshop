@@ -167,9 +167,10 @@ print(
 )
 
 # %% [markdown]
-# This cell shows one retina photo, its vessels (green) and a zoom with the 16 px grid DINOv3 sees (white
+# This cell shows one retina photo, its vessels ($\color{#2E7D32}{\blacksquare}$ green) and a zoom with the
+# 16 px grid DINOv3 sees ($\square$ white
 # squares), and measures a vessel's width against one patch. What to look for: in the zoom, a vessel is
-# thinner than one white square, so no square can be "all vessel".
+# thinner than one $\square$ white square, so no square can be "all vessel".
 
 # %%
 # @title Meet the retina images: vessels next to the DINOv3 patch grid { display-mode: "form" }
@@ -223,8 +224,10 @@ print(
 
 # %% [markdown]
 # **Try it yourself.** Section 1's SAM could mark a pet. Now see whether you can make it mark only the
-# vessels. What to look for: the violet mask is what SAM returned. Press "Show ground truth" to colour what
-# it found (violet), invented (orange) and missed (green); the key under the picture names the colours.
+# vessels. What to look for: the $\color{#6A1B9A}{\blacksquare}$ violet mask is what SAM returned. Press
+# "Show ground truth" to colour what
+# it found ($\color{#6A1B9A}{\blacksquare}$ violet), invented ($\color{#E65100}{\blacksquare}$ orange) and
+# missed ($\color{#2E7D32}{\blacksquare}$ green); the key under the picture names the colours.
 #
 # **Q5.** 🟡 Can you get SAM to mark only the vessels? Try these four and note after each what SAM marked: a
 # vessel, the whole tree, a blob, or the whole fundus.
@@ -410,10 +413,13 @@ def explain_cldice(case: str) -> None:
 # panel puts IoU next to clDice for all three cases. A blob's centre line is a short stub in its middle: here
 # the stub misses every vessel, so clDice is 0.
 #
-# 1. **Thin the true vessels to their centre line** (white line on the green truth, panel 1).
-# 2. **Thin the prediction the same way** (white line on the grey prediction, panel 2).
-# 3. **tprec**: of the prediction's centre line, how much lies inside the true vessels? Violet pixels count,
-#    orange ones do not. 490 of 529 pixels = 0.93.
+# 1. **Thin the true vessels to their centre line** ($\square$ white line on the
+#    $\color{#2E7D32}{\blacksquare}$ green truth, panel 1).
+# 2. **Thin the prediction the same way** ($\square$ white line on the $\color{#9E9E9E}{\blacksquare}$ grey
+#    prediction, panel 2).
+# 3. **tprec**: of the prediction's centre line, how much lies inside the true vessels?
+#    $\color{#6A1B9A}{\blacksquare}$ Violet pixels count,
+#    $\color{#E65100}{\blacksquare}$ orange ones do not. 490 of 529 pixels = 0.93.
 # 4. **tsens**: of the true centre line, how much is covered by the prediction? 534 of 534 = 1.00.
 #    Then clDice = 2 · 0.93 · 1.00 ÷ (0.93 + 1.00) = 0.96, while IoU for the same masks is only 0.57.
 #
@@ -447,7 +453,8 @@ explain_cldice(CASE)
 #
 # - Will IoU rise steadily from 1 to 20 clicks, jump at some point, or stay flat?
 # - Will the box beat 20 clicks?
-# - Where will the grey line sit? It scores a mask that says "everything is foreground": if vessels cover 12 %
+# - Where will the <span style="color:#9E9E9E">■</span> grey line sit? It scores a mask that says "everything
+#   is foreground": if vessels cover 12 %
 #   of the fundus, overlap 12 % ÷ union 100 % gives IoU 0.12. The load cell printed your share.
 
 # %% [markdown]
@@ -455,10 +462,14 @@ explain_cldice(CASE)
 # overlap ÷ union. **Recall** is the share of the true vessel pixels the mask finds. **Marked** is the share
 # of the fundus the mask covers (100 % = the whole eye).
 #
-# Then two figures. The bars show mean IoU for each setting (orange), the dashed grey line is the score of
-# marking everything, and the dotted violet line is SAM's one-box score on the pets. The pictures show the
-# four prompts (teal stars and box) on the demo image, with SAM's mask in violet next to the green truth.
-# What to look for: bars that do not rise above the grey dashed line, and masks that grow without getting
+# Then two figures. The bars show mean IoU for each setting ($\color{#E65100}{\blacksquare}$ orange), the
+# dashed $\color{#9E9E9E}{\blacksquare}$ grey line is the score of
+# marking everything, and the dotted $\color{#6A1B9A}{\blacksquare}$ violet line is SAM's one-box score on
+# the pets. The pictures show the
+# four prompts ($\color{#00838F}{\blacksquare}$ teal stars and box) on the demo image, with SAM's mask in
+# $\color{#6A1B9A}{\blacksquare}$ violet next to the $\color{#2E7D32}{\blacksquare}$ green truth.
+# What to look for: bars that do not rise above the $\color{#9E9E9E}{\blacksquare}$ grey dashed line, and
+# masks that grow without getting
 # thinner.
 
 # %%
@@ -540,15 +551,17 @@ show_clicks(
 
 # %% [markdown]
 # **Q6.** 🟡 Compare the ladder with your prediction. Read the table row by row. Example: IoU 0.30 with 70 %
-# marked, against a grey line at 0.29, is a big mask that is barely better than marking everything.
+# marked, against a $\color{#9E9E9E}{\blacksquare}$ grey line at 0.29, is a big mask that is barely better
+# than marking everything.
 #
-# - Which rows beat the grey line by more than 0.05 IoU?
+# - Which rows beat the $\color{#9E9E9E}{\blacksquare}$ grey line by more than 0.05 IoU?
 # - Did more clicks bring the masks closer to the vessels, or just make them bigger?
 # - What does that say about what SAM thinks an object is?
 #
 # <details><summary>What to look for</summary>
 #
-# - Read IoU next to the grey line, not on its own. A mask that marks most of the fundus scores the
+# - Read IoU next to the $\color{#9E9E9E}{\blacksquare}$ grey line, not on its own. A mask that marks most of
+#   the fundus scores the
 #   "everything" baseline, whatever the prompt.
 # - If more clicks push "marked" up while IoU stays near the line, SAM is growing one big object around the
 #   clicks, and for a vessel tree that object is the eye.
@@ -562,7 +575,7 @@ show_clicks(
 # SAM returns a crisp mask for every prompt. Its own confidence score is high for a mask of the whole eye,
 # because the whole eye *is* a good object. Nothing in the output says "this is the wrong kind of thing".
 #
-# - Score against a baseline that knows nothing (the grey line).
+# - Score against a baseline that knows nothing (the <span style="color:#9E9E9E">■</span> grey line).
 # - Always look at the mask.
 
 # %% [markdown]
@@ -669,9 +682,12 @@ print("(marked = share of the fundus the mask covers; recall = share of the true
 
 # %% [markdown]
 # This cell puts the section-1 pet numbers next to this section's vessel numbers, for the same two tools
-# (SAM and a linear head). The tools are the same, only the task changed. Violet bars are the pets, orange
-# bars the vessels, and the dashed grey line is the score of marking everything on the vessels. What to look
-# for: every orange bar sits far below its violet neighbour and close to the dashed line.
+# (SAM and a linear head). The tools are the same, only the task changed.
+# $\color{#6A1B9A}{\blacksquare}$ Violet bars are the pets, $\color{#E65100}{\blacksquare}$ orange
+# bars the vessels, and the dashed $\color{#9E9E9E}{\blacksquare}$ grey line is the score of marking
+# everything on the vessels. What to look
+# for: every $\color{#E65100}{\blacksquare}$ orange bar sits far below its
+# $\color{#6A1B9A}{\blacksquare}$ violet neighbour and close to the dashed line.
 
 # %%
 # @title Pets vs vessels: the same two tools, high on pets and low on vessels { display-mode: "form" }
@@ -711,7 +727,9 @@ plt.show()
 #
 # Numbers average the failures away; the gallery shows them. It sorts the evaluation images from worst to
 # best (by the head's IoU at the higher resolution) and shows three at a time. Each row is one image: the
-# photo, SAM's mask from a box (violet), the head's mask (violet) and the ground truth (green). What to look
+# photo, SAM's mask from a box ($\color{#6A1B9A}{\blacksquare}$ violet), the head's mask
+# ($\color{#6A1B9A}{\blacksquare}$ violet) and the ground truth ($\color{#2E7D32}{\blacksquare}$ green). What
+# to look
 # for: the kind of mistake, whole regions marked for SAM, missing thin vessels for the head.
 
 # %% [markdown]

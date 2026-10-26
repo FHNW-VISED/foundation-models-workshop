@@ -232,9 +232,12 @@ print(f"cache: {CACHE_DIR} · specialised task: {specialised['name']} ({speciali
 # %% [markdown]
 # ### The theme
 #
-# This cell sets the colours used in every figure: violet means "it works", orange "it fails, we adapt",
-# green is the hidden ground truth and teal marks scribbles, the same in every plot. Masks are drawn on a
-# grey copy of the photo, so every colour you see belongs to a mask and none to the photo.
+# This cell sets the colours used in every figure: $\color{#6A1B9A}{\blacksquare}$ violet means "it works",
+# $\color{#E65100}{\blacksquare}$ orange "it fails, we adapt",
+# $\color{#2E7D32}{\blacksquare}$ green is the hidden ground truth and $\color{#00838F}{\blacksquare}$ teal
+# marks scribbles, the same in every plot. Masks are drawn on a
+# $\color{#9E9E9E}{\blacksquare}$ grey copy of the photo, so every colour you see belongs to a mask and none
+# to the photo.
 
 # %%
 # @title Theme and image helpers { display-mode: "form" }
@@ -337,8 +340,10 @@ def load_index(dataset: dict) -> dict:
 # ### The data
 #
 # This cell reads the two datasets (pets, and the specialised task) and shows two images of each with the
-# ground truth in green and its share of the pixels in the title; the ground truth is for evaluation only.
-# Light grey marks pixels nobody scores: on the pets, the "not sure" band that the annotators drew around the
+# ground truth in $\color{#2E7D32}{\blacksquare}$ green and its share of the pixels in the title; the ground
+# truth is for evaluation only.
+# $\color{#E0E0E0}{\blacksquare}$ Light grey marks pixels nobody scores: on the pets, the "not sure" band
+# that the annotators drew around the
 # outline of each animal.
 
 # %%
@@ -855,4 +860,7 @@ image has one, else the whole image) SAM's mask covers.</div></div>
 #   evaluation only.
 # - When a cell needs a model → `dino` and `sam` are already loaded, nothing is downloaded.
 # - When you skip or fail a `...` stub → `use()` continues with our version, nothing breaks.
-# - When you read a figure → violet works, orange falls short, green is ground truth, teal is a scribble.
+# - When you read a figure → <span style="color:#6A1B9A">■</span> violet works,
+#   <span style="color:#E65100">■</span> orange falls short, <span style="color:#2E7D32">■</span> green is
+#   ground
+#   truth, <span style="color:#00838F">■</span> teal is a scribble.

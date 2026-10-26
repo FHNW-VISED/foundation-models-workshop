@@ -111,7 +111,8 @@ def show_keyed(panels: list[tuple[str, np.ndarray]], key: list[tuple[str, str]],
 #
 # The printout gives two shares that differ a little: the share of hidden *segments* is what we ask for, the
 # share of hidden vessel *pixels* is what results, because long segments hold more pixels than short ones.
-# What to look for: the teal (painted) vessels in the third picture and the green (hidden) vessels in the
+# What to look for: the $\color{#00838F}{\blacksquare}$ teal (painted) vessels in the third picture and the
+# $\color{#2E7D32}{\blacksquare}$ green (hidden) vessels in the
 # fourth together make the full ground truth in the second.
 
 # %%
@@ -441,7 +442,8 @@ plt.show()
 # %% [markdown]
 # This cell shows the naive head on its typical training image (the median by hidden vessels found).
 #
-# What to look for: how much green (missed) is left, and whether the violet (found) vessels are the thick,
+# What to look for: how much $\color{#2E7D32}{\blacksquare}$ green (missed) is left, and whether the
+# $\color{#6A1B9A}{\blacksquare}$ violet (found) vessels are the thick,
 # clear ones.
 
 # %%

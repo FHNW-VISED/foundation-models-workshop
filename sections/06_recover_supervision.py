@@ -182,8 +182,11 @@ def sam_pseudo_labels(run_sam: bool, n_clicks: int):
 #   Diagnosis only.
 # - **Marked:** the share of the fundus that the pseudo-label calls vessel (section 2 printed how much is
 #   really vessel).
-# - **Colours:** violet = a real vessel found, orange = a vessel SAM invented, green = a vessel SAM left out.
-#   Every orange and green pixel becomes a wrong training label if we take the guesses as they are.
+# - **Colours:** $\color{#6A1B9A}{\blacksquare}$ violet = a real vessel found,
+#   $\color{#E65100}{\blacksquare}$ orange = a vessel SAM invented, $\color{#2E7D32}{\blacksquare}$ green = a
+#   vessel SAM left out.
+#   Every $\color{#E65100}{\blacksquare}$ orange and $\color{#2E7D32}{\blacksquare}$ green pixel becomes a
+#   wrong training label if we take the guesses as they are.
 
 # %% [markdown]
 # This cell asks SAM for a probability map on each training image from the stroke clicks and shows one image
@@ -200,14 +203,16 @@ scrib_ex = scrib_train[0]
 # %% [markdown]
 # **Q14.** 🟡 Look at the error map and the probability panel. Where does SAM's guess go wrong: around
 # the thick vessels, along the thin ones, in the background between the strokes? Is SAM sure of itself (deep
-# violet, dark grey) or unsure (pale)? What does that mean for a cut at exactly 0.5?
+# $\color{#6A1B9A}{\blacksquare}$ violet, $\color{#424242}{\blacksquare}$ dark grey) or unsure (pale)? What
+# does that mean for a cut at exactly 0.5?
 #
 # <details><summary>What to look for</summary>
 #
 # - SAM looks for one object that contains the positive clicks (section 2.3). Forty clicks on a vessel tree
 #   do not describe one object, so SAM settles for the object that holds most of them, often the whole
-#   fundus. Its edge is careful, but the inside is a region (orange), and thin branches between the clicks can
-#   drop out (green).
+#   fundus. Its edge is careful, but the inside is a region ($\color{#E65100}{\blacksquare}$ orange), and
+#   thin branches between the clicks can
+#   drop out ($\color{#2E7D32}{\blacksquare}$ green).
 # - If the probability panel is mostly pale, the values sit just around 0.5 and the exact cut decides almost
 #   everything: a little below and the whole fundus is "vessel", a little above and nothing is. The crisp
 #   mask hides that doubt.
@@ -474,7 +479,8 @@ tune_pseudo_labels(PSEUDO_THRESHOLD, UNSURE_BAND)
 # This simulation invents a teacher that is right about the strokes but confidently calls the brightest blob
 # of the fundus (usually the optic disc) vessel. It trains one head on the strokes alone and one with that
 # blind spot, and shows both on the same held-out image (no ground truth, seconds per head). What to look
-# for: how much violet each head puts inside the orange blob.
+# for: how much $\color{#6A1B9A}{\blacksquare}$ violet each head puts inside the
+# $\color{#E65100}{\blacksquare}$ orange blob.
 
 # %%
 # @title Playful pitfall: a teacher with one confident blind spot { display-mode: "form" }
@@ -530,7 +536,8 @@ show_masks(
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# - Compare the blind-spot share in the printout with the violet inside the orange blob. If the biased head
+# - Compare the blind-spot share in the printout with the $\color{#6A1B9A}{\blacksquare}$ violet inside the
+#   $\color{#E65100}{\blacksquare}$ orange blob. If the biased head
 #   marks the blob far more than the clean head, it copied the teacher's mistake onto an image it never saw
 #   labelled.
 # - It may also mark other bright patches, because it learnt "bright and round means vessel", not "this exact
@@ -759,7 +766,8 @@ show_masks(
 #
 # This cell prints the scribble head of section 4 and the two pseudo-label heads in one table, draws their
 # error maps on the held-out demo image and writes the annotation effort for section 8: the same strokes
-# for all three. What to look for: violet is what each head got right, orange is what it invented, green is
+# for all three. What to look for: $\color{#6A1B9A}{\blacksquare}$ violet is what each head got right,
+# $\color{#E65100}{\blacksquare}$ orange is what it invented, $\color{#2E7D32}{\blacksquare}$ green is
 # what it missed. Recall is the share of the true vessels a head marks; marked is the share of the fundus it
 # covers.
 

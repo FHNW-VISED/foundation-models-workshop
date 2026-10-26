@@ -191,9 +191,11 @@ print(
 # %% [markdown]
 # ### 1.1 SAM: one click, one box
 #
-# **What the grey band is.** The Oxford pet photos come with a ground truth drawn by annotators. Around every
+# **What the $\color{#E0E0E0}{\blacksquare}$ grey band is.** The Oxford pet photos come with a ground truth
+# drawn by annotators. Around every
 # outline they added a "not sure" strip, about 10 to 20 pixels wide. A pixel in that strip is neither pet nor
-# floor: the annotator said "unknown". We do not score it, so ground-truth pictures show it in grey and a mask
+# floor: the annotator said "unknown". We do not score it, so ground-truth pictures show it in
+# $\color{#9E9E9E}{\blacksquare}$ grey and a mask
 # is judged only on the rest. The difference between "unknown" and "background" is the idea behind the whole
 # workshop.
 
@@ -206,8 +208,10 @@ print(
 # %% [markdown]
 # The cell below shows a held-out pet and takes a click, a box or a word, then draws SAM's mask with its IoU
 # against the ground truth (IoU = overlap ÷ union of the two masks: 1 is a perfect match, 0 no overlap; 1.2
-# explains it). The ◀ ▶ buttons change pet. 👁 Show ground truth colours the result: violet found, orange
-# invented, green missed, light grey not scored. Without Colab it shows one fixed click and one box instead.
+# explains it). The ◀ ▶ buttons change pet. 👁 Show ground truth colours the result:
+# $\color{#6A1B9A}{\blacksquare}$ violet found, $\color{#E65100}{\blacksquare}$ orange
+# invented, $\color{#2E7D32}{\blacksquare}$ green missed, $\color{#E0E0E0}{\blacksquare}$ light grey not
+# scored. Without Colab it shows one fixed click and one box instead.
 #
 # **Q2.** 🟢 Drive SAM on three or four pets.
 #
@@ -247,7 +251,8 @@ sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, defau
 # - Example: the predicted mask and the true mask each cover 100 pixels and share 80. The union is 120
 #   pixels, so IoU = 80 / 120 = 0.67.
 # - 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
-# - On the pets, both masks are first cut to the scored area, so the grey "not sure" band counts for nothing.
+# - On the pets, both masks are first cut to the scored area, so the $\color{#E0E0E0}{\blacksquare}$ grey
+#   "not sure" band counts for nothing.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 1 min) -->
@@ -326,8 +331,10 @@ print(
 # %% [markdown]
 # ### 1.3 What DINOv3 sees
 #
-# This cell keeps the **3 main directions (a PCA)** of each patch's 384 numbers and shows them as red, green
-# and blue, next to each photo. The same colour means the model sees those patches as similar (both cat
+# This cell keeps the **3 main directions (a PCA)** of each patch's 384 numbers and shows them as
+# $\color{#E53935}{\blacksquare}$ red, $\color{#43A047}{\blacksquare}$ green
+# and $\color{#1E88E5}{\blacksquare}$ blue, next to each photo. The same colour means the model sees those
+# patches as similar (both cat
 # ears, say). What to look for: does the animal get colours that differ from the floor, and do its parts
 # (face, body) differ from each other? The blocks are the 16 px patches.
 
@@ -475,7 +482,8 @@ def fit_pet_head(train_yourself: bool, n_pets: int, steps: int) -> tuple[list[di
 
 
 # %% [markdown]
-# This cell trains the head on the full masks of five pets, leaving out the grey band. Untick
+# This cell trains the head on the full masks of five pets, leaving out the
+# $\color{#E0E0E0}{\blacksquare}$ grey band. Untick
 # `TRAIN_PET_HEAD` to load our checkpoint instead.
 
 # %%
@@ -489,8 +497,10 @@ if head_sec > 60:
 
 # %% [markdown]
 # This cell runs the head you just trained on one training pet and shows each step (patches, one probability
-# per patch, the upsampled map, the final mask), then works through one patch by hand. The teal square marks
-# that patch; white to violet is the probability p of "pet" (white 0, violet 1). What to look for: the map in
+# per patch, the upsampled map, the final mask), then works through one patch by hand. The
+# $\color{#00838F}{\blacksquare}$ teal square marks
+# that patch; $\square$ white to $\color{#6A1B9A}{\blacksquare}$ violet is the probability p of "pet"
+# ($\square$ white 0, $\color{#6A1B9A}{\blacksquare}$ violet 1). What to look for: the map in
 # panel 2 is coarse (one value per patch), and panels 3 and 4 only smooth and threshold it.
 
 # %%
@@ -542,7 +552,8 @@ plt.show()
 # %% [markdown]
 # This cell runs the head on the held-out pets it never saw and scores it with the same IoU. The figure shows
 # SAM from the box (row 1) and the head (row 2) on the same three pets: the worst, median and best by SAM's
-# IoU. The teal rectangle is the box given to SAM. What to look for: is the spread across pets as large for
+# IoU. The $\color{#00838F}{\blacksquare}$ teal rectangle is the box given to SAM. What to look for: is the
+# spread across pets as large for
 # the head as for SAM, and are the head's edges blockier (16 px patches)?
 
 # %%

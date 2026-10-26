@@ -345,7 +345,8 @@ print(
 # - **Precision:** of the pixels the mask marks, the share that really are vessel.
 # - **Marked:** the share of the fundus (the scored area) the mask covers.
 #
-# What to look for: which rung misses vessels (green) and which invents them (orange).
+# What to look for: which rung misses vessels ($\color{#2E7D32}{\blacksquare}$ green) and which invents them
+# ($\color{#E65100}{\blacksquare}$ orange).
 
 # %%
 # @title Table and error maps of the rungs { display-mode: "form" }
@@ -396,7 +397,8 @@ show_masks(
 # %% [markdown]
 # **Q9.** 🟡 Read the table and the two error maps:
 #
-# - Which rung misses more vessels (green), and which invents more (orange)? Is the rung with the higher IoU
+# - Which rung misses more vessels ($\color{#2E7D32}{\blacksquare}$ green), and which invents more
+#   ($\color{#E65100}{\blacksquare}$ orange)? Is the rung with the higher IoU
 #   also the one with fewer of both?
 # - You need a screening tool that must not miss a vessel, and a tool whose every mark must be right. Do you
 #   pick the same rung for both?

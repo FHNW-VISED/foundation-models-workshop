@@ -585,7 +585,7 @@ def train_pu_head(labelled_share: float):
 # The next cell trains the PU head (seconds) with `LABELLED_SHARE`, the share of the vessels the annotator
 # painted, then draws two pictures: the 2 × 3 comparison of the three heads, and one chart with their recall
 # and precision. What to look for in the pictures: how many hidden vessels each head found (row 1), and how
-# much orange (invented) the finding cost on the held-out image (row 2).
+# much $\color{#E65100}{\blacksquare}$ orange (invented) the finding cost on the held-out image (row 2).
 
 # %%
 # @title Train the PU head, then compare the three recipes { display-mode: "form" }
@@ -603,9 +603,10 @@ path_chart()
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# - **Naive:** finds few hidden vessels. It was told they are background, so little orange, much green.
+# - **Naive:** finds few hidden vessels. It was told they are background, so little
+#   $\color{#E65100}{\blacksquare}$ orange, much $\color{#2E7D32}{\blacksquare}$ green.
 # - **Masked:** finds most of them, but nothing told it where a vessel ends, so the area around each vessel
-#   often turns orange.
+#   often turns $\color{#E65100}{\blacksquare}$ orange.
 # - **PU:** it hears about every pixel, so it lands between the two. Where exactly depends on the run: read
 #   your numbers.
 #
@@ -652,7 +653,8 @@ path_chart()
 # - **A label file where unpainted = background** → mark the unpainted pixels "ignore" (−1), so the hidden
 #   vessels stop being punished.
 # - **The loss ignores almost everything** → keep some known background close to the objects, and watch the
-#   "marked" share, not the training loss: hidden vessels come back, but the orange area grows.
+#   "marked" share, not the training loss: hidden vessels come back, but the
+#   <span style="color:#E65100">■</span> orange area grows.
 # - **Only positives are labelled and you can estimate their share** → use the PU loss, and sweep
 #   `LABELLED_SHARE` to see how much a wrong guess moves recall.
 # - **Annotators skip the thin or faint cases** → neither fix works and none adds information about the

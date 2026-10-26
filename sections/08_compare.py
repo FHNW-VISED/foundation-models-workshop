@@ -150,8 +150,10 @@ print(
 #
 # This cell shows every approach's mask on one held-out image, next to the image and its hidden ground truth.
 #
-# What to look for: who follows the thin vessels, who paints blobs, who marks almost nothing. Violet is
-# always a model's mask and green is the ground truth. A title's colour is the approach's colour in the
+# What to look for: who follows the thin vessels, who paints blobs, who marks almost nothing.
+# $\color{#6A1B9A}{\blacksquare}$ Violet is
+# always a model's mask and $\color{#2E7D32}{\blacksquare}$ green is the ground truth. A title's colour is
+# the approach's colour in the
 # charts below.
 
 # %%
@@ -472,7 +474,8 @@ plt.show()
 
 # %% [markdown]
 # This cell shows the IoU winner on its **worst**, **typical** (median) and **best** held-out image, as error
-# maps. What to look for: what the winner invents (orange) and what it misses (green) when it fails, against
+# maps. What to look for: what the winner invents ($\color{#E65100}{\blacksquare}$ orange) and what it misses
+# ($\color{#2E7D32}{\blacksquare}$ green) when it fails, against
 # when it works.
 
 # %%
