@@ -18,3 +18,4 @@ Never edit a version folder.
 | v09 | 2026-10-26 | AMLD only: SDS 2027 mention removed | 2a2f8b1 |
 | v10 | 2026-10-26 | AMLD only + colour swatches next to every colour named in text (N-059) | 3625d93 |
 | v11 | 2026-10-26 | SAM 3 downloads itself into the cache when HF_TOKEN is set | 6d44a0d |
+| v12 | 2026-10-26 | Review round 3: plain numbers, panel tags, blue score maps, one-shot browser, Q15 both predictions, 10.3 state of the art, rules N-060–N-067 | 2b757ec |
