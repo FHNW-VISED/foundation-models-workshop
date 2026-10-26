@@ -82,8 +82,10 @@ def mean_scores(scores: list[dict]) -> dict:
 
 
 def marked_pct(pred: np.ndarray, item: dict) -> str:
-    """How much of the evaluation region a prediction marks, e.g. "marked 98 %"."""
-    return f"marked {100 * pred[region(item)].mean():.0f} %"
+    """How much of the evaluation region a prediction calls vessel, next to the truth, e.g.
+    "calls 98 % vessel (really 11 %)"."""
+    r = region(item)
+    return f"calls {100 * pred[r].mean():.0f} % vessel (really {100 * item['mask'][r].mean():.0f} %)"
 
 
 def recall_of(pred: np.ndarray, item: dict) -> float:
@@ -93,13 +95,13 @@ def recall_of(pred: np.ndarray, item: dict) -> float:
 
 
 MARKED_NOTE = (
-    "marked = share of the fundus (the photo inside the black ring) that the mask covers · "
-    "recall = share of the true vessel pixels it finds"
+    "calls … vessel = share of the fundus (the photo inside the black ring) the mask calls vessel, "
+    "next to the share that really is · recall = share of the true vessel pixels it finds"
 )
 
 
 def pred_title(label: str, pred: np.ndarray, item: dict) -> str:
-    """Panel title on three short lines: what made the mask, IoU and recall, then the share marked."""
+    """Panel title on three short lines: what made the mask, IoU and recall, then the share called vessel."""
     r = region(item)
     return (
         f"{label}\nIoU {iou(pred & r, item['mask'] & r):.2f} · recall {recall_of(pred, item):.2f}\n"
@@ -516,14 +518,15 @@ RESULTS["specialised_zero_shot_seconds"] = spec_sec
 vessel_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
 print(f"SAM prompt ladder on {len(spec_eval)} held-out images · {spec_sec} s on {DEVICE}")
 print(
-    "marked = share of the fundus the mask covers "
-    f"(100 % = the whole eye; the vessels cover about {vessel_share:.0%})"
+    "calls vessel = share of the fundus the mask calls vessel "
+    f"(100 % = the whole eye; the vessels really cover about {vessel_share:.0%})"
 )
 print("recall = share of the true vessel pixels the mask finds")
-print(f"{'setting':<12}{'IoU':>7}{'recall':>8}{'marked':>8}")
+print(f"{'setting':<12}{'IoU':>7}{'recall':>8}{'calls vessel':>14}")
 for name, v in ladder_mean.items():
-    print(f"{name:<12}{v['iou']:>7.3f}{np.mean(ladder_recall[name]):>8.3f}{np.mean(ladder_cover[name]):>8.0%}")
-print(f"{'everything':<12}{everything_mean['iou']:>7.3f}{1:>8.3f}{1:>8.0%}")
+    print(f"{name:<12}{v['iou']:>7.3f}{np.mean(ladder_recall[name]):>8.3f}{np.mean(ladder_cover[name]):>14.0%}")
+print(f"{'everything':<12}{everything_mean['iou']:>7.3f}{1:>8.3f}{1:>14.0%}")
+print(f"{'truth':<12}{'':>15}{vessel_share:>14.0%}")
 box_marked = float(np.mean(ladder_cover["box"]))
 if abs(ladder_mean["box"]["iou"] - everything_mean["iou"]) < 0.02:
     print(
@@ -655,7 +658,7 @@ TRAIN_SPEC_HEADS = True  # @param {type:"boolean"}
 spec_train, spec_heads = fit_spec_heads(TRAIN_SPEC_HEADS)
 
 # %% [markdown]
-# This cell scores both heads on the evaluation images and prints mean IoU, recall and marked per
+# This cell scores both heads on the evaluation images and prints mean IoU, recall and "calls vessel" per
 # resolution, next to SAM's one box. What to look for: does doubling the resolution add more than 0.05 to
 # IoU, and does recall rise with it?
 
@@ -686,13 +689,13 @@ RESULTS["resolution_effect"] = {f"{side} px": v for side, v in res_scores.items(
 for side, v in res_scores.items():
     print(
         f"linear head @ {side:>4} px · mean IoU {v['iou']:.3f} · recall {res_recall[side]:.3f} · "
-        f"marked {res_marked[side]:.0%}"
+        f"calls {res_marked[side]:.0%} of the fundus vessel"
     )
 print(
     f"SAM one box · mean IoU {ladder_mean['box']['iou']:.3f} · recall {np.mean(ladder_recall['box']):.3f} · "
-    f"marked {np.mean(ladder_cover['box']):.0%}"
+    f"calls {np.mean(ladder_cover['box']):.0%} of the fundus vessel"
 )
-print("(marked = share of the fundus the mask covers; recall = share of the true vessel pixels it finds)")
+print(f"(really vessel: {fg_share:.0%} of the fundus; recall = share of the true vessel pixels a mask finds)")
 
 # %% [markdown]
 # This cell puts the section-1 pet numbers next to this section's vessel numbers, for the same two tools

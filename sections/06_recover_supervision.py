@@ -57,16 +57,19 @@ approach_names |= {
     "gradcam_pseudo": "pseudo-labels: Grad-CAM of a tile classifier",
 }
 
-# one scale for every map of this section: violet = high (1), white = 0.5, dark grey = low (0); no orange,
-# because orange means "invented" in the error maps
-prob_cmap = mpl.colors.LinearSegmentedColormap.from_list("prob", ["#455A64", "white", THEME["works"]])
-prob_key = [("high (1)", THEME["works"]), ("0.5: unsure / at the cut", "white"), ("low (0)", "#455A64")]
+# every map of this section uses the shared score scale of section 0: blue = 1, white = 0.5, dark grey = 0
+# (blue, so a score map never shares a colour with the violet "found" of the error maps)
+prob_key = [
+    ("score map: 1 = sure it is vessel", THEME["score"]),
+    ("score map: 0.5 = unsure", "white"),
+    ("score map: 0 = sure it is not", "#424242"),
+]
 error_key = ["found", "invented", "missed"]  # the error-map legend: violet, orange, green
 
 
 def prob_rgb(prob: np.ndarray) -> np.ndarray:
-    """A probability map as RGB on a fixed scale: violet = 1, white = 0.5 (unsure), dark grey = 0."""
-    return (prob_cmap(np.clip(prob, 0, 1))[..., :3] * 255).astype(np.uint8)
+    """A probability map as RGB on the shared score scale: blue = 1, white = 0.5 (unsure), dark grey = 0."""
+    return (score_cmap(np.clip(prob, 0, 1))[..., :3] * 255).astype(np.uint8)
 
 
 def stroke_points(item: dict, value: int, n: int) -> list[list[float]]:
@@ -162,29 +165,41 @@ def sam_pseudo_labels(run_sam: bool, n_clicks: int):
     spread = np.quantile(
         np.concatenate([p[region(it)] for p, it in zip(probs, scrib_train, strict=True)]), [0.05, 0.5, 0.95]
     )
+    train_truth = float(np.mean([it["mask"][region(it)].mean() for it in scrib_train]))
     print(
         f"SAM pseudo-labels on {len(scrib_train)} training images · {src} · {sec} s on {DEVICE}\n"
-        f"SAM's probability inside the fundus · 5 % of the pixels below {spread[0]:.2f} · median "
-        f"{spread[1]:.2f} · 95 % below {spread[2]:.2f}\n"
-        f"diagnosis (truth used to score only): at 0.5 the pseudo-labels have IoU {quality['iou']:.3f} · "
-        f"recall {quality['recall']:.2f} · marked {quality['marked']:.0%} of the fundus"
+        f"how sure SAM is: 90 % of the fundus pixels get a probability between {spread[0]:.2f} and "
+        f"{spread[2]:.2f} (middle value {spread[1]:.2f})\n"
+        f"checked against the truth (never used for training), cutting at 0.5: the pseudo-labels "
+        f"{called_vessel(quality['marked'], train_truth)} · recall {quality['recall']:.2f} · "
+        f"IoU {quality['iou']:.3f}"
     )
     scrib_ex, (pos, neg) = scrib_train[0], clicks_used[0]
-    show_clicks(
-        [
-            (f"{scrib_ex['name']}\nvessel clicks", scrib_ex["image"], pos),
-            ("background clicks", scrib_ex["image"], neg),
-            ("SAM's probability", prob_rgb(probs[0]), None),
-            (
-                "pseudo-label at 0.5\nvs ground truth",
-                error_map(scrib_ex["image"], probs[0] >= 0.5, scrib_ex),
-                None,
-            ),
-        ],
-        width=2.8,
-        legend=[("click", "click (the panel title says which kind)"), *prob_key, *error_key],
-        note="probability panel: violet = SAM sure it is vessel, white = unsure, dark grey = sure it is not",
+    fig, axes = plt.subplots(1, 3, figsize=(10.2, 3.6))
+    axes[0].imshow(scrib_ex["image"])
+    for (x, y), kind in [(xy, 1) for xy in pos] + [(xy, 0) for xy in neg]:
+        if kind:
+            axes[0].plot(x, y, marker="*", ms=10, color=THEME["scribble"], mec="white", ls="")
+        else:
+            axes[0].plot(x, y, marker="X", ms=8, color="#424242", mec="white", ls="")
+    axes[0].set_title(
+        f"{scrib_ex['name']} · what SAM gets:\n{len(pos)} vessel + {len(neg)} background clicks", fontsize=9
     )
+    im = axes[1].imshow(np.clip(probs[0], 0, 1), cmap=score_cmap, vmin=0, vmax=1)
+    axes[1].set_title("what SAM answers: probability of vessel\n(pale = unsure, near 0.5)", fontsize=9)
+    fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.02, ticks=[0, 0.5, 1]).ax.tick_params(labelsize=7)
+    axes[2].imshow(error_map(scrib_ex["image"], probs[0] >= 0.5, scrib_ex))
+    axes[2].set_title("pseudo-label (probability ≥ 0.5)\ncompared with the ground truth", fontsize=9)
+    for ax, role in zip(axes, ("input", "map", "errors"), strict=True):
+        ax.axis("off")
+        tag_panel(ax, role)
+    add_key(
+        fig,
+        [("click", "vessel click"), ("background click (X)", "#424242"), *error_key],
+        note="The colour bar reads the middle panel: blue = sure it is vessel, white = unsure, "
+        "dark grey = sure it is not.",
+    )
+    plt.show()
     return probs, clicks_used, sec, quality
 
 
@@ -194,19 +209,18 @@ def sam_pseudo_labels(run_sam: bool, n_clicks: int):
 # them saying "not here". Will its mask follow the vessels, or cover a region around them? Write one guess.
 
 # %% [markdown]
-# How to read the printout and the last panel of the next cell:
+# The next cell draws three panels, left to right: what SAM gets (the photo and the clicks), what it answers
+# (a probability per pixel), and the pseudo-label you get by cutting that probability at 0.5, checked
+# against the truth. The printout says the same in numbers:
 #
-# - **Probability spread:** the 5 %, 50 % and 95 % points of SAM's probability over the fundus pixels. Near 0
-#   or 1 means sure, near 0.5 means unsure.
-# - **IoU, recall:** overlap with the hidden truth, and the share of the true vessels the pseudo-label covers.
-#   Diagnosis only.
-# - **Marked:** the share of the fundus that the pseudo-label calls vessel (section 2 printed how much is
-#   really vessel).
-# - **Colours:** $\color{#6A1B9A}{\blacksquare}$ violet = a real vessel found,
+# - **How sure SAM is:** 90 % of the pixels fall between the two printed values. Values near 0 or 1 mean
+#   sure, near 0.5 unsure.
+# - **Calls … vessel:** how much of the fundus the pseudo-label calls vessel, next to how much really is.
+# - **Colours in the last panel:** $\color{#6A1B9A}{\blacksquare}$ violet = a real vessel found,
 #   $\color{#E65100}{\blacksquare}$ orange = a vessel SAM invented, $\color{#2E7D32}{\blacksquare}$ green = a
-#   vessel SAM left out.
-#   Every $\color{#E65100}{\blacksquare}$ orange and $\color{#2E7D32}{\blacksquare}$ green pixel becomes a
-#   wrong training label if we take the guesses as they are.
+#   vessel SAM left out. Every $\color{#E65100}{\blacksquare}$ orange and
+#   $\color{#2E7D32}{\blacksquare}$ green pixel becomes a wrong training label if we take the guesses as
+#   they are.
 
 # %% [markdown]
 # This cell asks SAM for a probability map on each training image from the stroke clicks and shows one image
@@ -223,7 +237,7 @@ scrib_ex = scrib_train[0]
 # %% [markdown]
 # **Q14.** 🟡 Look at the error map and the probability panel. Where does SAM's guess go wrong: around
 # the thick vessels, along the thin ones, in the background between the strokes? Is SAM sure of itself (deep
-# $\color{#6A1B9A}{\blacksquare}$ violet, $\color{#424242}{\blacksquare}$ dark grey) or unsure (pale)? What
+# $\color{#1565C0}{\blacksquare}$ blue, $\color{#424242}{\blacksquare}$ dark grey) or unsure (pale)? What
 # does that mean for a cut at exactly 0.5?
 #
 # <details><summary>What to look for</summary>
@@ -276,7 +290,8 @@ def draw_cut_and_band(cut: float, band: float) -> None:
     ax.set_yticks([])
     ax.set_xlabel("SAM's probability for a pixel")
     ax.set_title(
-        f"cut {cut}, band {band}\nbelow {cut - band:g} → 0 · between → −1 · from {cut + band:g} → 1",
+        f"cut {cut}, band {band}: below {cut - band:g} a pixel becomes background,\n"
+        f"from {cut + band:g} vessel, and in between it is ignored",
         fontsize=9,
     )
     plt.tight_layout()
@@ -352,7 +367,8 @@ sam_head, sam_sec, sam_targets = train_sam_head(TRAIN_SAM_HEAD)
 # %% [markdown]
 # This cell scores the new head on the held-out images and prints it under the scribble head, which saw the
 # same strokes but kept every other pixel unknown. Columns: **IoU** (overlap with the truth), **recall** (the
-# share of the true vessels it marks) and **marked** (the share of the fundus it covers).
+# share of the true vessels it finds) and **calls vessel** (the share of the fundus it calls vessel; the last
+# line says how much really is).
 
 # %%
 # @title Score the SAM pseudo-label head on the held-out images { display-mode: "form" }
@@ -381,11 +397,12 @@ RESULTS["sam_pseudo_head"] = path2_report["sam_pseudo"] | {
 
 
 def print_path2(reports: dict) -> None:
-    """One line per head: IoU, recall and marked share of the fundus (held-out images)."""
-    print(f"{'approach':<46}{'IoU':>6}{'recall':>8}{'marked':>8}")
+    """One line per head on the held-out images: IoU, recall and the share of the fundus it calls vessel."""
+    print(f"{'approach (held-out images)':<46}{'IoU':>6}{'recall':>8}{'calls vessel':>14}")
     for k, v in reports.items():
         name = approach_names.get(k, k)
-        print(f"{name:<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>8.0%}")
+        print(f"{name:<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>14.0%}")
+    print(f"{'really vessel (the ground truth)':<46}{'':>14}{fg_share:>14.0%}")
 
 
 print_path2(path2_report)
@@ -434,12 +451,48 @@ def tune_pseudo_labels(threshold: float, band: float) -> None:
     ]
     tuned_report = rung_report(tuned_preds)
     RESULTS["sam_pseudo_tuned"] = tuned_report | {"threshold": threshold, "band": band}
-    print(f"{'targets on the training images':<46}{'ignored':>8}{'vessel → bg':>13}{'bg → vessel':>13}")
-    for name, t in {"threshold 0.5, no band": sam_targets, "your setting": tuned_targets}.items():
+    yours = f"yours (cut {threshold:g}, band {band:g})"
+    print("1 · the labels the head trains on (training images, checked against the truth):")
+    print(f"{'':<30}{'ignored':>10}{'true vessel':>14}{'true background':>18}")
+    print(f"{'':<30}{'':>10}{'labelled bg':>14}{'labelled vessel':>18}")
+    for name, t in {"usual (cut 0.5, no band)": sam_targets, yours: tuned_targets}.items():
         e = target_errors(t)
-        print(f"{name:<46}{e['ignored']:>8.0%}{e['vessel_as_bg']:>13.0%}{e['bg_as_vessel']:>13.0%}")
-    print(f"\nyour head: threshold {threshold}, band {band} · trained in {tuned_sec:.1f} s")
-    print_path2({"threshold 0.5, no band": path2_report["sam_pseudo"], "your setting": tuned_report})
+        print(f"{name:<30}{e['ignored']:>10.0%}{e['vessel_as_bg']:>14.0%}{e['bg_as_vessel']:>18.0%}")
+    print(f"\n2 · the head trained on them, on the held-out images (trained in {tuned_sec:.1f} s):")
+    print_path2({"usual (cut 0.5, no band)": path2_report["sam_pseudo"], yours: tuned_report})
+    if threshold == 0.5 and band == 0:
+        print("\nℹ️ Your setting equals the usual one: move a slider, then run this cell again.")
+    k_demo = next(i for i, it in enumerate(spec_eval) if it is demo)
+    ex = scrib_train[0]
+
+    def label_view(t: np.ndarray) -> np.ndarray:
+        """Training labels as three flat colours: vessel teal, background dark grey, ignored light grey."""
+        out = np.full((*t.shape, 3), 224, np.uint8)  # ignored (−1) and outside the fundus
+        out[t == 0] = (hex_rgb("#616161") * 255).astype(np.uint8)
+        out[t == 1] = (hex_rgb(THEME["scribble"]) * 255).astype(np.uint8)
+        return out
+
+    def label_title(name: str, t: np.ndarray) -> str:
+        r = region(ex)
+        return (f"labels, {name}\nvessel {(t == 1)[r].mean():.0%} · background {(t == 0)[r].mean():.0%} · "
+                f"ignored {(t < 0)[r].mean():.0%}")
+
+    show_masks(
+        [
+            (label_title("usual", sam_targets[0]), label_view(sam_targets[0])),
+            (label_title("yours", tuned_targets[0]), label_view(tuned_targets[0])),
+            (rung_title("head, usual", path2_preds["sam_pseudo"][k_demo], demo),
+             error_map(demo["image"], path2_preds["sam_pseudo"][k_demo], demo)),
+            (rung_title("head, yours", tuned_preds[k_demo], demo),
+             error_map(demo["image"], tuned_preds[k_demo], demo)),
+        ],
+        width=2.9,
+        roles=["input", "input", "errors", "errors"],
+        legend=[("label: vessel", THEME["scribble"]), ("label: background", "#616161"),
+                ("label: ignored (−1)", "#E0E0E0"), "found", "invented", "missed"],
+        note=f"Left: what each head is told on training image {ex['name']}. "
+        "Right: what each head then predicts on the held-out demo image.",
+    )
 
 
 # %% [markdown]
@@ -457,10 +510,16 @@ def tune_pseudo_labels(threshold: float, band: float) -> None:
 # Both are sliders in the next cell: move one, then run it again.
 
 # %% [markdown]
-# This cell trains the same head on targets made with your setting and prints it under the head at 0.5, with
-# three diagnosis columns from the hidden truth on the training images: **ignored** (the share of the fundus
-# set to −1), **vessel → bg** (the share of true vessel pixels that got label 0) and **bg → vessel** (the
-# share of true background pixels that got label 1).
+# This cell trains the same head on labels made with your setting and compares it with the usual one (cut
+# 0.5, no band), in two steps:
+#
+# 1. **The labels**, checked against the hidden truth on the training images: the share of the fundus
+#    **ignored** (−1), the share of the true vessel pixels **labelled background**, and the share of the true
+#    background **labelled vessel**. Lower is better for the last two.
+# 2. **The heads** trained on those labels, on the held-out images, and a picture: the labels of one training
+#    image for both settings, then both heads' predictions on the demo image.
+#
+# Colab does not rerun the cell when you move a slider: move it, then press ▶.
 
 # %%
 # @title Q15 — tune the pseudo-label threshold and the unsure band { display-mode: "form" }
@@ -470,9 +529,9 @@ tune_pseudo_labels(PSEUDO_THRESHOLD, UNSURE_BAND)
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pair moment (optional, 4 min) -->
-# One of you tries a low cut (`PSEUDO_THRESHOLD = 0.55`), the other a high one (`0.7`). Compare your **vessel
-# → bg** and **bg → vessel** columns: which kind of wrong label did each of you buy, and what happened to the
-# held-out line?
+# One of you tries a low cut (`PSEUDO_THRESHOLD = 0.55`), the other a high one (`0.7`). Compare your two
+# error columns (true vessel labelled background, true background labelled vessel): which kind of wrong
+# label did each of you buy, and what happened to the held-out line?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -750,12 +809,14 @@ RESULTS["gradcam_head"] = path2_report["gradcam_pseudo"] | {
     "pseudo_sec": cam_sec,
     "infer_sec": cam_infer,
 }
+cam_truth = float(np.mean([it["mask"][region(it)].mean() for it in scrib_train]))
 print(
-    f"Grad-CAM pseudo-labels · {cam_sec} s · diagnosis (truth used to score only): "
-    f"IoU {cam_quality['iou']:.3f} · recall {cam_quality['recall']:.2f} · marked "
-    f"{cam_quality['marked']:.0%} of the fundus on the training "
-    f"images (SAM at 0.5: IoU {sam_quality['iou']:.3f} · recall {sam_quality['recall']:.2f} · marked "
-    f"{sam_quality['marked']:.0%})"
+    f"Grad-CAM pseudo-labels made in {cam_sec} s. Checked against the truth on the training images "
+    f"(never used for training):\n"
+    f"  Grad-CAM labels: IoU {cam_quality['iou']:.3f} · recall {cam_quality['recall']:.2f} · "
+    f"{called_vessel(cam_quality['marked'], cam_truth)}\n"
+    f"  SAM labels (cut 0.5): IoU {sam_quality['iou']:.3f} · recall {sam_quality['recall']:.2f} · "
+    f"{called_vessel(sam_quality['marked'], cam_truth)}"
 )
 print(f"Grad-CAM head trained in {cam_head_sec:.1f} s on {DEVICE}")
 print_path2(path2_report)
@@ -770,8 +831,10 @@ show_masks(
         ("SAM pseudo-label\nvs ground truth", error_map(scrib_ex["image"], sam_targets[0] == 1, scrib_ex)),
     ],
     width=2.8,
+    roles=["input", "map", "errors", "errors"],
     legend=[*prob_key, *error_key],
-    note="Grad-CAM map: violet = strongest evidence for vessel (the pseudo-label keeps the top half)",
+    note="Grad-CAM map: blue = strongest evidence for vessel; the pseudo-label keeps every pixel above "
+    "half the peak.",
 )
 
 # %% [markdown]
@@ -798,8 +861,8 @@ show_masks(
 # error maps on the held-out demo image and writes the annotation effort for section 8: the same strokes
 # for all three. What to look for: $\color{#6A1B9A}{\blacksquare}$ violet is what each head got right,
 # $\color{#E65100}{\blacksquare}$ orange is what it invented, $\color{#2E7D32}{\blacksquare}$ green is
-# what it missed. Recall is the share of the true vessels a head marks; marked is the share of the fundus it
-# covers.
+# what it missed. Recall is the share of the true vessels a head finds; "calls … vessel" is the share of the
+# fundus it calls vessel, next to the share that really is.
 
 # %%
 # @title Path 2 side by side: table and error maps { display-mode: "form" }
@@ -815,12 +878,12 @@ print(
 
 
 def head_title(label: str, pred: np.ndarray, item: dict) -> str:
-    """Panel title: the head, then its IoU, recall and marked share on this image."""
+    """Panel title: the head, then its IoU, recall and the share of this fundus it calls vessel."""
     r = region(item)
     p, t = pred & r, item["mask"] & r
     return (
-        f"{label}\nIoU {score(pred, item)['iou']:.2f} · recall {hidden_recall(p, t):.2f} · "
-        f"marked {100 * p[r].mean():.0f} %"
+        f"{label}\nIoU {score(pred, item)['iou']:.2f} · recall {hidden_recall(p, t):.2f}\n"
+        f"calls {100 * p[r].mean():.0f} % vessel (really {100 * t[r].mean():.0f} %)"
     )
 
 
@@ -834,8 +897,10 @@ show_masks(
     ]
     + [("ground truth\n(every vessel, green)", overlay(demo["image"], demo["mask"], THEME["truth"]))],
     width=2.8,
+    roles=["errors"] * len(path2_preds) + ["truth"],
     legend=error_key,
-    note="held-out demo image · recall = true vessels found · marked = share of the fundus covered",
+    note="held-out demo image · recall = true vessels found · calls … vessel = share of the fundus it "
+    "calls vessel",
 )
 
 # %% [markdown]

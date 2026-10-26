@@ -113,13 +113,16 @@ def path_report(tensors: dict) -> dict:
 
 
 def print_reports(reports: dict) -> None:
-    """One line per head: recall on the hidden / visible training vessels, then the held-out numbers."""
-    print(f"{'head':<34}{'recall: hidden':>15}{'visible':>9}   held-out IoU  recall  marked")
+    """One line per head: on the training images, the share of the hidden and of the painted vessels it finds;
+    on the held-out images, IoU, recall and the share of the fundus it calls vessel."""
+    print(f"{'':<34}{'training images · found':^26}   {'held-out images':^30}")
+    print(f"{'head':<34}{'hidden':>12}{'painted':>12}   {'IoU':>7}{'recall':>9}{'calls vessel':>14}")
     for name, r in reports.items():
         print(
-            f"{name:<34}{r['recall_hidden_fit']:>15.3f}{r['recall_visible_fit']:>9.3f}   {r['iou']:>12.3f}"
-            f"{r['recall']:>8.3f}{r['marked']:>8.0%}"
+            f"{name:<34}{r['recall_hidden_fit']:>12.0%}{r['recall_visible_fit']:>12.0%}   {r['iou']:>7.3f}"
+            f"{r['recall']:>9.0%}{r['marked']:>14.0%}"
         )
+    print(f"{'really vessel (the ground truth)':<34}{'':>24}   {'':>16}{fg_share:>14.0%}")
 
 
 def public(r: dict) -> dict:
@@ -353,8 +356,8 @@ RESULTS["masked_head"] = public(masked) | {
 print_reports(path_reports)
 truth_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
 print(
-    f"the true vessels cover {truth_share:.1%} of the fundus · the masked head marks {masked['marked']:.1%} "
-    f"· the naive head {path_reports[approach_names['naive']]['marked']:.1%}"
+    f"the true vessels cover {truth_share:.1%} of the fundus · the masked head calls {masked['marked']:.1%} "
+    f"of it vessel · the naive head {path_reports[approach_names['naive']]['marked']:.1%}"
 )
 
 # annotation effort of the three Path 1 heads, for the comparison table of section 8: the painted half of
@@ -375,7 +378,7 @@ print(
 # %% [markdown]
 # <!-- callout: pitfall | Pitfall: "ignore" is not free -->
 # Remove the background strokes and the masked loss hears only "vessel": a head that paints the whole eye
-# scores a loss near zero. Watch the "marked" share, not the training loss.
+# scores a loss near zero. Watch how much of the fundus the head calls vessel, not the training loss.
 
 # %%
 # @title A fake head that always answers "vessel" { display-mode: "form" }
@@ -539,42 +542,66 @@ def path_chart(names: list[str] | None = None) -> None:
     plt.show()
 
 
+def hidden_error_map(item: dict, pred: np.ndarray) -> np.ndarray:
+    """A training image scored on what the label file did not say: hidden vessels found (violet) or missed
+    (green), background called vessel (orange); the painted vessels are not scored here (light grey)."""
+    r = region(item)
+    painted, hidden = item["visible"] & r, item["hidden"] & r
+    out = overlay(item["image"], pred & hidden, THEME["works"], unscored=~r | painted)
+    out = overlay(out, pred & ~item["mask"] & r, THEME["fails"])
+    return overlay(out, hidden & ~pred, THEME["truth"])
+
+
 def recipe_comparison() -> None:
-    """2 x 3 figure for the naive, masked and PU head. Row 1: the hidden vessels each head found on training
-    image 0. Row 2: its error map on the held-out demo image. Uses the stored predictions; no training."""
+    """2 x 4 figure. Column 1: what the heads were given (the label file of training image 0) and the truth of
+    the held-out demo image. Then one column per head (naive, masked, PU). Row 1: training image 0, scored on
+    the hidden vessels and the background. Row 2: the held-out demo image. Stored predictions; no training."""
     k_demo = next(i for i, e in enumerate(spec_eval) if e is demo)
-    train, truth = miss_train[0], demo["mask"] & region(demo)
-    hidden = train["hidden"] & region(train)
-    base = overlay(train["image"], train["visible"], THEME["scribble"])
-    fig, axes = plt.subplots(2, 3, figsize=(10.5, 7.2))
+    train, r_demo = miss_train[0], region(demo)
+    fig, axes = plt.subplots(2, 4, figsize=(12.4, 7.0))
+    axes[0, 0].imshow(overlay(train["image"], train["visible"] & region(train), THEME["scribble"]))
+    axes[0, 0].set_title("training image · the label file\n(painted vessels only)", fontsize=9)
+    tag_panel(axes[0, 0], "input")
+    axes[1, 0].imshow(overlay(demo["image"], demo["mask"], THEME["truth"], unscored=~r_demo))
+    axes[1, 0].set_title(f"held-out image · ground truth\nreally vessel: {demo['mask'][r_demo].mean():.0%}",
+                         fontsize=9)
+    tag_panel(axes[1, 0], "truth")
     lab = {"naive": "naive", "masked": "masked", "pu": "PU"}.get
-    for col, key in enumerate(("naive", "masked", "pu")):
+    for col, key in enumerate(("naive", "masked", "pu"), start=1):
         report = path_reports[approach_names[key]]
-        fit = report["fit_preds"][0]
-        found, missed = hidden & fit, hidden & ~fit
-        axes[0, col].imshow(overlay(overlay(base, found, THEME["works"]), missed, THEME["truth"]))
+        fit, held = report["fit_preds"][0], report["held_preds"][k_demo]
+        r_fit = region(train)
+        bg_called = (fit & ~train["mask"] & r_fit).sum() / max((~train["mask"] & r_fit).sum(), 1)
+        axes[0, col].imshow(hidden_error_map(train, fit))
         axes[0, col].set_title(
-            f"{lab(key)} head · training image\nhidden vessels found {hidden_recall(fit, hidden):.0%}",
-            fontsize=9,
+            f"{lab(key)} head · training image\nhidden vessels found "
+            f"{hidden_recall(fit, train['hidden'] & r_fit):.0%}\nbackground called vessel {bg_called:.0%}",
+            fontsize=8,
         )
-        held = report["held_preds"][k_demo]
+        tag_panel(axes[0, col], "errors")
         axes[1, col].imshow(error_map(demo["image"], held, demo))
         axes[1, col].set_title(
-            f"{lab(key)} head · held-out image\nIoU {score(held, demo)['iou']:.2f} · found "
-            f"{hidden_recall(held, truth):.0%} · {marked_pct(held, demo)}",
-            fontsize=9,
+            f"{lab(key)} head · held-out image\nIoU {score(held, demo)['iou']:.2f} · recall "
+            f"{hidden_recall(held, demo['mask'] & r_demo):.0%}\ncalls {held[r_demo].mean():.0%} vessel "
+            f"(really {demo['mask'][r_demo].mean():.0%})",
+            fontsize=8,
         )
+        tag_panel(axes[1, col], "errors")
     for ax in axes.ravel():
-        ax.axis("off")
+        if not ax.texts:  # untagged panels only
+            ax.axis("off")
     add_key(
         fig,
         [
-            ("painted, in the label file (row 1)", THEME["scribble"]),
+            ("painted vessel: in the label file (input)", THEME["scribble"]),
+            ("ground truth (held-out image)", THEME["truth"]),
             "found",
+            "invented",
             "missed",
-            ("invented", "invented (row 2: prediction only)"),
+            ("not scored (outside the fundus; row 1 also the painted vessels)", "#E0E0E0"),
         ],
-        note="Row 1: only the hidden vessels are scored. Row 2: only the round fundus is scored.",
+        note="Row 1 asks what each head did where the label file was silent; row 2 asks how it does on a new "
+        "image.",
     )
     plt.show()
 
@@ -620,9 +647,16 @@ def train_pu_head(labelled_share: float):
 
 # %% [markdown]
 # The next cell trains the PU head (seconds) with `LABELLED_SHARE`, the share of the vessels the annotator
-# painted, then draws two pictures: the 2 × 3 comparison of the three heads, and one chart with their recall
-# and precision. What to look for in the pictures: how many hidden vessels each head found (row 1), and how
-# much $\color{#E65100}{\blacksquare}$ orange (invented) the finding cost on the held-out image (row 2).
+# painted, then draws two pictures: the comparison of the three heads, and one chart with their recall
+# and precision.
+#
+# How to read the comparison. The first column is the reference: on top, the label file the heads were
+# trained on (only the painted vessels); below, the true vessels of a held-out image. Then one column per
+# head. Row 1 scores each head on the training image, only where the label file was silent: a hidden vessel
+# it found is $\color{#6A1B9A}{\blacksquare}$ violet, one it missed $\color{#2E7D32}{\blacksquare}$ green, and
+# background it called vessel $\color{#E65100}{\blacksquare}$ orange. Row 2 is the same head on the held-out
+# image. What to look for: who finds the hidden vessels in row 1, and how much
+# $\color{#E65100}{\blacksquare}$ orange that costs in both rows.
 
 # %%
 # @title Train the PU head, then compare the three recipes { display-mode: "form" }

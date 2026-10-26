@@ -127,14 +127,20 @@ def direct_boxes(items: list[dict], pad: int, with_click: bool) -> tuple[list[np
     return preds, prompts
 
 
-def show_boxes(panels: list[tuple], width: float = 3.2, legend: list | None = None, note: str | None = None):
+def show_boxes(
+    panels: list[tuple], width: float = 3.2, legend: list | None = None, note: str | None = None,
+    roles: list | None = None,
+):
     """One row of panels (title, RGB image, boxes or None[, clicks]); boxes and clicks are drawn in teal.
-    `legend` and `note` are the colour key of add_key() under the figure."""
+    `legend` and `note` are the colour key of add_key() under the figure; `roles` one corner tag per panel."""
     fig, axes = plt.subplots(1, len(panels), figsize=(width * len(panels), width))
-    for ax, (title, img, boxes, *extra) in zip(np.atleast_1d(axes), panels, strict=True):
+    for ax, (title, img, boxes, *extra), role in zip(
+        np.atleast_1d(axes), panels, roles or [None] * len(panels), strict=True
+    ):
         ax.imshow(img)
         ax.set_title(title, fontsize=9)
         ax.axis("off")
+        tag_panel(ax, role)
         for x0, y0, x1, y1 in boxes or []:
             ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=1, color=THEME["scribble"]))
         for x, y in extra[0] if extra and extra[0] else []:
@@ -144,10 +150,11 @@ def show_boxes(panels: list[tuple], width: float = 3.2, legend: list | None = No
 
 
 def print_path3(reports: dict) -> None:
-    """One line per approach: IoU, recall and marked (the share of the fundus the mask covers)."""
-    print(f"{'approach':<46}{'IoU':>6}{'recall':>8}{'marked':>8}")
+    """One line per approach: IoU, recall and the share of the fundus the mask calls vessel."""
+    print(f"{'approach (held-out images)':<46}{'IoU':>6}{'recall':>8}{'calls vessel':>14}")
     for k, v in reports.items():
-        print(f"{approach_names.get(k, k):<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>8.0%}")
+        print(f"{approach_names.get(k, k):<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>14.0%}")
+    print(f"{'really vessel (the ground truth)':<46}{'':>14}{fg_share:>14.0%}")
 
 
 def try_boxes(box_pad: int, with_click: bool) -> None:
@@ -196,7 +203,8 @@ print(f"{'section 2: SAM, 20 vessel clicks only (IoU)':<46}{RESULTS['sam_prompt_
 print(f"{'everything is foreground (IoU)':<46}{RESULTS['specialised_everything_iou']:>6.3f}")
 
 # %% [markdown]
-# **What to look for.** Read *marked* first. A value near 100 % means the "not here" clicks only cut a few
+# **What to look for.** Read *calls vessel* first. A value near 100 % means the "not here" clicks only cut a
+# few
 # holes in one big region (section 2.3), and the IoU stays near the "everything" line.
 
 # %% [markdown]
@@ -266,17 +274,19 @@ show_boxes(
     [
         (f"SAM's input: {len(boxes)} boxes\nand a centre click in each", demo["image"], boxes, centre_clicks),
         (
-            f"SAM, one object per box\nIoU {box_nums['iou']:.2f} · marked {box_nums['marked']:.0%}",
+            f"SAM, one object per box\nIoU {box_nums['iou']:.2f} · calls {box_nums['marked']:.0%} vessel",
             error_map(demo["image"], path3_preds["sam_boxes"][k_demo], demo),
             None,
         ),
         (
-            f"strokes thickened, no model\nIoU {thick_nums['iou']:.2f} · marked {thick_nums['marked']:.0%}",
+            f"baseline: the strokes themselves, no SAM\nIoU {thick_nums['iou']:.2f} · "
+            f"calls {thick_nums['marked']:.0%} vessel",
             error_map(demo["image"], strokes_alone[k_demo], demo),
             None,
         ),
     ],
     width=3.0,
+    roles=["input", "errors", "errors"],
     legend=["box", "click", "found", "invented", "missed"],
     note="Left is what SAM is given; the other two panels compare with the true vessels.",
 )
@@ -290,7 +300,8 @@ show_boxes(
 
 # %% [markdown]
 # **Q17.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
-# moved, recall or marked? Then grow the boxes (try 0, 16 and 32 px of the 1024 px crop) and untick the
+# moved, recall or "calls vessel"? Then grow the boxes (try 0, 16 and 32 px of the 1024 px crop) and untick
+# the
 # centre click in the next cell. What does a larger box let SAM find, and what does it cost?
 
 # %% [markdown]
@@ -307,7 +318,8 @@ try_boxes(BOX_PAD_TRY, WITH_CLICK_TRY)
 #
 # - **Recall is capped.** Each box finds only what lies inside it: the vessels a person stroked, plus the
 #   branches that cross their boxes. A larger box reaches more branches (recall rises) but also more
-#   background (*marked* rises, and part of it is invented). At some size it becomes section 2's big box.
+#   background (*calls vessel* rises, and part of it is invented). At some size it becomes section 2's big
+#   box.
 # - **The centre click** tells SAM which thing inside the box is meant. It helps most when the box holds more
 #   than one candidate.
 # - **The baseline:** if the thickened strokes come close to or beat SAM, that is a real finding, not a bug.
@@ -384,7 +396,8 @@ show_masks(
     ]
     + [("ground truth\n(the true vessels)", overlay(demo["image"], demo["mask"], THEME["truth"]))],
     width=2.6,
-    legend=["found", "invented", "missed", "truth"],
+    roles=["errors"] * len(order) + ["truth"],
+    legend=["found", "invented", ("missed", "missed (truth only); the last panel shows every true vessel")],
     note="Same demo image under every approach; the last panel is the answer key.",
 )
 
@@ -445,8 +458,8 @@ sam_playground(
 # %% [markdown]
 # <!-- callout: go-deeper | Optional: score a word on all evaluation images -->
 # The playground shows one image at a time. The next cell scores one phrase on every evaluation image, with
-# the same IoU, recall and marked columns as above, and stores it in `RESULTS["sam3_text"]` so section 8 can
-# add an optional row. It needs SAM 3 access and otherwise prints one line and stops.
+# the same IoU, recall and "calls vessel" columns as above, and stores it in `RESULTS["sam3_text"]` so
+# section 8 can add an optional row. It needs SAM 3 access and otherwise prints one line and stops.
 
 # %%
 # @title Optional: score one SAM 3 phrase on all images (needs SAM 3 access) { display-mode: "form" }

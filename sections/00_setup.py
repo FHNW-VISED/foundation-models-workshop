@@ -240,8 +240,11 @@ print(f"cache: {CACHE_DIR} · specialised task: {specialised['name']} ({speciali
 #
 # This cell sets the colours used in every figure: $\color{#6A1B9A}{\blacksquare}$ violet means "it works",
 # $\color{#E65100}{\blacksquare}$ orange "it fails, we adapt",
-# $\color{#2E7D32}{\blacksquare}$ green is the hidden ground truth and $\color{#00838F}{\blacksquare}$ teal
-# marks scribbles, the same in every plot. Masks are drawn on a
+# $\color{#2E7D32}{\blacksquare}$ green is the hidden ground truth, $\color{#00838F}{\blacksquare}$ teal
+# marks what a person draws (strokes, clicks, boxes) and $\color{#1565C0}{\blacksquare}$ blue is a model's
+# score before any threshold (a probability or similarity map), the same in every plot. Every panel carries a
+# tag in its corner: INPUT (what the model is given), PREDICTION, TRUTH (scoring only) or SCORE MAP.
+# Masks are drawn on a
 # $\color{#9E9E9E}{\blacksquare}$ grey copy of the photo, so every colour you see belongs to a mask and none
 # to the photo.
 
@@ -256,6 +259,7 @@ THEME = {
     "fails": "#E65100",  # orange: it falls short / we adapt
     "truth": "#2E7D32",  # green: hidden ground truth, evaluation only
     "scribble": "#00838F",  # teal: strokes a person drew
+    "score": "#1565C0",  # blue: a model's score before the threshold (probability, similarity, heat map)
     "background": "#9E9E9E",  # grey overlay
     "banner": "#4A148C",
 }
@@ -268,6 +272,8 @@ mpl.rcParams.update(
         "axes.prop_cycle": mpl.cycler(color=[THEME[k] for k in ("works", "fails", "truth", "scribble")]),
     }
 )
+# one scale for every score map: dark grey = 0 (sure it is not), white = 0.5 (unsure), blue = 1 (sure it is)
+score_cmap = mpl.colors.LinearSegmentedColormap.from_list("score", ["#424242", "white", THEME["score"]])
 
 
 def hex_rgb(colour: str) -> np.ndarray:
@@ -644,8 +650,9 @@ drag = box.</div>
 <span style="background:$c_invented;color:#fff;padding:1px 6px;border-radius:3px">invented (SAM only)</span>
 <span style="background:$c_missed;color:#fff;padding:1px 6px;border-radius:3px">missed (truth only)</span>
 <span style="background:$c_unscored;color:#333;padding:1px 6px;border-radius:3px">not scored</span></div>
-<div style="color:#666;font-size:12px">marked N % = how much of the scored area (the field of view if the
-image has one, else the whole image) SAM's mask covers.</div></div>
+<div style="color:#666;font-size:12px">covers N % = how much of the scored area (the field of view if the
+image has one, else the whole image) SAM's mask covers; "truth M %" = how much the true object
+covers.</div></div>
 <script>
 (function () {
   var D = $data, uid = "$uid", k = 0, pts = [], box = null, bg = false, seq = 0, start = null, cur = null,
@@ -733,10 +740,12 @@ image has one, else the whole image) SAM's mask covers.</div></div>
     UNSCORED = "#D0D0D0"  # light grey: outside the scored region
 
     def score(item: dict, pred: np.ndarray, truth: bool = False) -> str:
-        """'IoU vs ground truth 0.83 · marked 12 %'; `truth` adds 'found 90 % of the truth'."""
+        """'IoU vs ground truth 0.83 · covers 12 % of the image (truth 10 %)'; `truth` adds 'found 90 % of the
+        truth'."""
         r = region(item)
-        line = f"marked {(pred & r).sum() / max(1, r.sum()):.0%}"
+        line = f"covers {(pred & r).sum() / max(1, r.sum()):.0%} of the image"
         if item.get("mask") is not None:
+            line += f" (truth {(item['mask'] & r).sum() / max(1, r.sum()):.0%})"
             union = ((pred | item["mask"]) & r).sum()
             line = f"IoU vs ground truth {((pred & item['mask']) & r).sum() / max(1, union):.2f} · " + line
             if truth:
@@ -815,7 +824,7 @@ image has one, else the whole image) SAM's mask covers.</div></div>
                 fontsize=8,
                 frameon=False,
             )
-            note = "marked N % = how much of the scored area SAM's mask covers."
+            note = "covers N % = how much of the scored area SAM's mask covers, next to the true object's."
             fig.text(0.5, 0.005, note, ha="center", fontsize=7)
         plt.tight_layout(rect=(0, 0.16 if has_truth else 0, 1, 0.97))
         plt.show()

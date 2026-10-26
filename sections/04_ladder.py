@@ -60,6 +60,7 @@ show_masks(
     ],
     prompts=[{"box": box_prompt(demo)}, None, None],
     width=3.4,
+    roles=["input"] * 3,
     legend=[
         ("teal: what the person draws (box, mask, vessel strokes)", THEME["scribble"]),
         ("grey: background strokes", THEME["background"]),
@@ -129,10 +130,11 @@ def score_to_mask(s: torch.Tensor, shape: tuple[int, int]) -> np.ndarray:
 
 
 def heat_rgb(s: torch.Tensor, shape: tuple[int, int]) -> np.ndarray:
-    """A score map as RGB: dark violet = like the foreground prototype, light = like the background."""
+    """A score map as RGB on the shared score scale: blue = like the vessel prototype, white = in between
+    (score 0, the cut), dark grey = like the background prototype."""
     up = F.interpolate(s[None, None], size=shape, mode="bilinear", align_corners=False)[0, 0].cpu().numpy()
     up = 0.5 + 0.5 * up / (np.abs(up).max() + 1e-9)
-    return (mpl.colormaps["Purples"](up)[..., :3] * 255).astype(np.uint8)
+    return (score_cmap(up)[..., :3] * 255).astype(np.uint8)
 
 
 def error_map(image: np.ndarray, pred: np.ndarray, item: dict) -> np.ndarray:
@@ -145,12 +147,19 @@ def error_map(image: np.ndarray, pred: np.ndarray, item: dict) -> np.ndarray:
     return overlay(out, truth & ~p, THEME["truth"])
 
 
+def called_vessel(marked: float, truth_share: float | None = None) -> str:
+    """The "marked" share in plain words: how much of the fundus a mask calls vessel, next to how much really
+    is vessel (by default the evaluation images' share printed in section 2)."""
+    truth_share = fg_share if truth_share is None else truth_share
+    return f"calls {marked:.0%} of the fundus vessel (really vessel: {truth_share:.0%})"
+
+
 def rung_title(label: str, pred: np.ndarray, item: dict) -> str:
-    """Panel title: what made the mask, then IoU, recall and the share of the fundus marked."""
+    """Panel title: what made the mask, then IoU, recall and the share of this fundus it calls vessel."""
     r = region(item)
     truth, p = item["mask"] & r, pred & r
-    numbers = f"IoU {iou(p, truth):.2f} · recall {hidden_recall(pred, truth):.2f} · marked {p[r].mean():.0%}"
-    return f"{label}\n{numbers}"
+    numbers = f"IoU {iou(p, truth):.2f} · recall {hidden_recall(pred, truth):.2f}"
+    return f"{label}\n{numbers}\ncalls {p[r].mean():.0%} vessel (really {truth[r].mean():.0%})"
 
 
 def image_numbers(pred: np.ndarray, item: dict) -> dict:
@@ -180,7 +189,9 @@ def rung_report(preds: list[np.ndarray]) -> dict:
 # ### 4.1 Rung 0: zero-shot, from section 2
 #
 # Nothing new to run: the next cell measures section 2's SAM-with-one-box masks with the numbers every rung
-# is compared on (the table in 4.3 explains each one).
+# is compared on (the table in 4.3 explains each one). The last line answers "how much of the photo does the
+# mask call vessel?": a mask that calls 99 % of the fundus vessel, when about a tenth really is, has simply
+# painted the whole eye.
 
 # %%
 # @title Score rung 0 { display-mode: "form" }
@@ -190,7 +201,7 @@ ladder_report = {"zero_shot": rung_report(sam_box_masks)}
 v = ladder_report["zero_shot"]
 print(
     f"zero-shot (SAM, one box) on {len(spec_eval)} held-out images · IoU {v['iou']:.3f} · recall "
-    f"{v['recall']:.3f} · precision {v['precision']:.3f} · marked {v['marked']:.0%} of the fundus"
+    f"{v['recall']:.3f} · precision {v['precision']:.3f}\n{called_vessel(v['marked'])}"
 )
 
 # %% [markdown]
@@ -232,6 +243,7 @@ show_masks(
         ("ground truth · evaluation only", overlay(ex["image"], ex["mask"], THEME["truth"])),
     ],
     width=2.8,
+    roles=["input", "input", "input", "truth"],
     legend=[
         ("teal: vessel stroke", THEME["scribble"]),
         ("grey: background stroke", THEME["background"]),
@@ -335,7 +347,8 @@ UNLABELLED_TARGET = -1  # @param [-1, 0] {type:"raw"}
 scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_SCRIBBLE_HEAD, UNLABELLED_TARGET)
 
 # %% [markdown]
-# This cell scores the scribble head on the evaluation images with the same numbers as rung 0.
+# This cell scores the scribble head on the evaluation images with the same numbers as rung 0. Compare its
+# "calls … vessel" share with the real one: everything above it is fundus the head paints by mistake.
 
 # %%
 # @title Score the scribble head on the evaluation images { display-mode: "form" }
@@ -349,7 +362,7 @@ scrib_infer = round(time.monotonic() - t0, 1)
 v = ladder_report["scribbles"]
 print(
     f"scribble head · IoU {v['iou']:.3f} · recall {v['recall']:.3f} · precision {v['precision']:.3f} · "
-    f"marked {v['marked']:.0%} of the fundus · {scrib_infer} s on {DEVICE}"
+    f"{scrib_infer} s on {DEVICE}\n{called_vessel(v['marked'])}"
 )
 
 # %% [markdown]
@@ -361,7 +374,8 @@ print(
 # - **IoU:** overlap of the mask with the true vessels.
 # - **Recall:** of the true vessel pixels, the share the mask finds.
 # - **Precision:** of the pixels the mask marks, the share that really are vessel.
-# - **Marked:** the share of the fundus (the scored area) the mask covers.
+# - **Called vessel:** the share of the fundus (the scored area) the mask calls vessel. Compare it with the
+#   last line, the share that really is vessel: far above it means the mask paints background too.
 #
 # What to look for: which rung misses vessels ($\color{#2E7D32}{\blacksquare}$ green) and which invents them
 # ($\color{#E65100}{\blacksquare}$ orange).
@@ -390,13 +404,14 @@ RESULTS["scribbles_head"] = ladder_report["scribbles"] | {
     "infer_sec": scrib_infer,
 }
 
-print(f"{'approach':<36}{'IoU':>6}{'recall':>8}{'precis.':>8}{'marked':>8}   annotation (≈ minutes)")
+print(f"{'approach':<36}{'IoU':>6}{'recall':>8}{'precis.':>8}{'called vessel':>15}   annotation (≈ minutes)")
 for k, v in ladder_report.items():
     print(
         f"{approach_names[k]:<36}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
-        f"{v['marked']:>8.0%}   {effort_text[k]} (≈ {effort[k]:.1f})"
+        f"{v['marked']:>15.0%}   {effort_text[k]} (≈ {effort[k]:.1f})"
     )
-print(f"{'everything is foreground':<36}{RESULTS['specialised_everything_iou']:>6.3f}")
+print(f"{'everything is foreground':<36}{RESULTS['specialised_everything_iou']:>6.3f}{'':>16}{1:>15.0%}")
+print(f"{'really vessel (the ground truth)':<36}{'':>22}{fg_share:>15.0%}")
 
 show_masks(
     [
@@ -408,6 +423,7 @@ show_masks(
     ]
     + [("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"], unscored=~region(demo)))],
     width=3.2,
+    roles=["errors"] * len(ladder_preds) + ["truth"],
     legend=["found", "invented", "missed", "unscored"],
     note="Each rung's mask on the demo image, compared with the ground truth.",
 )
@@ -450,8 +466,8 @@ show_masks(
 # Before you run the next cell, guess: will the prototype mark more of the fundus than SAM's box, or less?
 # Will it find the thin vessels, or only the thick ones?
 #
-# Then change `ONE_SHOT_IMAGE` (the annotated training image: try 1, 2, …) and run it again. Does the
-# held-out IoU move much, and what does that say about relying on a single example?
+# Then move `ONE_SHOT_IMAGE` and run the cell again. Does the held-out IoU move much, and what does that say
+# about relying on a single example?
 #
 # The prototype is as coarse as a 16 px patch, like the section-2 head, and it depends on *which* example
 # you annotated: with one image, a lucky or unlucky choice is the whole training set.
@@ -488,8 +504,9 @@ def run_one_shot(image_index: int):
     RESULTS.setdefault("ladder_detail", {})["one_shot"] = v
     RESULTS["one_shot"] = v | {"image": shot["name"], "infer_sec": proto_sec}
     print(
-        f"one-shot prototype from {shot['name']} · IoU {v['iou']:.3f} · recall {v['recall']:.3f} · precision "
-        f"{v['precision']:.3f} · marked {v['marked']:.0%} of the fundus · {proto_sec} s on {DEVICE}"
+        f"one-shot prototype from training image {image_index} ({shot['name']}) · IoU {v['iou']:.3f} · "
+        f"recall {v['recall']:.3f} · precision {v['precision']:.3f} · {proto_sec} s on {DEVICE}\n"
+        f"{called_vessel(v['marked'])}"
     )
     print(f"for scale: the section-2 head on five complete masks · IoU {RESULTS['specialised_head_iou']:.3f}")
     show_masks(
@@ -505,25 +522,67 @@ def run_one_shot(image_index: int):
             ),
         ],
         width=3.4,
+        roles=["input", "map", "errors"],
         legend=[
-            ("teal: the annotator's complete mask", THEME["scribble"]),
+            ("teal: the annotator's complete mask (input)", THEME["scribble"]),
+            ("score map: looks like the vessel prototype", THEME["score"]),
+            ("score map: looks like the background", "#424242"),
             "found",
             "invented",
             "missed",
             "unscored",
         ],
-        note="Similarity: dark violet = looks like the annotated vessels, light = looks like the background.",
+        note="Panels 2 and 3 show the held-out demo image; the next cell browses all held-out images.",
     )
     return shot, proto_scores, proto_sec
 
 
 # %% [markdown]
 # This cell runs the one-shot rung; it also runs under "Run all", so the table in section 8 has its row.
+#
+# **`ONE_SHOT_IMAGE`** chooses *which* training image the annotator traced completely: 0 is the first of the
+# 20 training images, 19 the last. That one mask is all the rung learns from; the left panel shows it. The
+# 25 held-out images it is scored on never change.
 
 # %%
 # @title One-shot: one annotated image, applied to every held-out image { display-mode: "form" }
-ONE_SHOT_IMAGE = 0  # @param {type:"integer"}
+ONE_SHOT_IMAGE = 0  # @param {type:"slider", min:0, max:19, step:1}
 shot, proto_scores, proto_sec = run_one_shot(ONE_SHOT_IMAGE)
+
+# %% [markdown]
+# The next cell lets you flip through the one-shot result on every held-out image (◀ ▶ or the slider): the
+# photo the model gets, its score map, and its errors against the truth. It reuses the cell above, so run that
+# one first after changing `ONE_SHOT_IMAGE`. What to look for: does the prototype fail the same way on every
+# image, or only on some?
+
+# %%
+# @title Browse the one-shot result on every held-out image { display-mode: "form" }
+def one_shot_browser() -> None:
+    """One figure per held-out image (photo, score map, error map) in a ◀ ▶ browser."""
+    figs, labels = [], []
+    for s, pred, it in zip(proto_scores, ladder_preds["one_shot"], spec_eval, strict=True):
+        figs.append(
+            show_masks(
+                [
+                    (f"{it['name']} · the photo", it["image"]),
+                    ("similarity: vessel − background", heat_rgb(s, it["mask"].shape)),
+                    (rung_title("one-shot prototype", pred, it), error_map(it["image"], pred, it)),
+                ],
+                width=3.0,
+                roles=["input", "map", "errors"],
+                legend=[
+                    ("score: like the vessels", THEME["score"]),
+                    ("score: like the background", "#424242"),
+                    "found", "invented", "missed", "unscored",
+                ],
+                show=False,
+            )
+        )
+        labels.append(f"{it['name']} · IoU {iou(pred & region(it), it['mask'] & region(it)):.2f}")
+    browse_figures(figs, labels, f"One-shot prototype from {shot['name']}, on the held-out images")
+
+
+one_shot_browser()
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway -->
