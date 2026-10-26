@@ -87,14 +87,21 @@ key_found = (THEME["works"], "violet: hidden vessel the head found")
 key_missed = (THEME["truth"], "green: hidden vessel it missed")
 
 
-def show_keyed(panels: list[tuple[str, np.ndarray]], key: list[tuple[str, str]], width: float = 3.0) -> None:
+def show_keyed(
+    panels: list[tuple[str, np.ndarray]],
+    key: list[tuple[str, str]],
+    width: float = 3.0,
+    roles: list | None = None,
+) -> None:
     """One row of RGB panels (title, image) with a colour key under them: `key` = [(colour, meaning), ...].
-    Long titles wrap with a newline so neighbours never overlap."""
+    Long titles wrap with a newline so neighbours never overlap. `roles` = one corner tag per panel."""
     fig, axes = plt.subplots(1, len(panels), figsize=(width * len(panels), width + 0.7))
-    for ax, (title, img) in zip(np.atleast_1d(axes), panels, strict=True):
+    tags = roles or [None] * len(panels)
+    for ax, (title, img), role in zip(np.atleast_1d(axes), panels, tags, strict=True):
         ax.imshow(img)
         ax.set_title(title, fontsize=9)
         ax.axis("off")
+        tag_panel(ax, role)
     handles = [mpl.patches.Patch(color=c, label=m) for c, m in key]
     fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=8)
     fig.tight_layout(rect=(0, 0.1, 1, 1))
@@ -142,6 +149,7 @@ show_keyed(
     ],
     [(THEME["truth"], "green: true vessels (all of them, or the hidden ones)"), key_painted],
     width=2.8,
+    roles=["input", "truth", "input", "truth"],
 )
 
 # %% [markdown]
@@ -341,8 +349,8 @@ naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_NAIVE_HEAD)
 # %% [markdown]
 # This cell scores the naive head and the section-2 head (full masks) on three sets of vessel pixels: the
 # ones we hid, the ones that were painted, and every vessel of the held-out images. Each bar is the share of
-# that set the head finds. The printout adds the held-out IoU, the precision, and **marked**: the share of
-# the fundus (the scored area) the head calls vessel.
+# that set the head finds. The printout adds the held-out IoU, the precision, and **calls vessel**: the share
+# of the fundus (the scored area) the head calls vessel, next to the share that really is vessel.
 #
 # What to look for (the numbers are from our run, yours will differ a little):
 #
@@ -395,12 +403,16 @@ GROUPS = {
     "recall_visible_fit": "painted vessels\n(told: vessel)",
     "recall_held": "held-out images\n(all vessels)",
 }
-print(f"{'head':<30}{'hidden found':>13}{'painted':>9}{'held-out':>10}   held-out IoU / precision / marked")
+print(
+    f"{'head':<30}{'hidden found':>13}{'painted':>9}{'held-out':>10}"
+    "   held-out IoU / precision / calls vessel"
+)
 for name, r in naive_report.items():
     print(
         f"{name:<30}{r['recall_hidden_fit']:>13.3f}{r['recall_visible_fit']:>9.3f}{r['recall_held']:>10.3f}"
         f"   {r['iou_held']:.3f} / {r['precision_held']:.3f} / {r['marked_held']:.0%}"
     )
+print(f"really vessel on the held-out images: {fg_share:.0%} of the fundus")
 
 x = np.arange(len(GROUPS))
 fig, ax = plt.subplots(figsize=(6.4, 3.2))
@@ -458,6 +470,7 @@ show_keyed(
         key_found,
     ],
     width=3.6,
+    roles=["input", "truth", "errors"],
 )
 
 # %% [markdown]
@@ -536,6 +549,7 @@ def naive_with_hidden_share(percent: int) -> None:
                 key_found,
             ],
             width=3.0,
+            roles=["input", "truth", "errors"],
         )
     else:
         print(
