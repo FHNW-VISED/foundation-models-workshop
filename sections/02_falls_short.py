@@ -222,7 +222,8 @@ def _ref_cldice(pred: np.ndarray, truth: np.ndarray) -> float:
 # %%
 # ✍️ YOUR CODE
 def my_cldice(pred: np.ndarray, truth: np.ndarray) -> float:
-    """clDice of two boolean masks: 2·tprec·tsens / (tprec + tsens); 0.0 when either skeleton is empty."""
+    """clDice of two boolean masks: 2·tprec·tsens / (tprec + tsens); 0.0 when either skeleton is empty.
+    e.g. 0.71"""
     ...
 
 

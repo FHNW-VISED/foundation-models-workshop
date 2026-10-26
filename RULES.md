@@ -1,6 +1,6 @@
 # RULES — every notebook
 
-Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-21.
+Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-22.
 Do not edit here; SPEC.md › Notebook-specific rules (L-xxx) override these for this notebook.
 Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = read for it.
 
@@ -29,7 +29,7 @@ Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = re
 | N-021 | Install with `%pip`, not `!pip`, and only what Colab does not already have. | lint |
 | N-022 | Parameter (control-panel) cells validate their values and fail with a plain message, not a deep stack trace. | review |
 | N-023 | When the notebook follows a known recipe or paper, say so near the top and link it. | review |
-| N-024 | Questions that end in a written answer get a hidden worked answer (`<details>`), unless the SPEC says the answers are shown openly. | review |
+| N-024 | Every worked answer sits in a collapsed toggle (`<details>`), hidden until the learner opens it, answer figures and printed answer keys included (a figure is drawn as HTML output inside the toggle). No SPEC override. | review |
 | N-025 | Every kind of part sits in a Callout, and each kind keeps one colour and icon for the whole notebook. Theory Callouts name their topic. | review |
 | N-026 | Every place where a learner writes code or changes a value is unmistakable: an action Callout right above the cell, and stubs that run without errors before they are touched. Not foolproof: learners may write code. | review |
 | N-027 | Each notebook has its own Theme (palette, title banner, figure style), and a colour means the same thing everywhere in it (e.g. one colour per class across every plot and overlay). | review |
@@ -55,3 +55,6 @@ Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = re
 | N-047 | The notebook fits its slot. Each section has a minute budget in the SPEC; after every build a cutting review proposes what to drop, and only Simone approves removals. | review |
 | N-048 | Main points are visually dominant; depth is visibly secondary (collapsed `<details>` or a muted "Go deeper" callout), so a learner who only reads the coloured parts still gets the lesson. | review |
 | N-049 | An abstract pitfall is shown with a tiny, slightly playful simulation on the notebook's own data (e.g. a fake model that always answers "sheep"), not only described. | review |
+| N-050 | Every ✍️ YOUR CODE docstring ends with a made-up example of the return value (`e.g. {"train": ["a.jpg", …], "test": ["b.jpg", …]}`), so the learner sees the shape before writing. | lint |
+| N-051 | A figure that shows only part of a set (the first 3 of 12 folds, 5 of 40 photos) says so in the image itself: dots (⋮ or …) after the last shown item and an "N more not shown" label. | review |
+| N-052 | The order follows the learner. (1) A hunt or multi-step task opens with what the learner will do, in order (a numbered roadmap). (2) Everything a question needs (pictures, definitions) comes before it, and nothing that answers it does: no figure, caption, number, example or box that gives the answer away (a picture that *shows* a case the question asks about gives it away; show a correct row and, under it, the same picture with an error, and let the question name each picture it refers to by its title, e.g. Picture A). (3) A question sits right after its material; only its own ✏️/✍️ box may stand between the question and its run cell, and side boxes (go-deeper, "try this afterwards") come after. (4) Nothing refers to a question, cell or picture before it appears ("run it in Q9 below"). (5) The worked answer comes after the cell that shows the result. | review; lint warns on (4) for question numbers |

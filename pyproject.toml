@@ -40,6 +40,9 @@ target-version = "py312"
 select = ["E", "F", "I", "B"]
 ignore = ["E402"]  # notebook sections import where they are taught
 
+[tool.ruff.lint.isort]
+known-first-party = ["build"]  # scripts/build.py; else a local build/ folder decides how imports sort
+
 [tool.ruff.lint.per-file-ignores]
 "sections/*.py" = ["F821", "F811"]  # names come from earlier sections (one shared kernel)
 

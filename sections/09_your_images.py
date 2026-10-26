@@ -555,7 +555,8 @@ def _ref_disagreement(masks: list[np.ndarray]) -> np.ndarray:
 # ✍️ YOUR CODE
 def my_disagreement(masks: list[np.ndarray]) -> np.ndarray:
     """Boolean map, same shape as each mask: True where the masks disagree (at least one marks the pixel and
-    at least one does not)."""
+    at least one does not).
+    e.g. three 1×4 masks [1, 1, 0, 0], [1, 0, 0, 0], [1, 1, 0, 1] -> [False, True, False, True]"""
     ...
 
 

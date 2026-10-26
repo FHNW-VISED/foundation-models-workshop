@@ -221,7 +221,8 @@ def _ref_spread(per_image_iou: list[float]) -> float:
 # %%
 # ✍️ YOUR CODE
 def my_spread(per_image_iou: list[float]) -> float:
-    """The population standard deviation of the per-image IoUs: sqrt(mean((x - mean(x))²))."""
+    """The population standard deviation of the per-image IoUs: sqrt(mean((x - mean(x))²)).
+    e.g. 0.083"""
     ...
 
 
