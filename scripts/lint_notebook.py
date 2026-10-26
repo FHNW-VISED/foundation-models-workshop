@@ -8,6 +8,7 @@ they never change the exit code.
 from __future__ import annotations
 
 import ast
+import builtins
 import re
 import sys
 from pathlib import Path
@@ -111,6 +112,154 @@ def spec_rows() -> dict[str, str]:
     return rows
 
 
+SETTING_RE = re.compile(r"^[A-Z][A-Z0-9_]+$")
+SETTING_EXEMPT = {"RESULTS"}  # the smoke test's hook (SPEC §9), not a setting
+MUTATORS = {
+    "append",
+    "extend",
+    "insert",
+    "update",
+    "setdefault",
+    "pop",
+    "popitem",
+    "clear",
+    "remove",
+    "add",
+    "discard",
+    "sort",
+    "reverse",
+}
+BUILTIN_NAMES = set(dir(builtins))
+
+
+def is_setting(name: str) -> bool:
+    return bool(SETTING_RE.match(name)) and name not in SETTING_EXEMPT
+
+
+def module_level(body: list[ast.stmt], path: tuple = ()):
+    """(statement, branch path) for what runs at notebook level: the cell body and the inside of
+    if/for/while/with/try, not of def/class. The path records the branch of each if/try a statement is in."""
+    for node in body:
+        yield node, path
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        for field in ("body", "orelse", "finalbody"):
+            yield from module_level(getattr(node, field, []) or [], path + ((id(node), field),))
+        for k, handler in enumerate(getattr(node, "handlers", []) or []):
+            yield from module_level(handler.body, path + ((id(node), f"handler{k}"),))
+
+
+def exclusive(a: tuple, b: tuple) -> bool:
+    """True when two branch paths can never both run: they split at one if/try into different branches."""
+    for (node_a, field_a), (node_b, field_b) in zip(a, b, strict=False):
+        if node_a != node_b:
+            return False
+        if field_a != field_b:
+            return "finalbody" not in (field_a, field_b)
+    return False
+
+
+def assigned_names(node: ast.stmt) -> list[str]:
+    targets = (
+        node.targets
+        if isinstance(node, ast.Assign)
+        else [node.target]
+        if isinstance(node, (ast.AnnAssign, ast.AugAssign))
+        else []
+    )
+    return [
+        n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)
+    ]
+
+
+def computed_from(value: ast.expr, imported: set[str]) -> str | None:
+    """The first name a setting's value reads that makes it computed data rather than a setting: anything
+    other than another setting, a builtin, an imported module/name, or a comprehension's own variable."""
+    bound = {
+        n.id
+        for c in ast.walk(value)
+        if isinstance(c, ast.comprehension)
+        for n in ast.walk(c.target)
+        if isinstance(n, ast.Name)
+    }
+    for n in ast.walk(value):
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+            if not (is_setting(n.id) or n.id in bound or n.id in BUILTIN_NAMES or n.id in imported):
+                return n.id
+    return None
+
+
+def check_settings(files: list[Path]) -> None:
+    """N-058: UPPER_CASE names are settings, decided once. Not reassigned, not changed in place, not computed
+    from the notebook's data or functions; a learner's ✏️ / @param setting is read only in its own section."""
+    parsed = []  # (rel, cell index, cell source, tree)
+    for path in files:
+        for i, cell in enumerate(jupytext.read(path, fmt="py:percent").cells):
+            if cell.cell_type != "code":
+                continue
+            # magics become blank lines, so line numbers still match the cell
+            src = "\n".join(
+                "" if line.lstrip().startswith(("%", "!")) else line for line in cell.source.splitlines()
+            )
+            try:
+                parsed.append((f"sections/{path.name}", i, cell.source, ast.parse(src)))
+            except SyntaxError:
+                continue
+    imported = {
+        (a.asname or a.name).split(".")[0]
+        for _, _, _, tree in parsed
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for a in node.names
+    }
+    first_set: dict[str, tuple[str, int, tuple]] = {}  # setting -> (where, cell, branch path)
+    learner_set: dict[str, str] = {}  # setting -> section of its ✏️ cell
+    for rel, i, src, tree in parsed:
+        where = f"{rel} cell {i}"
+        src_lines = src.splitlines()
+        for node, path in module_level(tree.body):
+            # the learner's settings: everything in a ✏️ cell, or a Colab form line marked '# @param'
+            learner = src.lstrip().startswith("# ✏️") or "# @param" in src_lines[node.lineno - 1]
+            for name in [n for n in assigned_names(node) if is_setting(n)]:
+                first = first_set.get(name)
+                if first and first[1] == id(tree) and exclusive(first[2], path):
+                    continue  # if/else alternatives in one cell: still one decision
+                if isinstance(node, ast.AugAssign) or first:
+                    fail(
+                        where,
+                        f"{name} is set again (first set in {first[0] if first else 'this cell'}); a "
+                        "setting is decided once (N-058)",
+                    )
+                    continue
+                first_set[name] = (where, id(tree), path)
+                if learner:
+                    learner_set[name] = rel
+                elif node.value is not None and (culprit := computed_from(node.value, imported)):
+                    fail(where, f"{name} is computed (reads {culprit}); computed data is lowercase (N-058)")
+        for node in ast.walk(tree):
+            changed = None
+            if isinstance(node, (ast.Subscript, ast.Attribute)) and isinstance(
+                node.ctx, (ast.Store, ast.Del)
+            ):
+                changed = node.value
+            elif (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in MUTATORS
+            ):
+                changed = node.func.value
+            if isinstance(changed, ast.Name) and is_setting(changed.id):
+                fail(where, f"{changed.id} is changed in place; a setting is decided once (N-058)")
+    for rel, i, _, tree in parsed:
+        for name in sorted({n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} & set(learner_set)):
+            if learner_set[name] != rel:
+                fail(
+                    f"{rel} cell {i}",
+                    f"{name} is the learner's ✏️ setting in {learner_set[name]}; another "
+                    "section needs its own setting (N-058)",
+                )
+
+
 def main() -> int:
     files = sorted(SECTIONS.glob("[0-9][0-9]_*.py"))
     on_disk = {f"sections/{p.name}" for p in files}
@@ -185,6 +334,8 @@ def main() -> int:
 
     if files and not smoke_defined:
         fail("sections", "no cell defines SMOKE = ... (N-014)")
+
+    check_settings(files)
 
     for p in problems:
         print(p)

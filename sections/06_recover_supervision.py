@@ -39,11 +39,11 @@
 
 # %%
 # @title Path 2 helpers: colours, clicks along the strokes { display-mode: "form" }
-APPROACH_COLOURS |= {
+approach_colours |= {
     "sam_pseudo": "#0277BD",
     "gradcam_pseudo": "#827717",
 }
-APPROACH_NAMES |= {
+approach_names |= {
     "sam_pseudo": "pseudo-labels: SAM from stroke clicks",
     "gradcam_pseudo": "pseudo-labels: Grad-CAM of a tile classifier",
 }
@@ -304,7 +304,7 @@ def train_sam_head(train_yourself: bool):
     """The head trained on SAM's pseudo-labels at threshold 0.5, no band. Returns the head's tensors, the
     training seconds and the targets."""
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+        raise SystemExit("TRAIN_SAM_HEAD must be True or False.")
     # the supervision of this path: the strokes, and SAM's guesses from clicks on the strokes (L-005)
     targets = [
         pseudo_targets(p, it["scribbles"], region(it), 0.5, 0.0)
@@ -314,12 +314,12 @@ def train_sam_head(train_yourself: bool):
         head, sec = train_head(scrib_feats, targets, HEAD_STEPS)
         src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, SAM pseudo-labels at 0.5"
     else:
-        head, entry = load_head(SPECIALISED, "pseudo", side)
+        head, entry = load_head(specialised, "pseudo", side)
         sec = entry["train_sec"]
         src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
     print(f"SAM pseudo-label head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
     if sec > 60:
-        print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+        print("ℹ️ Slow session? Set TRAIN_SAM_HEAD = False above to load our checkpoint next time.")
     return head, sec, targets
 
 # %% [markdown]
@@ -330,12 +330,12 @@ def train_sam_head(train_yourself: bool):
 
 # %% [markdown]
 # This cell turns SAM's maps into targets at the usual cut (threshold 0.5, no band) and trains the section-2
-# head on them (`TRAIN_YOURSELF = False` loads our "pseudo" checkpoint instead, trained the same way).
+# head on them (`TRAIN_SAM_HEAD = False` loads our "pseudo" checkpoint instead, trained the same way).
 
 # %%
 # @title Train the SAM pseudo-label head (False = load our checkpoint) { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-sam_head, sam_sec, sam_targets = train_sam_head(TRAIN_YOURSELF)
+TRAIN_SAM_HEAD = True  # @param {type:"boolean"}
+sam_head, sam_sec, sam_targets = train_sam_head(TRAIN_SAM_HEAD)
 
 # %% [markdown]
 # This cell scores the new head on the held-out images with the numbers of section 4 and prints it under the
@@ -347,7 +347,7 @@ t0 = time.monotonic()
 path2_preds = {
     "scribbles": ladder_preds["scribbles"],
     "sam_pseudo": [
-        predict_head(sam_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(sam_head, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
     ],
 }
 sam_infer = round(time.monotonic() - t0, 1)
@@ -361,7 +361,7 @@ RESULTS["sam_pseudo_head"] = path2_report["sam_pseudo"] | {
     "pseudo_label_iou_fit": sam_quality["iou"],
     "pseudo_sec": pseudo_sec,
     "sam_run_here": RUN_SAM,
-    "trained_here": TRAIN_YOURSELF,
+    "trained_here": TRAIN_SAM_HEAD,
     "train_sec": round(float(sam_sec), 2),
     "infer_sec": sam_infer,
 }
@@ -371,7 +371,7 @@ def print_path2(reports: dict) -> None:
     """One line per head with the numbers of section 4."""
     print(f"{'approach':<46}{COLUMNS}")
     for k, v in reports.items():
-        name = APPROACH_NAMES.get(k, k)
+        name = approach_names.get(k, k)
         print(
             f"{name:<46}{v['iou']:>6.3f}{v['cldice']:>8.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
             f"{v['marked']:>8.0%}"
@@ -414,14 +414,14 @@ def tune_pseudo_labels(threshold: float, band: float) -> None:
         raise SystemExit(
             "PSEUDO_THRESHOLD must lie between 0 and 1, and UNSURE_BAND ≥ 0 must keep both edges inside."
         )
-    side = SPECIALISED["feat_side"]
+    side = specialised["feat_side"]
     tuned_targets = [
         pseudo_targets(p, it["scribbles"], region(it), threshold, band)
         for p, it in zip(pseudo_probs, scrib_train, strict=True)
     ]
     tuned_head, tuned_sec = train_head(scrib_feats, tuned_targets, HEAD_STEPS)
     tuned_preds = [
-        predict_head(tuned_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(tuned_head, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
     ]
     tuned_report = rung_report(tuned_preds)
     RESULTS["sam_pseudo_tuned"] = tuned_report | {"threshold": threshold, "band": band}
@@ -519,7 +519,7 @@ def stroke_targets(item: dict, blind_spot: bool) -> np.ndarray:
 
 clean_head, _ = train_head(scrib_feats, [stroke_targets(it, False) for it in scrib_train], HEAD_STEPS)
 biased_head, _ = train_head(scrib_feats, [stroke_targets(it, True) for it in scrib_train], HEAD_STEPS)
-feat_demo = features_for(SPECIALISED, demo, side)
+feat_demo = features_for(specialised, demo, side)
 p_clean = predict_head(clean_head, feat_demo, demo["mask"].shape)
 p_biased = predict_head(biased_head, feat_demo, demo["mask"].shape)
 blob_demo = bright_blob(demo)
@@ -673,8 +673,8 @@ with torch.no_grad():
     fit_acc = float(((clf(tile_x)[:, 0] > 0).long() == tile_y).float().mean())
 # evaluation only: the share of held-out tiles that truly contain a vessel
 held_tiles = []
-for it in SPEC_EVAL:
-    grid = tuple(features_for(SPECIALISED, it, side).shape[1:])
+for it in spec_eval:
+    grid = tuple(features_for(specialised, it, side).shape[1:])
     share = to_tiles(patch_share(it["mask"] & region(it), grid)[None], TILE_PATCHES).amax((1, 2, 3))
     inside = to_tiles(patch_share(region(it), grid)[None], TILE_PATCHES).mean((1, 2, 3)) > 0.5
     held_tiles.append(float((share[inside] > 0).float().mean()))
@@ -714,13 +714,13 @@ cam_quality = mean_scores([score(t == 1, it) for t, it in zip(cam_targets, scrib
 cam_head, cam_head_sec = train_head(scrib_feats, cam_targets, HEAD_STEPS)
 t0 = time.monotonic()
 path2_preds["gradcam_pseudo"] = [
-    predict_head(cam_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+    predict_head(cam_head, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
 ]
 cam_infer = round(time.monotonic() - t0, 1)
 path2_report["gradcam_pseudo"] = rung_report(path2_preds["gradcam_pseudo"])
 RESULTS["gradcam_iou"] = path2_report["gradcam_pseudo"]["iou"]  # held-out IoU of the head (SPEC §9)
 RESULTS["gradcam_note"] = (
-    f"Patch-level proxy '{SPECIALISED['gradcam']['patch_level_task']}' (tiles labelled from the strokes), "
+    f"Patch-level proxy '{specialised['gradcam']['patch_level_task']}' (tiles labelled from the strokes), "
     f"because every image contains the structure and there is no image-level negative class: an awkward "
     f"fit, {vessel_tile_share:.0%} of the held-out tiles contain foreground"
 )
@@ -935,7 +935,7 @@ x, width = np.arange(len(metrics)), 0.8 / len(path2_report)
 fig, ax = plt.subplots(figsize=(7.2, 3.2))
 for n, (k, v) in enumerate(path2_report.items()):
     shift = (n - (len(path2_report) - 1) / 2) * width
-    ax.bar(x + shift, [v[m] for m in metrics], width, color=APPROACH_COLOURS[k], label=APPROACH_NAMES[k])
+    ax.bar(x + shift, [v[m] for m in metrics], width, color=approach_colours[k], label=approach_names[k])
 ax.axhline(
     RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--", label='IoU of "everything"'
 )
@@ -948,7 +948,7 @@ plt.show()
 show_masks(
     [
         (
-            f"{APPROACH_NAMES[k].split(':')[-1].strip()} · IoU {score(p[k_demo], demo)['iou']:.2f}",
+            f"{approach_names[k].split(':')[-1].strip()} · IoU {score(p[k_demo], demo)['iou']:.2f}",
             error_map(demo["image"], p[k_demo], demo),
         )
         for k, p in path2_preds.items()

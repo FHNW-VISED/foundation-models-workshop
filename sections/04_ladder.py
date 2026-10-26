@@ -18,15 +18,15 @@
 # @title What each rung receives { display-mode: "form" }
 def effort_minutes(n_strokes: int = 0, n_full_masks: int = 0) -> float:
     """Annotation minutes under the dataset's stated assumptions (seconds per stroke, hours per full mask)."""
-    cost = SPECIALISED["annotation_effort"]
+    cost = specialised["annotation_effort"]
     return n_strokes * cost["seconds_per_stroke"] / 60 + n_full_masks * 60 * float(
         np.mean(cost["hours_per_full_mask"])
     )
 
 
-_shot0 = load_item(SPECIALISED, SPECIALISED["fit"][0])
-_scribs = [load_item(SPECIALISED, m) for m in SPECIALISED["fit"][:N_TRAIN_SPEC]]
-_n_str = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in SPECIALISED["fit"][:N_TRAIN_SPEC])
+_shot0 = load_item(specialised, specialised["fit"][0])
+_scribs = [load_item(specialised, m) for m in specialised["fit"][:N_TRAIN_SPEC]]
+_n_str = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in specialised["fit"][:N_TRAIN_SPEC])
 
 
 def _cost(minutes: float) -> str:
@@ -81,13 +81,13 @@ plt.show()
 
 # %%
 # @title Ladder helpers: colours, prototypes, clicks, error and difference maps { display-mode: "form" }
-APPROACH_COLOURS = {  # one colour per approach (L-003); later sections add theirs and keep these
+approach_colours = {  # one colour per approach (L-003); later sections add theirs and keep these
     "zero_shot": "#E65100",
     "one_shot": "#C2185B",
     "one_shot_sam": "#F06292",
     "scribbles": "#3949AB",
 }
-APPROACH_NAMES = {
+approach_names = {
     "zero_shot": "zero-shot: SAM, one box",
     "one_shot": "one-shot: nearest prototype",
     "one_shot_sam": "one-shot: prototype → SAM clicks",
@@ -165,18 +165,18 @@ def diff_map(image: np.ndarray, prev: np.ndarray, new: np.ndarray, k_prev: str, 
     r = region(item)
     prev, new = prev & r, new & r
     out = overlay(image, prev & new, THEME["background"])
-    out = overlay(out, prev & ~new, APPROACH_COLOURS[k_prev])
-    return overlay(out, new & ~prev, APPROACH_COLOURS[k_new])
+    out = overlay(out, prev & ~new, approach_colours[k_prev])
+    return overlay(out, new & ~prev, approach_colours[k_new])
 
 
 def rung_report(preds: list[np.ndarray]) -> dict:
-    """Mean IoU, clDice, recall, precision and marked share of the evaluation region, over SPEC_EVAL."""
-    pairs = tqdm(list(zip(preds, SPEC_EVAL, strict=True)), desc="scoring (IoU, clDice)", leave=False)
+    """Mean IoU, clDice, recall, precision and marked share of the evaluation region, over spec_eval."""
+    pairs = tqdm(list(zip(preds, spec_eval, strict=True)), desc="scoring (IoU, clDice)", leave=False)
     out = mean_scores([score(p, it) for p, it in pairs])
-    out["recall"] = part_recall(preds, SPEC_EVAL, "mask")
-    pairs = zip(preds, SPEC_EVAL, strict=True)
+    out["recall"] = part_recall(preds, spec_eval, "mask")
+    pairs = zip(preds, spec_eval, strict=True)
     out["precision"] = float(np.mean([hidden_recall(it["mask"], p & region(it)) for p, it in pairs]))
-    out["marked"] = float(np.mean([p[region(it)].mean() for p, it in zip(preds, SPEC_EVAL, strict=True)]))
+    out["marked"] = float(np.mean([p[region(it)].mean() for p, it in zip(preds, spec_eval, strict=True)]))
     return out
 
 
@@ -193,7 +193,7 @@ def image_numbers(pred: np.ndarray, item: dict) -> dict:
 
 def show_extremes(preds: list[np.ndarray]) -> None:
     """Error maps of the worst, the median and the best held-out image (by IoU), with their numbers."""
-    nums = [image_numbers(p, it) for p, it in zip(preds, SPEC_EVAL, strict=True)]
+    nums = [image_numbers(p, it) for p, it in zip(preds, spec_eval, strict=True)]
     order = np.argsort([n["iou"] for n in nums])
     picks = [("worst", order[0]), ("typical (median)", order[len(order) // 2]), ("best", order[-1])]
     show_masks(
@@ -201,7 +201,7 @@ def show_extremes(preds: list[np.ndarray]) -> None:
             (
                 f"{label} · IoU {nums[k]['iou']:.2f}\nrecall {nums[k]['recall']:.2f} · "
                 f"precision {nums[k]['precision']:.2f}\nmarked {nums[k]['marked']:.0%}",
-                error_map(SPEC_EVAL[k]["image"], preds[k], SPEC_EVAL[k]),
+                error_map(spec_eval[k]["image"], preds[k], spec_eval[k]),
             )
             for label, k in picks
         ],
@@ -224,12 +224,12 @@ def show_extremes(preds: list[np.ndarray]) -> None:
 
 # %%
 # @title Score rung 0 and show its worst, typical and best image { display-mode: "form" }
-k_demo = next(i for i, it in enumerate(SPEC_EVAL) if it is demo)  # the section-2 demo image
+k_demo = next(i for i, it in enumerate(spec_eval) if it is demo)  # the section-2 demo image
 ladder_preds = {"zero_shot": sam_box_masks}  # section 2.3: SAM, one box, per evaluation image
 ladder_report = {"zero_shot": rung_report(sam_box_masks)}
 v = ladder_report["zero_shot"]
 print(
-    f"zero-shot (SAM, one box) on {len(SPEC_EVAL)} held-out images · IoU {v['iou']:.3f} · clDice "
+    f"zero-shot (SAM, one box) on {len(spec_eval)} held-out images · IoU {v['iou']:.3f} · clDice "
     f"{v['cldice']:.3f} · recall {v['recall']:.3f} · precision {v['precision']:.3f} · marks {v['marked']:.0%}"
 )
 show_extremes(sam_box_masks)
@@ -254,18 +254,18 @@ show_extremes(sam_box_masks)
 def run_one_shot(image_index: int):
     """Rung 1 from the annotated training image `image_index`: prints the numbers and draws the maps.
     Returns the annotated item, the similarity map of every evaluation image and the scoring seconds."""
-    if not isinstance(image_index, int) or not 0 <= image_index < len(SPECIALISED["fit"]):
-        raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(SPECIALISED['fit']) - 1}.")
-    side = SPECIALISED["feat_side"]
-    shot = load_item(SPECIALISED, SPECIALISED["fit"][image_index])
-    shot_feat = features_for(SPECIALISED, shot, side)
+    if not isinstance(image_index, int) or not 0 <= image_index < len(specialised["fit"]):
+        raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(specialised['fit']) - 1}.")
+    side = specialised["feat_side"]
+    shot = load_item(specialised, specialised["fit"][image_index])
+    shot_feat = features_for(specialised, shot, side)
     grid, r = tuple(shot_feat.shape[1:]), region(shot)
     # the rung's supervision: one complete mask of one *training* image (L-005)
     protos = prototypes(shot_feat, patch_share(shot["mask"] & r, grid), patch_share(~shot["mask"] & r, grid))
     t0 = time.monotonic()
-    proto_scores = [prototype_score(features_for(SPECIALISED, it, side), protos) for it in SPEC_EVAL]
+    proto_scores = [prototype_score(features_for(specialised, it, side), protos) for it in spec_eval]
     ladder_preds["one_shot"] = [
-        score_to_mask(s, it["mask"].shape) for s, it in zip(proto_scores, SPEC_EVAL, strict=True)
+        score_to_mask(s, it["mask"].shape) for s, it in zip(proto_scores, spec_eval, strict=True)
     ]
     ladder_report["one_shot"] = rung_report(ladder_preds["one_shot"])
     proto_sec = round(time.monotonic() - t0, 1)
@@ -351,7 +351,7 @@ shot, proto_scores, proto_sec = run_one_shot(ONE_SHOT_IMAGE)
 N_PROTO_CLICKS = 5  # positive clicks, and as many negative ones, per image
 t0 = time.monotonic()
 ladder_preds["one_shot_sam"], proto_clicks = [], []
-for it, s in tqdm(list(zip(SPEC_EVAL, proto_scores, strict=True)), desc="SAM on the evaluation images"):
+for it, s in tqdm(list(zip(spec_eval, proto_scores, strict=True)), desc="SAM on the evaluation images"):
     keep = patch_share(region(it), tuple(s.shape))
     pos = top_points(s, keep, N_PROTO_CLICKS, it["mask"].shape, largest=True)
     neg = top_points(s, keep, N_PROTO_CLICKS, it["mask"].shape, largest=False)
@@ -442,14 +442,14 @@ show_clicks(
 
 # %%
 # @title Show the scribbles of one training image { display-mode: "form" }
-scrib_train = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:N_TRAIN_SPEC]]
+scrib_train = [load_item(specialised, it) for it in specialised["fit"][:N_TRAIN_SPEC]]
 labelled = float(np.mean([(it["scribbles"] > 0)[region(it)].mean() for it in scrib_train]))
-scrib_meta = SPECIALISED["fit"][:N_TRAIN_SPEC]
+scrib_meta = specialised["fit"][:N_TRAIN_SPEC]
 n_strokes = sum(m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in scrib_meta)
 print(
     f"{len(scrib_train)} training images · {n_strokes} strokes · {labelled:.2%} of the fundus pixels "
     f"labelled · ≈ {effort_minutes(n_strokes=n_strokes):.1f} min at "
-    f"{SPECIALISED['annotation_effort']['seconds_per_stroke']} s per stroke"
+    f"{specialised['annotation_effort']['seconds_per_stroke']} s per stroke"
 )
 ex = scrib_train[0]
 thick = {v: ndi.binary_dilation(ex["scribbles"] == v, iterations=2) for v in (1, 2)}
@@ -556,21 +556,21 @@ def train_scribble_head(train_yourself: bool):
     """The scribble head of rung 2. Returns the head's tensors, the training seconds and the DINOv3
     features of the training images (section 6 trains on them too)."""
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
-    side = SPECIALISED["feat_side"]
-    feats = [features_for(SPECIALISED, it, side) for it in scrib_train]
+        raise SystemExit("TRAIN_SCRIBBLE_HEAD must be True or False.")
+    side = specialised["feat_side"]
+    feats = [features_for(specialised, it, side) for it in scrib_train]
     # the rung's supervision: strokes only; unlabelled pixels and the border are ignored (-1)
     labels = [scribble_targets(it["scribbles"], region(it)) for it in scrib_train]
     if train_yourself:
         head, sec = train_head(feats, labels, HEAD_STEPS)
         src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, partial cross-entropy"
     else:
-        head, entry = load_head(SPECIALISED, "scribbles", side)
+        head, entry = load_head(specialised, "scribbles", side)
         sec = entry["train_sec"]
         src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
     print(f"scribble head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
     if sec > 60:
-        print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+        print("ℹ️ Slow session? Set TRAIN_SCRIBBLE_HEAD = False above to load our checkpoint next time.")
     return head, sec, feats
 
 # %% [markdown]
@@ -583,13 +583,13 @@ def train_scribble_head(train_yourself: bool):
 
 # %% [markdown]
 # The next cell trains the section-2 head on the scribbles of the five training images, every unlabelled
-# pixel ignored; with `TRAIN_YOURSELF = False` it loads our checkpoint, trained the same way on all fit
+# pixel ignored; with `TRAIN_SCRIBBLE_HEAD = False` it loads our checkpoint, trained the same way on all fit
 # images.
 
 # %%
 # @title Train the scribble head on the strokes (False = load our checkpoint) { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_YOURSELF)
+TRAIN_SCRIBBLE_HEAD = True  # @param {type:"boolean"}
+scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_SCRIBBLE_HEAD)
 
 # %% [markdown]
 # This cell scores the scribble head on the evaluation images with the same five numbers as the other rungs.
@@ -598,7 +598,7 @@ scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_YOURSELF)
 # @title Score the scribble head on the evaluation images { display-mode: "form" }
 t0 = time.monotonic()
 ladder_preds["scribbles"] = [
-    predict_head(scrib_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+    predict_head(scrib_head, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
 ]
 ladder_report["scribbles"] = rung_report(ladder_preds["scribbles"])
 scrib_infer = round(time.monotonic() - t0, 1)
@@ -618,13 +618,13 @@ print(
 # %%
 # @title Table, bar chart and error maps of all rungs { display-mode: "form" }
 effort = {
-    "zero_shot": effort_minutes(n_strokes=len(SPEC_EVAL)),  # one box per image you segment
+    "zero_shot": effort_minutes(n_strokes=len(spec_eval)),  # one box per image you segment
     "one_shot": effort_minutes(n_full_masks=1),
     "one_shot_sam": effort_minutes(n_full_masks=1),
     "scribbles": effort_minutes(n_strokes=n_strokes),
 }
 effort_text = {
-    "zero_shot": f"1 box per image ({len(SPEC_EVAL)} here)",
+    "zero_shot": f"1 box per image ({len(spec_eval)} here)",
     "one_shot": "1 complete mask",
     "one_shot_sam": "1 complete mask",
     "scribbles": f"{n_strokes} strokes, {len(scrib_train)} images",
@@ -646,7 +646,7 @@ COLUMNS = f"{'IoU':>6}{'clDice':>8}{'recall':>8}{'precis.':>8}{'marked':>8}"
 print(f"{'approach':<36}{COLUMNS}   annotation (≈ minutes)")
 for k, v in ladder_report.items():
     print(
-        f"{APPROACH_NAMES[k]:<36}{v['iou']:>6.3f}{v['cldice']:>8.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
+        f"{approach_names[k]:<36}{v['iou']:>6.3f}{v['cldice']:>8.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
         f"{v['marked']:>8.0%}   {effort_text[k]} (≈ {effort[k]:.1f})"
     )
 print(f"{'everything is foreground':<36}{RESULTS['specialised_everything_iou']:>6.3f}")
@@ -657,7 +657,7 @@ width = 0.8 / len(ladder_report)
 fig, ax = plt.subplots(figsize=(7.2, 3.2))
 for n, (k, v) in enumerate(ladder_report.items()):
     shift = (n - (len(ladder_report) - 1) / 2) * width
-    ax.bar(x + shift, [v[m] for m in metrics], width, color=APPROACH_COLOURS[k], label=APPROACH_NAMES[k])
+    ax.bar(x + shift, [v[m] for m in metrics], width, color=approach_colours[k], label=approach_names[k])
 ax.axhline(
     RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--", label='IoU of "everything"'
 )
@@ -671,7 +671,7 @@ plt.show()
 show_masks(
     [
         (
-            f"{APPROACH_NAMES[k].split(':')[0]} · IoU {score(ladder_preds[k][k_demo], demo)['iou']:.2f}",
+            f"{approach_names[k].split(':')[0]} · IoU {score(ladder_preds[k][k_demo], demo)['iou']:.2f}",
             error_map(demo["image"], ladder_preds[k][k_demo], demo),
         )
         for k in ladder_preds
@@ -723,8 +723,8 @@ for ax, a, b in zip(axes, keys[:-1], keys[1:], strict=True):
     ax.axis("off")
     ax.legend(
         handles=[
-            mpl.patches.Patch(color=APPROACH_COLOURS[a], label=f"only {APPROACH_SHORT[a]}"),
-            mpl.patches.Patch(color=APPROACH_COLOURS[b], label=f"only {APPROACH_SHORT[b]}"),
+            mpl.patches.Patch(color=approach_colours[a], label=f"only {APPROACH_SHORT[a]}"),
+            mpl.patches.Patch(color=approach_colours[b], label=f"only {APPROACH_SHORT[b]}"),
             mpl.patches.Patch(color=THEME["background"], label="both"),
         ],
         loc="upper center",
@@ -764,7 +764,7 @@ def try_bg_distance(bg_beyond_px: float | None) -> None:
     (None = ignore every unlabelled pixel). Trains a head, prints its numbers and draws the rule's targets."""
     if bg_beyond_px is not None and (not isinstance(bg_beyond_px, (int, float)) or bg_beyond_px <= 0):
         raise SystemExit("BG_BEYOND_PX must be a positive number of pixels, or 0 for none.")
-    side = SPECIALISED["feat_side"]
+    side = specialised["feat_side"]
     # smoke thumbnails are 4x smaller than the 1024 px crops
     bg_px = bg_beyond_px / 4 if (SMOKE and bg_beyond_px) else bg_beyond_px
     far_labels = [scribble_targets(it["scribbles"], region(it), bg_px) for it in scrib_train]
@@ -774,7 +774,7 @@ def try_bg_distance(bg_beyond_px: float | None) -> None:
     far_labelled = float(np.mean([(t >= 0)[region(it)].mean() for t, it in far_pairs]))
     far_head, far_sec = train_head(scrib_feats, far_labels, HEAD_STEPS)
     far_preds = [
-        predict_head(far_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(far_head, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
     ]
     far_report = rung_report(far_preds)
     RESULTS["scribbles_bg_beyond"] = far_report | {"bg_beyond_px": bg_beyond_px, "vessel_called_bg": wrong}

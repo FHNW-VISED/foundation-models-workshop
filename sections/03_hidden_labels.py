@@ -91,19 +91,19 @@ def two_colour(
 
 # %%
 # @title Hide half of the vessel segments and look at the result { display-mode: "form" }
-MISSING = SPECIALISED["missing_labels"]  # {"hidden_fraction": 0.5, "unit": ...}: never hard-coded here
-miss_train = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:N_TRAIN_SPEC]]
+missing_labels = specialised["missing_labels"]  # {"hidden_fraction": 0.5, "unit": ...}: never hard-coded here
+miss_train = [load_item(specialised, it) for it in specialised["fit"][:N_TRAIN_SPEC]]
 same_as_cache = []
 for it in miss_train:
     rng = hide_rng(it["name"])
-    visible = hide_units(it["mask"], MISSING["hidden_fraction"], rng, SPECIALISED["thin_structures"])
+    visible = hide_units(it["mask"], missing_labels["hidden_fraction"], rng, specialised["thin_structures"])
     same_as_cache.append(float((visible == it["visible"]).mean()))
     it["visible"], it["hidden"] = visible, it["mask"] & ~visible  # from now on: what training may see
 hidden_share = float(np.mean([it["hidden"].sum() / max(it["mask"].sum(), 1) for it in miss_train]))
 print(
     f"{len(miss_train)} training images · {hidden_share:.0%} of the vessel pixels hidden "
-    f"(asked for {MISSING['hidden_fraction']:.0%} of the segments) · pixels identical to the cached labels "
-    f"our checkpoints used: {np.mean(same_as_cache):.2%}"
+    f"(asked for {missing_labels['hidden_fraction']:.0%} of the segments) · pixels identical to the cached "
+    f"labels our checkpoints used: {np.mean(same_as_cache):.2%}"
 )
 
 ex = miss_train[0]
@@ -213,7 +213,7 @@ show_masks(hidden_panels(miss_train[0], believer[0]), width=2.9)
 
 # %%
 # @title Picture: two look-alike patches, two targets { display-mode: "form" }
-pic_side = int(2 * 16 * max(miss_train[0]["mask"].shape) / SPECIALISED["feat_side"])  # 2 × 2 patches, in px
+pic_side = int(2 * 16 * max(miss_train[0]["mask"].shape) / specialised["feat_side"])  # 2 × 2 patches, in px
 pic_half = pic_side // 2
 pic_pair = None
 for pic_item in miss_train:
@@ -276,32 +276,32 @@ def fit_naive(train_yourself: bool) -> tuple[dict, float, list[torch.Tensor], li
     """Naive head on the label file: returns (head, seconds, features, labels). The hidden ground truth never
     enters training (L-005)."""
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
-    side = SPECIALISED["feat_side"]
-    feats = [features_for(SPECIALISED, it, side) for it in miss_train]
+        raise SystemExit("TRAIN_NAIVE_HEAD must be True or False.")
+    side = specialised["feat_side"]
+    feats = [features_for(specialised, it, side) for it in miss_train]
     labels = [np.where(region(it), it["visible"], -1).astype(np.int8) for it in miss_train]  # unpainted = 0
     if train_yourself:
         head, sec = train_head(feats, labels, HEAD_STEPS, balanced=False)
         src = f"trained here on {len(miss_train)} images, {HEAD_STEPS} steps, plain cross-entropy"
     else:
-        head, entry = load_head(SPECIALISED, "hidden_bg", side)
+        head, entry = load_head(specialised, "hidden_bg", side)
         sec = entry["train_sec"]
         src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
     print(f"naive head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
     if sec > 60:
-        print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoint next time.")
+        print("ℹ️ Slow session? Untick TRAIN_NAIVE_HEAD above to load our checkpoint next time.")
     return head, sec, feats, labels
 
 
 # %% [markdown]
-# This cell trains the naive head and prints the seconds it took; untick `TRAIN_YOURSELF` and run it again
+# This cell trains the naive head and prints the seconds it took; untick `TRAIN_NAIVE_HEAD` and run it again
 # to load our checkpoint.
 
 # %%
 # @title Train the naive head { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-side = SPECIALISED["feat_side"]
-naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_YOURSELF)
+TRAIN_NAIVE_HEAD = True  # @param {type:"boolean"}
+side = specialised["feat_side"]
+naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_NAIVE_HEAD)
 
 # %% [markdown]
 # This cell scores the naive head and the section-2 head (full masks) on the vessel pixels we hid, the ones
@@ -310,23 +310,23 @@ naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_YOURSELF)
 # %%
 # @title Score both heads on hidden, painted and held-out vessels { display-mode: "form" }
 full_head = spec_heads[side][0]  # section 2.5: same features, trained on full masks
-HEADS = {"full masks (section 2)": full_head, "naive: missing = background": naive_head}
+compared_heads = {"full masks (section 2)": full_head, "naive: missing = background": naive_head}
 t0 = time.monotonic()
 naive_report = {}
-for name, tensors in HEADS.items():
+for name, tensors in compared_heads.items():
     fit_preds = [
         predict_head(tensors, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
     ]
     held_preds = [
-        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(tensors, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
     ]
-    held = mean_scores([score(p, it) for p, it in zip(held_preds, SPEC_EVAL, strict=True)])
-    held_pairs = zip(held_preds, SPEC_EVAL, strict=True)
+    held = mean_scores([score(p, it) for p, it in zip(held_preds, spec_eval, strict=True)])
+    held_pairs = zip(held_preds, spec_eval, strict=True)
     precision = [marked_precision(p & region(it), it["mask"]) for p, it in held_pairs]
     naive_report[name] = {
         "recall_hidden_fit": part_recall(fit_preds, miss_train, "hidden"),
         "recall_visible_fit": part_recall(fit_preds, miss_train, "visible"),
-        "recall_held": part_recall(held_preds, SPEC_EVAL, "mask"),
+        "recall_held": part_recall(held_preds, spec_eval, "mask"),
         "precision_held": float(np.mean(precision)),
         "iou_held": held["iou"],
         "cldice_held": held["cldice"],
@@ -368,7 +368,7 @@ ax.bar(
     color=THEME["background"],
     label="believer: the file itself",
 )
-for shift, name, colour in zip((0.0, 0.27), HEADS, (THEME["works"], THEME["fails"]), strict=True):
+for shift, name, colour in zip((0.0, 0.27), compared_heads, (THEME["works"], THEME["fails"]), strict=True):
     ax.bar(x + shift, [naive_report[name][g] for g in GROUPS], 0.26, color=colour, label=name)
 ax.set_xticks(x, list(GROUPS.values()), fontsize=8)
 ax.set_ylabel("share of vessel pixels found")
@@ -413,10 +413,10 @@ show_masks(
 # %%
 # @title show_naive_on_image: both heads on one held-out image { display-mode: "form" }
 def show_naive_on_image(k: int) -> None:
-    """Both heads' predictions on SPEC_EVAL[k] next to its ground truth, with the share of fundus marked."""
-    if not isinstance(k, int) or not 0 <= k < len(SPEC_EVAL):
-        raise SystemExit(f"DEMO_IMAGE must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
-    item = SPEC_EVAL[k]
+    """Both heads' predictions on spec_eval[k] next to its ground truth, with the share of fundus marked."""
+    if not isinstance(k, int) or not 0 <= k < len(spec_eval):
+        raise SystemExit(f"DEMO_IMAGE must be a whole number from 0 to {len(spec_eval) - 1}.")
+    item = spec_eval[k]
     panels = []
     for name, r in naive_report.items():
         pred = r["held_preds"][k]
@@ -480,7 +480,7 @@ def naive_with_hidden_share(percent: int) -> None:
     (the 3.3 helper), and print hidden vessels found and held-out precision next to the default run."""
     if not isinstance(percent, int) or not 0 <= percent <= 90:
         raise SystemExit("HIDE_PERCENT must be a whole number from 0 to 90.")
-    thin = SPECIALISED["thin_structures"]
+    thin = specialised["thin_structures"]
     visibles = [
         it["mask"] if percent == 0 else hide_units(it["mask"], percent / 100, hide_rng(it["name"]), thin)
         for it in miss_train
@@ -490,14 +490,14 @@ def naive_with_hidden_share(percent: int) -> None:
     trial = [dict(it, visible=v, hidden=it["mask"] & ~v) for it, v in zip(miss_train, visibles, strict=True)]
     fit_preds = [predict_head(head, f, it["mask"].shape) for f, it in zip(miss_feats, trial, strict=True)]
     held_preds = []
-    for it in SPEC_EVAL:
+    for it in spec_eval:
         if it["name"] not in _HELD_FEATS:
-            _HELD_FEATS[it["name"]] = features_for(SPECIALISED, it, SPECIALISED["feat_side"])
+            _HELD_FEATS[it["name"]] = features_for(specialised, it, specialised["feat_side"])
         held_preds.append(predict_head(head, _HELD_FEATS[it["name"]], it["mask"].shape))
     shown = next((it for it in trial if it["hidden"].any()), None)  # first image that has hidden vessels
     has_hidden = shown is not None
     rows = {
-        f"default ({MISSING['hidden_fraction']:.0%} of segments)": (
+        f"default ({missing_labels['hidden_fraction']:.0%} of segments)": (
             naive["recall_hidden_fit"],
             naive["recall_visible_fit"],
             naive["precision_held"],
@@ -509,7 +509,7 @@ def naive_with_hidden_share(percent: int) -> None:
                 np.mean(
                     [
                         marked_precision(p & region(it), it["mask"])
-                        for p, it in zip(held_preds, SPEC_EVAL, strict=True)
+                        for p, it in zip(held_preds, spec_eval, strict=True)
                     ]
                 )
             ),

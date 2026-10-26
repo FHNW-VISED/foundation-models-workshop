@@ -101,7 +101,7 @@ def show_sam_demo(items: list[dict], index: int) -> None:
 
 def features_for(dataset: dict, item: dict, long_side: int) -> torch.Tensor:
     """DINOv3 patch features [384, h, w]: from the precomputed file when it exists, else computed now."""
-    prefix = "pets" if dataset is PETS else "specialised"
+    prefix = "pets" if dataset is pets_task else "specialised"
     path = PRECOMPUTED / "features" / f"{prefix}_{long_side}.safetensors"
     if path.is_file():
         if path not in _FEATURE_FILES:
@@ -131,10 +131,13 @@ def pca_rgb(feat: torch.Tensor, shape: tuple[int, int]) -> np.ndarray:
 
 # %%
 # @title Load the held-out pets { display-mode: "form" }
-PETS["feat_side"] = 256 if SMOKE else PETS["index"]["feature_long_side"]
-PETS["eval"] = PETS["held"] if (SMOKE or DEVICE == "cuda") else PETS["held"][:12]
-PETS_EVAL = [load_item(PETS, it) for it in PETS["eval"]]
-print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PETS['feat_side']} px long side")
+pets_task["feat_side"] = 256 if SMOKE else pets_task["index"]["feature_long_side"]
+pets_task["eval"] = pets_task["held"] if (SMOKE or DEVICE == "cuda") else pets_task["held"][:12]
+pets_eval = [load_item(pets_task, it) for it in pets_task["eval"]]
+print(
+    f"evaluation set: {len(pets_eval)} held-out pets · "
+    f"DINOv3 features at {pets_task['feat_side']} px long side"
+)
 
 # %% [markdown]
 # ### 1.1 SAM: one click, one box
@@ -166,7 +169,7 @@ print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PE
 # %%
 # @title Q2 — SAM with one click and with one box on a held-out pet { display-mode: "form" }
 DEMO_INDEX = 0  # @param {type:"slider", min:0, max:11, step:1}
-show_sam_demo(PETS_EVAL, DEMO_INDEX)
+show_sam_demo(pets_eval, DEMO_INDEX)
 
 # %% [markdown]
 # Now drive SAM yourself on the same held-out pets: the widget below takes a click, a box or a word and draws
@@ -181,7 +184,7 @@ show_sam_demo(PETS_EVAL, DEMO_INDEX)
 
 # %%
 # @title Q3 — Click, box or a word: drive SAM yourself { display-mode: "form" }
-sam_playground(PETS_EVAL, "Pets: click, box, or a word", text_prompt=True, default_text="dog")
+sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, default_text="dog")
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the three tools -->
@@ -260,7 +263,7 @@ iou = use(my_iou, reference=_ref_iou, check=lambda f: round(float(f(_play_pred, 
 # @title Score SAM on every held-out pet { display-mode: "form" }
 t0 = time.monotonic()
 zero_shot_all = {"point": [], "box": []}
-for it in tqdm(PETS_EVAL, desc="SAM on the held-out pets"):
+for it in tqdm(pets_eval, desc="SAM on the held-out pets"):
     pt = click_point(it)
     by_point = sam.probability(it["image"], points=[pt], labels=[1]) >= 0.5
     by_box = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
@@ -272,7 +275,7 @@ RESULTS["pets_zero_shot_point_iou"] = zero_shot["point"]
 RESULTS["pets_zero_shot_box_iou"] = zero_shot["box"]
 RESULTS["pets_zero_shot_seconds"] = round(time.monotonic() - t0, 1)
 print(
-    f"SAM zero-shot on {len(PETS_EVAL)} held-out pets · mean IoU one click {zero_shot['point']:.3f} · "
+    f"SAM zero-shot on {len(pets_eval)} held-out pets · mean IoU one click {zero_shot['point']:.3f} · "
     f"one box {zero_shot['box']:.3f} · {RESULTS['pets_zero_shot_seconds']} s"
 )
 
@@ -286,7 +289,7 @@ print(
 order = np.argsort(zero_shot_all["box"])
 panels = []
 for label, pos in (("worst", order[0]), ("median", order[len(order) // 2]), ("best", order[-1])):
-    it = PETS_EVAL[int(pos)]
+    it = pets_eval[int(pos)]
     pred = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
     panels.append((f"{label} · IoU {zero_shot_all['box'][int(pos)]:.2f}", error_panel(it, pred)))
 show_masks(panels)
@@ -299,10 +302,10 @@ show_masks(panels)
 
 # %%
 # @title Show the patch features as colours { display-mode: "form" }
-fig_items = [load_item(PETS, it) for it in PETS["fit"][:3]]
+fig_items = [load_item(pets_task, it) for it in pets_task["fit"][:3]]
 panels = []
 for it in fig_items:
-    feat = features_for(PETS, it, PETS["feat_side"])
+    feat = features_for(pets_task, it, pets_task["feat_side"])
     title = f"DINOv3 PCA · {feat.shape[2]}×{feat.shape[1]} patches"
     panels += [(it["name"], it["image"]), (title, pca_rgb(feat, it["image"].shape[:2]))]
 show_masks(panels, width=2.6)
@@ -404,7 +407,7 @@ def predict_head(tensors: dict, feat: torch.Tensor, shape: tuple[int, int]) -> n
 def load_head(dataset: dict, regime: str, long_side: int | None = None) -> tuple[dict, dict]:
     """Our precomputed checkpoint for (dataset, regime): its tensors and its index entry."""
     long_side = long_side or dataset["feat_side"]
-    key = "pets" if dataset is PETS else SPECIALISED["key"]
+    key = "pets" if dataset is pets_task else specialised["key"]
     wanted = (key, regime, long_side)
     heads = PRECOMPUTED_HEADS
     entry = next((h for h in heads if (h["dataset"], h["regime"], h["long_side"]) == wanted), None)
@@ -419,11 +422,11 @@ def fit_pet_head(train_yourself: bool, n_pets: int, steps: int) -> tuple[list[di
     The "not sure" band is labelled -1, so the loss skips it. Returns pets, head, seconds, source line.
     """
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
-    items = [load_item(PETS, it) for it in PETS["fit"][:n_pets]]
-    feats = [features_for(PETS, it, PETS["feat_side"]) for it in items]
+        raise SystemExit("TRAIN_PET_HEAD must be True or False.")
+    items = [load_item(pets_task, it) for it in pets_task["fit"][:n_pets]]
+    feats = [features_for(pets_task, it, pets_task["feat_side"]) for it in items]
     if not train_yourself:
-        head, entry = load_head(PETS, "full5")
+        head, entry = load_head(pets_task, "full5")
         src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} pets)"
         return items, head, entry["train_sec"], src
     labels = []
@@ -437,17 +440,17 @@ def fit_pet_head(train_yourself: bool, n_pets: int, steps: int) -> tuple[list[di
 
 # %% [markdown]
 # This cell trains the head on the full masks of five fit pets (only sections 1 and 2 use full masks); the
-# grey "not sure" band is left out of its loss. Untick `TRAIN_YOURSELF` and run it again to load our
+# grey "not sure" band is left out of its loss. Untick `TRAIN_PET_HEAD` and run it again to load our
 # checkpoint instead.
 
 # %%
 # @title Train the linear head on five pets { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-N_TRAIN_PETS, HEAD_STEPS = 5, 30 if SMOKE else 200
-train_items, head_full5, head_sec, head_src = fit_pet_head(TRAIN_YOURSELF, N_TRAIN_PETS, HEAD_STEPS)
+TRAIN_PET_HEAD = True  # @param {type:"boolean"}
+N_TRAIN_PETS = 5
+train_items, head_full5, head_sec, head_src = fit_pet_head(TRAIN_PET_HEAD, N_TRAIN_PETS, HEAD_STEPS)
 print(f"linear head · {head_src} · {head_sec:.1f} s on {DEVICE}")
 if head_sec > 60:
-    print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoint next time.")
+    print("ℹ️ Slow session? Untick TRAIN_PET_HEAD above to load our checkpoint next time.")
 
 # %% [markdown]
 # This cell runs the head you just trained on one training pet and shows each step (patches, one probability
@@ -456,7 +459,7 @@ if head_sec > 60:
 # %%
 # @title The linear head step by step on one pet { display-mode: "form" }
 hx = train_items[0]
-hfeat = features_for(PETS, hx, PETS["feat_side"])  # [384, h, w]: 384 numbers per patch
+hfeat = features_for(pets_task, hx, pets_task["feat_side"])  # [384, h, w]: 384 numbers per patch
 dev = hfeat.device
 with torch.no_grad():
     hp = {k: v.to(dev) for k, v in head_full5.items()}
@@ -503,9 +506,10 @@ plt.show()
 # @title Score the head on the held-out pets { display-mode: "form" }
 t0 = time.monotonic()
 head_preds = [
-    predict_head(head_full5, features_for(PETS, it, PETS["feat_side"]), it["mask"].shape) for it in PETS_EVAL
+    predict_head(head_full5, features_for(pets_task, it, pets_task["feat_side"]), it["mask"].shape)
+    for it in pets_eval
 ]
-head_ious = [pet_iou(pred, it) for pred, it in zip(head_preds, PETS_EVAL, strict=True)]
+head_ious = [pet_iou(pred, it) for pred, it in zip(head_preds, pets_eval, strict=True)]
 RESULTS["pets_head_iou"] = float(np.mean(head_ious))
 RESULTS["pets_head"] = {
     "iou": RESULTS["pets_head_iou"],
@@ -513,7 +517,7 @@ RESULTS["pets_head"] = {
     "train_sec": round(float(head_sec), 2),
     "infer_sec": round(time.monotonic() - t0, 1),
 }
-n_eval = len(PETS_EVAL)
+n_eval = len(pets_eval)
 print(f"Linear head: trained in 1.4 on {len(train_items)} pets with full masks, run on {n_eval} unseen pets.")
 print(f"Score: per-pet IoU with the ground truth (grey band not scored), averaged over the {n_eval} pets.")
 print(f"  linear head       mean IoU {RESULTS['pets_head_iou']:.3f}")
@@ -522,7 +526,7 @@ print(f"  SAM, one box      mean IoU {RESULTS['pets_zero_shot_box_iou']:.3f}  (t
 panels, works = [], THEME["works"]
 order = np.argsort(head_ious)
 for label, pos in (("worst", order[0]), ("median", order[n_eval // 2]), ("best", order[-1])):
-    it = PETS_EVAL[int(pos)]
+    it = pets_eval[int(pos)]
     panels += [
         (f"head, {label} · IoU {head_ious[int(pos)]:.2f}", overlay(it["image"], head_preds[int(pos)], works)),
         ("ground truth", truth_panel(it)),
@@ -566,7 +570,7 @@ show_masks(panels, width=2.6)
 
 # %%
 # @title Click on the floor, not the pet { display-mode: "form" }
-it = PETS_EVAL[0]
+it = pets_eval[0]
 floor_ys, floor_xs = np.nonzero(region(it) & ~it["mask"])  # a floor pixel, not one in the grey band
 k = int(np.random.default_rng([SEED, len(floor_ys)]).integers(len(floor_ys)))
 floor_pt = [float(floor_xs[k]), float(floor_ys[k])]

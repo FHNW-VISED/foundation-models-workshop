@@ -44,8 +44,8 @@
 
 # %%
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
-APPROACH_COLOURS |= {"full_masks": THEME["works"]}
-APPROACH_NAMES |= {"full_masks": "full masks: complete maps (section 2)"}
+approach_colours |= {"full_masks": THEME["works"]}
+approach_names |= {"full_masks": "full masks: complete maps (section 2)"}
 ALL_APPROACHES = [  # the short names Q33 accepts
     "zero_shot",
     "one_shot",
@@ -75,20 +75,20 @@ COMPARE_LABEL = {  # readable names for figure titles and the table
     "full_masks": "full masks",
 }
 # A 🔴 part you skipped must not break this section: its row is left out, with one note.
-SKIPPED = {}
+skipped = {}
 if "one_shot_sam" not in ladder_report or "proto_sam_sec" not in globals():
-    SKIPPED["one_shot_sam"] = "the 'prototype → SAM clicks' cell of section 4 was not run"
-if APPROACH_NAMES["pu"] not in path_reports or "pu_head" not in RESULTS:
-    SKIPPED["pu"] = "the PU cell of section 5.3 was not run"
-COMPARE_ORDER = [k for k in ALL_APPROACHES if k not in SKIPPED]
-COMPARE_REPORTS = (  # mean IoU, clDice, recall, precision, marked share and held-out predictions per approach
+    skipped["one_shot_sam"] = "the 'prototype → SAM clicks' cell of section 4 was not run"
+if approach_names["pu"] not in path_reports or "pu_head" not in RESULTS:
+    skipped["pu"] = "the PU cell of section 5.3 was not run"
+compare_order = [k for k in ALL_APPROACHES if k not in skipped]
+compare_reports = (  # mean IoU, clDice, recall, precision, marked share and held-out predictions per approach
     {k: ladder_report[k] | {"held_preds": ladder_preds[k]} for k in ladder_report}
-    | {k: path_reports[APPROACH_NAMES[k]] for k in ("naive", "masked", "pu") if k not in SKIPPED}
+    | {k: path_reports[approach_names[k]] for k in ("naive", "masked", "pu") if k not in skipped}
     | {k: path2_report[k] | {"held_preds": path2_preds[k]} for k in ("sam_pseudo", "gradcam_pseudo")}
     | {k: path3_report[k] | {"held_preds": path3_preds[k]} for k in ("sam_clicks", "sam_boxes")}
     | {"full_masks": path_reports["full masks (section 2)"]}
 )
-COMPARE_SECONDS = {  # training + pseudo-labels + inference, as recorded by each section in this session
+compare_seconds = {  # training + pseudo-labels + inference, as recorded by each section in this session
     "zero_shot": RESULTS["specialised_zero_shot_seconds"] / len(LADDER),  # the box: 1 of section 2's prompts
     "one_shot": proto_sec,
     "full_masks": spec_heads[side][1] + RESULTS["scribbles_head"]["infer_sec"],  # same head, same features
@@ -104,19 +104,19 @@ COMPARE_SECONDS = {  # training + pseudo-labels + inference, as recorded by each
         "sam_clicks": "sam_direct_clicks",
         "sam_boxes": "sam_direct_boxes",
     }.items()
-    if k not in SKIPPED
+    if k not in skipped
 }
-if "one_shot_sam" not in SKIPPED:
-    COMPARE_SECONDS["one_shot_sam"] = proto_sec + proto_sam_sec
-COMPARE_EFFORT = (  # annotation minutes for this run (section 4's effort_minutes and its assumptions)
+if "one_shot_sam" not in skipped:
+    compare_seconds["one_shot_sam"] = proto_sec + proto_sam_sec
+compare_effort = (  # annotation minutes for this run (section 4's effort_minutes and its assumptions)
     RESULTS["ladder_effort_min"]
     | RESULTS["path1_effort_min"]
     | RESULTS["path2_effort_min"]
     | RESULTS["path3_effort_min"]
     | {"full_masks": round(effort_minutes(n_full_masks=len(spec_train)), 2)}
 )
-COMPARE_PER_IMAGE = {  # annotation minutes for every *new* image; trained heads need none
-    k: 0.0 for k in COMPARE_ORDER
+compare_per_image = {  # annotation minutes for every *new* image; trained heads need none
+    k: 0.0 for k in compare_order
 } | {
     "zero_shot": effort_minutes(n_strokes=1),  # one box
     "sam_clicks": RESULTS["sam_direct_clicks"]["effort_min_per_image"],
@@ -136,15 +136,15 @@ SCALES = {
     "sam_boxes": "strokes on every new image, SAM per box; the clicking never stops",
     "full_masks": "hours of painting per training image; new images cost one feature pass",
 }
-WITH_CLDICE = "cldice" in SPECIALISED.get("metric_extras", [])
-print(f"{len(COMPARE_ORDER)} approaches, each scored on the same {len(SPEC_EVAL)} held-out images:")
-for k in COMPARE_ORDER:
-    print(f"  {k:<16}{APPROACH_NAMES[k]}")
-for k, why in SKIPPED.items():
+use_cldice = "cldice" in specialised.get("metric_extras", [])
+print(f"{len(compare_order)} approaches, each scored on the same {len(spec_eval)} held-out images:")
+for k in compare_order:
+    print(f"  {k:<16}{approach_names[k]}")
+for k, why in skipped.items():
     print(f"note: '{k}' is left out of this section, {why}. Run it to add the row.")
-cost =SPECIALISED["annotation_effort"]
+cost =specialised["annotation_effort"]
 print(
-    f"effort assumptions ({SPECIALISED['name']}): {cost['seconds_per_stroke']} s per stroke, click or box · "
+    f"effort assumptions ({specialised['name']}): {cost['seconds_per_stroke']} s per stroke, click or box · "
     f"{cost['hours_per_full_mask'][0]}–{cost['hours_per_full_mask'][-1]} h per complete mask "
     f"(we count {np.mean(cost['hours_per_full_mask']):.0f} h)"
 )
@@ -158,15 +158,15 @@ print(
 # %%
 # @title All approaches on one held-out image { display-mode: "form" }
 k_show = 0  # which held-out image to look at
-it_show = SPEC_EVAL[k_show]
+it_show = spec_eval[k_show]
 truth_img = overlay(it_show["image"], it_show["mask"], THEME["truth"])
 gallery = [
     (f"{it_show['name']} · image", it_show["image"], "#311B92"),
     ("ground truth (scoring only)", truth_img, THEME["truth"]),
 ]
-for k in COMPARE_ORDER:
-    pred = COMPARE_REPORTS[k]["held_preds"][k_show] & region(it_show)
-    colour = APPROACH_COLOURS[k]
+for k in compare_order:
+    pred = compare_reports[k]["held_preds"][k_show] & region(it_show)
+    colour = approach_colours[k]
     gallery.append((f"{COMPARE_LABEL[k]}\n{k}", overlay(it_show["image"], pred, colour), colour))
 g_cols = 5
 g_rows = -(-len(gallery) // g_cols)
@@ -218,41 +218,41 @@ def spread(per_image_iou: list[float]) -> float:
 # %%
 # @title Score every approach and show the table { display-mode: "form" }
 comparison = []
-PER_IMAGE_IOU = {}  # approach -> its IoU on each held-out image (drawn as violins below)
-for k in COMPARE_ORDER:
-    rep = COMPARE_REPORTS[k]
-    pairs = zip(rep["held_preds"], SPEC_EVAL, strict=True)
+iou_per_image = {}  # approach -> its IoU on each held-out image (drawn as violins below)
+for k in compare_order:
+    rep = compare_reports[k]
+    pairs = zip(rep["held_preds"], spec_eval, strict=True)
     per_image = [iou(p & region(it), it["mask"] & region(it)) for p, it in pairs]
-    PER_IMAGE_IOU[k] = per_image
+    iou_per_image[k] = per_image
     comparison.append(
         {
             "approach": k,
-            "name": APPROACH_NAMES[k],
+            "name": approach_names[k],
             "iou": float(np.mean(per_image)),
-            **({"cldice": float(rep["cldice"])} if WITH_CLDICE else {}),
+            **({"cldice": float(rep["cldice"])} if use_cldice else {}),
             "recall": float(rep["recall"]),
             "precision": float(rep["precision"]),
-            "effort_min": float(COMPARE_EFFORT[k]),
-            "effort_min_per_new_image": round(float(COMPARE_PER_IMAGE[k]), 2),
+            "effort_min": float(compare_effort[k]),
+            "effort_min_per_new_image": round(float(compare_per_image[k]), 2),
             "reliability": float(spread(per_image)),
             "worst_iou": float(np.min(per_image)),
-            "seconds": round(float(COMPARE_SECONDS[k]), 1),
+            "seconds": round(float(compare_seconds[k]), 1),
             "scalability": SCALES[k],
         }
     )
 RESULTS["comparison_table"] = comparison
-RESULTS["comparison_assumptions"] = dict(SPECIALISED["annotation_effort"]) | {
-    "reliability": f"standard deviation of the IoU over {len(SPEC_EVAL)} held-out images",
+RESULTS["comparison_assumptions"] = dict(specialised["annotation_effort"]) | {
+    "reliability": f"standard deviation of the IoU over {len(spec_eval)} held-out images",
     "seconds": f"training + pseudo-labels + inference in this session, on {DEVICE}",
 }
 
 from html import escape
 
 ranked = sorted(comparison, key=lambda r: r["iou"], reverse=True)
-THICK_IOU = RESULTS["sam_direct_strokes_alone"]["iou"]
-TABLE_COLS = [  # header, row key, number format, which value is the best one
+thick_iou = RESULTS["sam_direct_strokes_alone"]["iou"]
+table_cols = [  # header, row key, number format, which value is the best one
     ("IoU", "iou", "{:.3f}", max),
-    *([("clDice", "cldice", "{:.3f}", max)] if WITH_CLDICE else []),
+    *([("clDice", "cldice", "{:.3f}", max)] if use_cldice else []),
     ("recall", "recall", "{:.3f}", max),
     ("± spread", "reliability", "{:.3f}", min),
     ("worst", "worst_iou", "{:.3f}", max),
@@ -265,35 +265,35 @@ TABLE_COLS = [  # header, row key, number format, which value is the best one
 def comparison_html(rows: list[dict]) -> str:
     """The table as HTML: a colour chip per approach, the best value of each column in bold."""
     best = {}
-    for _, key, fmt, pick in TABLE_COLS:
+    for _, key, fmt, pick in table_cols:
         top = fmt.format(pick(r[key] for r in rows))
         ties = sum(fmt.format(r[key]) == top for r in rows)
         best[key] = top if ties <= 3 else None  # when many rows tie, nobody is "the best"
     th = "padding:4px 8px;border-bottom:2px solid #311B92;color:#311B92;text-align:"
     td = "padding:3px 8px;border-bottom:1px solid #D1C4E9;text-align:"
     head = f'<th style="{th}left">approach</th>'
-    head += "".join(f'<th style="{th}right">{h}</th>' for h, *_ in TABLE_COLS)
+    head += "".join(f'<th style="{th}right">{h}</th>' for h, *_ in table_cols)
     lines = []
     for r in rows:
         chip = (
             '<span style="display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;'
-            f'background:{APPROACH_COLOURS[r["approach"]]}"></span>'
+            f'background:{approach_colours[r["approach"]]}"></span>'
         )
         cells = f'<td style="{td}left;white-space:nowrap">{chip}{escape(COMPARE_LABEL[r["approach"]])} '
         cells += f'<span style="color:#757575">{r["approach"]}</span></td>'
-        for _, key, fmt, _pick in TABLE_COLS:
+        for _, key, fmt, _pick in table_cols:
             text = fmt.format(r[key])
             text = f"<b>{text}</b>" if text == best[key] else text
             cells += f'<td style="{td}right">{text}</td>'
         lines.append(f"<tr>{cells}</tr>")
     for label, value in (
-        ("no model: strokes thickened (section 7)", THICK_IOU),
+        ("no model: strokes thickened (section 7)", thick_iou),
         ("everything is foreground", RESULTS["specialised_everything_iou"]),
     ):
         grey = "color:#757575;font-style:italic"
         lines.append(
             f'<tr><td style="{td}left;{grey}">{label}</td><td style="{td}right;{grey}">{value:.3f}</td>'
-            f'<td colspan="{len(TABLE_COLS) - 1}" style="{td}left"></td></tr>'
+            f'<td colspan="{len(table_cols) - 1}" style="{td}left"></td></tr>'
         )
     scales = "".join(f"<li><b>{r['approach']}</b>: {escape(r['scalability'])}</li>" for r in rows)
     return (
@@ -315,9 +315,9 @@ try:
     display(HTML(comparison_html(ranked)))
 except ImportError:  # no IPython: a plain list with the same numbers
     for r in ranked:
-        nums = " · ".join(f"{h} {fmt.format(r[key])}" for h, key, fmt, _ in TABLE_COLS)
+        nums = " · ".join(f"{h} {fmt.format(r[key])}" for h, key, fmt, _ in table_cols)
         print(f"{r['approach']:<16}{nums}")
-    print(f"no model: strokes thickened (section 7) {THICK_IOU:.3f}")
+    print(f"no model: strokes thickened (section 7) {thick_iou:.3f}")
     print(f"everything is foreground {RESULTS['specialised_everything_iou']:.3f}")
 
 winner = ranked[0]["approach"]
@@ -331,7 +331,7 @@ if MY_STEADIEST in by_spread:
     rank = by_spread.index(MY_STEADIEST) + 1
     print(f"your steadiness pick {MY_STEADIEST} ranks {rank} of {len(by_spread)}")
 for pick in {MY_WINNER, MY_STEADIEST} - {"", *by_spread}:
-    print(f"(your pick {pick} was left out: {SKIPPED.get(pick, 'not run')})")
+    print(f"(your pick {pick} was left out: {skipped.get(pick, 'not run')})")
 if not (MY_WINNER or MY_STEADIEST):
     print("no prediction written in Q33; fine, but next time guess first: it is the cheapest lesson here")
 
@@ -359,7 +359,7 @@ for group in groups:
     for r in sorted(group, key=lambda r: r["iou"]):
         label_y[r["approach"]] = y_prev = max(r["iou"], y_prev + gap)
 for r in comparison:
-    x, colour = max(r["effort_min"], 0.01), APPROACH_COLOURS[r["approach"]]
+    x, colour = max(r["effort_min"], 0.01), approach_colours[r["approach"]]
     ax.errorbar(x, r["iou"], yerr=r["reliability"], fmt="o", ms=7, capsize=3, color=colour)
     ax.annotate(
         r["approach"],
@@ -380,7 +380,7 @@ ax.set_ylim(0, top)
 ax.set_title("Accuracy against annotation")
 ax.legend(fontsize=7, frameon=False, loc="upper left")
 names = [r["approach"] for r in ranked][::-1]
-bx.barh(names, [r["seconds"] for r in ranked][::-1], color=[APPROACH_COLOURS[k] for k in names])
+bx.barh(names, [r["seconds"] for r in ranked][::-1], color=[approach_colours[k] for k in names])
 bx.set_xlabel(f"seconds, training + inference ({DEVICE})")
 bx.tick_params(axis="y", labelsize=7)
 bx.set_title("Compute (sorted by IoU, best at the top)")
@@ -453,8 +453,8 @@ plt.show()
 # @title Violin plot: each approach's IoU over the held-out images { display-mode: "form" }
 fig, ax = plt.subplots(figsize=(10, 3.8))
 for x, r in enumerate(ranked):
-    vals = np.asarray(PER_IMAGE_IOU[r["approach"]], float)
-    colour = APPROACH_COLOURS[r["approach"]]
+    vals = np.asarray(iou_per_image[r["approach"]], float)
+    colour = approach_colours[r["approach"]]
     if len(vals) >= 2 and np.ptp(vals) > 1e-9:  # a violin needs some spread to draw
         body = ax.violinplot(vals, positions=[x], widths=0.8, showextrema=False)["bodies"][0]
         body.set_facecolor(colour)
@@ -477,12 +477,12 @@ plt.show()
 
 # %%
 # @title Worst, typical and best image of the IoU winner { display-mode: "form" }
-w_iou = np.asarray(PER_IMAGE_IOU[winner], float)
+w_iou = np.asarray(iou_per_image[winner], float)
 w_order = np.argsort(w_iou)
 panels = []
 w_picks = (("worst", w_order[0]), ("typical (median)", w_order[len(w_order) // 2]), ("best", w_order[-1]))
 for tag, n in w_picks:
-    it_n, pred_n = SPEC_EVAL[n], COMPARE_REPORTS[winner]["held_preds"][n]
+    it_n, pred_n = spec_eval[n], compare_reports[winner]["held_preds"][n]
     panels.append((f"{winner} · {tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
 show_masks(panels, width=3.4)
 

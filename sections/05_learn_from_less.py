@@ -33,13 +33,13 @@
 
 # %%
 # @title Path 1 helpers: train with any loss, score a head, view the loss mask { display-mode: "form" }
-APPROACH_COLOURS |= {
+approach_colours |= {
     "naive": "#BF360C",
     "naive_balanced": "#FF8A65",
     "masked": "#F9A825",
     "pu": "#6D4C41",
 }
-APPROACH_NAMES |= {
+approach_names |= {
     "naive": "naive: missing = background",
     "naive_balanced": "naive, balanced loss (3.4)",
     "masked": "masked: missing = unknown",
@@ -89,7 +89,7 @@ def path_report(tensors: dict) -> dict:
         predict_head(tensors, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
     ]
     held_preds = [
-        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(tensors, features_for(specialised, it, side), it["mask"].shape) for it in spec_eval
     ]
     out = {
         "recall_hidden_fit": part_recall(fit_preds, miss_train, "hidden"),
@@ -159,7 +159,7 @@ known = {
     "naive": np.mean([(lab >= 0).mean() for lab in naive_labels]),
     "masked": np.mean([(lab >= 0).mean() for lab in masked_labels]),
 }
-n_bg_strokes = sum(m.get("n_bg_strokes", 0) for m in SPECIALISED["fit"][: len(miss_train)])
+n_bg_strokes = sum(m.get("n_bg_strokes", 0) for m in specialised["fit"][: len(miss_train)])
 print(
     f"pixels the loss hears about · naive {known['naive']:.1%} (all called background unless painted) · "
     f"masked {known['masked']:.1%} ({n_bg_strokes} background strokes over {len(miss_train)} images) · "
@@ -248,13 +248,13 @@ show_masked_play(masked_loss_fn)
 def train_masked_head(train_yourself: bool):
     """The masked head of Path 1. Returns the head's tensors and the training seconds."""
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+        raise SystemExit("TRAIN_MASKED_HEAD must be True or False.")
     # the supervision of this path: painted vessels + background strokes; no hidden truth (L-005)
     if train_yourself:
         head, sec = train_head_with(miss_feats, masked_labels, masked_loss_fn, HEAD_STEPS)
         src = f"trained here on {len(miss_train)} images, {HEAD_STEPS} steps, masked loss"
     else:
-        head, entry = load_head(SPECIALISED, "masked", side)
+        head, entry = load_head(specialised, "masked", side)
         sec = entry["train_sec"]
         src = (
             f"our checkpoint {entry['file']} ({len(entry['train_names'])} images). ⚠️ It was told exactly "
@@ -263,7 +263,7 @@ def train_masked_head(train_yourself: bool):
         )
     print(f"masked head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
     if sec > 60:
-        print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+        print("ℹ️ Slow session? Set TRAIN_MASKED_HEAD = False above to load our checkpoint next time.")
     return head, sec
 
 # %% [markdown]
@@ -277,15 +277,15 @@ def train_masked_head(train_yourself: bool):
 
 # %% [markdown]
 # The next cell trains the head with your masked loss (or ours) on the masked labels of 5.1.
-# With `TRAIN_YOURSELF = False` it loads our "masked" checkpoint instead, which was made with a **stricter
+# With `TRAIN_MASKED_HEAD = False` it loads our "masked" checkpoint instead, which was made with a **stricter
 # rule**: it was told exactly which pixels next to the hidden vessels are unknown and that the rest is
 # background. That rule needs the hidden truth, so its numbers are an upper bound for this path, not what
 # you can do from the half-painted file.
 
 # %%
 # @title Train the masked head (False = load our checkpoint) { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-masked_head, masked_sec = train_masked_head(TRAIN_YOURSELF)
+TRAIN_MASKED_HEAD = True  # @param {type:"boolean"}
+masked_head, masked_sec = train_masked_head(TRAIN_MASKED_HEAD)
 
 # %% [markdown]
 # The next cell scores the masked head next to the heads of sections 2 and 3, on the hidden and visible
@@ -294,7 +294,7 @@ masked_head, masked_sec = train_masked_head(TRAIN_YOURSELF)
 # %%
 # @title Score the masked head next to the earlier heads { display-mode: "form" }
 t0 = time.monotonic()
-path_reports = {APPROACH_NAMES["masked"]: path_report(masked_head)}
+path_reports = {approach_names["masked"]: path_report(masked_head)}
 masked_infer = round(time.monotonic() - t0, 1)
 earlier_heads = {"naive": naive_head}
 if "balanced_head" in globals():  # made by the 🔴 Q14 cell of section 3; skipped there = no such row here
@@ -302,9 +302,9 @@ if "balanced_head" in globals():  # made by the 🔴 Q14 cell of section 3; skip
 else:
     print("ℹ️ No balanced naive head (the 🔴 Q14 cell of section 3 was skipped): its row is left out.")
 for key, tensors in earlier_heads.items():
-    path_reports[APPROACH_NAMES[key]] = path_report(tensors)
+    path_reports[approach_names[key]] = path_report(tensors)
 path_reports["full masks (section 2)"] = path_report(full_head)
-masked = path_reports[APPROACH_NAMES["masked"]]
+masked = path_reports[approach_names["masked"]]
 
 RESULTS["masked_recall_hidden_fg"] = masked["recall_hidden_fit"]  # same definition as section 3 (SPEC §9)
 RESULTS["masked_head"] = public(masked) | {
@@ -312,15 +312,15 @@ RESULTS["masked_head"] = public(masked) | {
     "n_train": len(miss_train),
     "known_share": float(known["masked"]),
     "n_bg_strokes": int(n_bg_strokes),
-    "trained_here": TRAIN_YOURSELF,
+    "trained_here": TRAIN_MASKED_HEAD,
     "train_sec": round(float(masked_sec), 2),
     "infer_sec": masked_infer,
 }
 print_reports(path_reports)
 print(f"section 3 recorded for the naive head · hidden-vessel recall {RESULTS['naive_recall_hidden_fg']:.3f}")
 
-PATH_COLOURS = {APPROACH_NAMES[k]: APPROACH_COLOURS[k] for k in earlier_heads} | {
-    APPROACH_NAMES["masked"]: APPROACH_COLOURS["masked"],
+path_colours = {approach_names[k]: approach_colours[k] for k in earlier_heads} | {
+    approach_names["masked"]: approach_colours["masked"],
     "full masks (section 2)": THEME["works"],
 }
 BARS = {
@@ -336,7 +336,7 @@ def path_chart(names: list[str]) -> None:
     fig, ax = plt.subplots(figsize=(7.2, 3))
     for j, name in enumerate(names):
         shift = (j - (len(names) - 1) / 2) * width
-        ax.bar(x + shift, [path_reports[name][b] for b in BARS], width, color=PATH_COLOURS[name], label=name)
+        ax.bar(x + shift, [path_reports[name][b] for b in BARS], width, color=path_colours[name], label=name)
     ax.set_xticks(x, list(BARS.values()), fontsize=8)
     ax.set_ylim(0, 1)
     ax.set_title("Path 1: what each head finds, and how much of what it marks is right")
@@ -345,7 +345,7 @@ def path_chart(names: list[str]) -> None:
     plt.show()
 
 
-path_chart(list(PATH_COLOURS))
+path_chart(list(path_colours))
 
 # %% [markdown]
 # This helper cell defines `compare_heads`: the hidden vessels each head found on one training image, then the
@@ -359,8 +359,8 @@ def compare_heads(image_index: int) -> None:
     if not isinstance(image_index, int) or not 0 <= image_index < len(miss_train):
         raise SystemExit(f"LOOK_IMAGE must be a whole number from 0 to {len(miss_train) - 1}.")
     it = miss_train[image_index]
-    names = [APPROACH_NAMES["naive"], APPROACH_NAMES["masked"]]
-    k_demo = next(i for i, e in enumerate(SPEC_EVAL) if e is demo)
+    names = [approach_names["naive"], approach_names["masked"]]
+    k_demo = next(i for i, e in enumerate(spec_eval) if e is demo)
     fit_preds = {name: path_reports[name]["fit_preds"][image_index] for name in names}
     show_masks(
         [
@@ -529,8 +529,8 @@ def train_pu_head(labelled_share: float):
         )
     head, sec = train_head_with(miss_feats, pu_labels, lambda z, y, ig: pu_loss(z, y, ig, prior), HEAD_STEPS)
     t0 = time.monotonic()
-    path_reports[APPROACH_NAMES["pu"]] = pu = path_report(head)
-    PATH_COLOURS[APPROACH_NAMES["pu"]] = APPROACH_COLOURS["pu"]
+    path_reports[approach_names["pu"]] = pu = path_report(head)
+    path_colours[approach_names["pu"]] = approach_colours["pu"]
     RESULTS["pu_recall_hidden_fg"] = pu["recall_hidden_fit"]
     RESULTS["pu_head"] = public(pu) | {
         "long_side": side,
@@ -544,7 +544,7 @@ def train_pu_head(labelled_share: float):
         f"PU head · painted {painted_share:.1%} of the fundus ÷ labelled share {labelled_share:.2f} → prior "
         f"{prior:.1%} vessel · trained in {sec:.1f} s on {DEVICE}"
     )
-    shown = [APPROACH_NAMES[k] for k in ("naive", "masked", "pu")]
+    shown = [approach_names[k] for k in ("naive", "masked", "pu")]
     print_reports({k: path_reports[k] for k in shown})
     path_chart(shown)
     return head
@@ -622,10 +622,10 @@ def recipe_comparison(eval_image: int) -> None:
     """2 x 3 figure: for the naive, masked and PU head, the loss view of training image 0 (row 1) and the
     error map on held-out image `eval_image` (row 2; -1 = the section-2 demo). Uses the predictions already
     stored in `path_reports`; the PU column asks for 5.3 if that head was not trained."""
-    k = next(i for i, e in enumerate(SPEC_EVAL) if e is demo) if eval_image < 0 else eval_image
-    if not isinstance(k, int) or not 0 <= k < len(SPEC_EVAL):
-        raise SystemExit(f"EVAL_IMAGE must be -1 (the demo) or a whole number up to {len(SPEC_EVAL) - 1}.")
-    item, train = SPEC_EVAL[k], miss_train[0]
+    k = next(i for i, e in enumerate(spec_eval) if e is demo) if eval_image < 0 else eval_image
+    if not isinstance(k, int) or not 0 <= k < len(spec_eval):
+        raise SystemExit(f"EVAL_IMAGE must be -1 (the demo) or a whole number up to {len(spec_eval) - 1}.")
+    item, train = spec_eval[k], miss_train[0]
     recipes = [
         ("naive", "vessel = 1, everything else = 0", loss_view(train, naive_labels[0])),
         ("masked", "vessel = 1, strokes = 0, rest ignored", loss_view(train, masked_labels[0])),
@@ -634,8 +634,8 @@ def recipe_comparison(eval_image: int) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(10.5, 7.2))
     for col, (key, told, told_img) in enumerate(recipes):
         axes[0, col].imshow(told_img)
-        axes[0, col].set_title(f"{APPROACH_NAMES[key].split(':')[0]}: the loss hears\n{told}", fontsize=9)
-        name = APPROACH_NAMES[key]
+        axes[0, col].set_title(f"{approach_names[key].split(':')[0]}: the loss hears\n{told}", fontsize=9)
+        name = approach_names[key]
         if name in path_reports:
             pred = path_reports[name]["held_preds"][k]
             truth = item["mask"] & region(item)
@@ -671,7 +671,7 @@ recipe_comparison(EVAL_IMAGE)
 # %%
 # @title Annotation effort of the Path 1 heads { display-mode: "form" }
 # LABELLED_SHARE is set in the 🔴 PU cell (5.3); if it was skipped, use the annotator's share from the config
-_share = LABELLED_SHARE if "LABELLED_SHARE" in globals() else 1 - MISSING["hidden_fraction"]
+_share = LABELLED_SHARE if "LABELLED_SHARE" in globals() else 1 - missing_labels["hidden_fraction"]
 painted_masks = len(miss_train) * _share
 RESULTS["path1_effort_min"] = {
     "naive": round(effort_minutes(n_full_masks=painted_masks), 2),
@@ -680,7 +680,7 @@ RESULTS["path1_effort_min"] = {
 }
 print(
     " · ".join(
-        f"{APPROACH_NAMES[k].split(':')[0]} {v:.0f} min" for k, v in RESULTS["path1_effort_min"].items()
+        f"{approach_names[k].split(':')[0]} {v:.0f} min" for k, v in RESULTS["path1_effort_min"].items()
     )
 )
 
