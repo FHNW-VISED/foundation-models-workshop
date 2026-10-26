@@ -10,7 +10,7 @@ design source; the 2025 `AMDL_workshop` repo is **discarded**). Agents never cha
 `Status` column of §6. **[OPEN]** marks a default taken while Simone's answer is pending.
 
 ## 1. Purpose
-A hands-on workshop at **AMLD 2027** (EPFL, Thu 11 Mar 2027) and **SDS2027** (Zurich, 1 Jun 2027).
+A hands-on workshop at **AMLD 2027** (EPFL, Thu 11 Mar 2027). Any other event is out of scope until confirmed (Simone, 2026-10-26).
 Participants start from a vision foundation model that works out of the box on a simple
 segmentation task. They watch it fall short on a specialised one, then add task-specific
 information step by step: scribbles, missing labels, pseudo-labels, explanations, direct prompting.

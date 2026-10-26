@@ -15,3 +15,6 @@ Never edit a version folder.
 | v06 | 2026-10-26 | SPEC: made with Susanne Suter (SN rules incl. SN-006); RULES.md synced with the current ledger | 91a315d |
 | v07 | 2026-10-26 | Simone review 2026-10-26: interactive SAM, pets band, clDice visual, shorter cells | b6b44ad |
 | v08 | 2026-10-26 | Simone review round 2: cuts, PU on main path, legends N-059, playground truth toggle | 46a0986 |
+| v09 | 2026-10-26 | AMLD only: SDS 2027 mention removed | 2a2f8b1 |
+| v10 | 2026-10-26 | AMLD only + colour swatches next to every colour named in text (N-059) | 3625d93 |
+| v11 | 2026-10-26 | SAM 3 downloads itself into the cache when HF_TOKEN is set | 6d44a0d |

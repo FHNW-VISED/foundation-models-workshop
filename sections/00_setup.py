@@ -5,7 +5,7 @@
 # <!-- callout: banner | When Foundation Models Fall Short -->
 # **From Off-the-Shelf AI to Problem-Specific Adaptation**
 #
-# AMLD 2027 · EPFL, 11 March 2027 &nbsp;·&nbsp; SDS 2027 · Zurich, 1 June 2027
+# AMLD 2027 · EPFL, 11 March 2027
 #
 # **The question:** what can modern AI solve out of the box, when do its limitations
 # start to matter, and what should we do next?
@@ -232,9 +232,12 @@ print(f"cache: {CACHE_DIR} · specialised task: {specialised['name']} ({speciali
 # %% [markdown]
 # ### The theme
 #
-# This cell sets the colours used in every figure: violet means "it works", orange "it fails, we adapt",
-# green is the hidden ground truth and teal marks scribbles, the same in every plot. Masks are drawn on a
-# grey copy of the photo, so every colour you see belongs to a mask and none to the photo.
+# This cell sets the colours used in every figure: $\color{#6A1B9A}{\blacksquare}$ violet means "it works",
+# $\color{#E65100}{\blacksquare}$ orange "it fails, we adapt",
+# $\color{#2E7D32}{\blacksquare}$ green is the hidden ground truth and $\color{#00838F}{\blacksquare}$ teal
+# marks scribbles, the same in every plot. Masks are drawn on a
+# $\color{#9E9E9E}{\blacksquare}$ grey copy of the photo, so every colour you see belongs to a mask and none
+# to the photo.
 
 # %%
 # @title Theme and image helpers { display-mode: "form" }
@@ -337,8 +340,10 @@ def load_index(dataset: dict) -> dict:
 # ### The data
 #
 # This cell reads the two datasets (pets, and the specialised task) and shows two images of each with the
-# ground truth in green and its share of the pixels in the title; the ground truth is for evaluation only.
-# Light grey marks pixels nobody scores: on the pets, the "not sure" band that the annotators drew around the
+# ground truth in $\color{#2E7D32}{\blacksquare}$ green and its share of the pixels in the title; the ground
+# truth is for evaluation only.
+# $\color{#E0E0E0}{\blacksquare}$ Light grey marks pixels nobody scores: on the pets, the "not sure" band
+# that the annotators drew around the
 # outline of each animal.
 
 # %%
@@ -505,11 +510,70 @@ HEAD_STEPS = 30 if SMOKE else 200  # training steps for every linear head in the
 _SAM3: dict = {}  # SAM 3 is loaded on the first text request and kept here
 
 
+# what transformers needs from the SAM 3 repo, not the duplicate sam3.pt
+SAM3_FILES = ["*.json", "*.txt", "model.safetensors", "*.model"]
+
+
+def hf_token() -> str | None:
+    """Your Hugging Face token: the HF_TOKEN environment variable, else Colab's 🔑 Secrets, else None."""
+    if os.environ.get("HF_TOKEN"):
+        return os.environ["HF_TOKEN"]
+    if IN_COLAB:
+        try:
+            from google.colab import userdata
+
+            return userdata.get("HF_TOKEN")
+        except Exception:  # noqa: BLE001 - no secret, or notebook access switched off
+            return None
+    return None
+
+
+def fetch_sam3() -> Path | None:
+    """SAM 3 not in the cache but a token is set: download it once into the cache, as setup_check would."""
+    import hashlib
+
+    from huggingface_hub import snapshot_download
+
+    token = hf_token()
+    if SMOKE or token is None:
+        return None
+    folder = MODELS_DIR / SAM3_ID.replace("/", "--")
+    print(f"SAM 3 is not in your cache yet: downloading it once (~3.4 GB, a few minutes) into {folder}")
+    snapshot_download(SAM3_ID, local_dir=folder, token=token, allow_patterns=SAM3_FILES)
+
+    def sha256_of(path: Path) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        return h.hexdigest()
+
+    files = [
+        p for p in sorted(folder.rglob("*")) if p.is_file() and ".cache" not in p.relative_to(folder).parts
+    ]
+    meta = {
+        p.relative_to(folder).as_posix(): {"bytes": p.stat().st_size, "sha256": sha256_of(p)} for p in files
+    }
+    (folder / MODEL_DONE).write_text(json.dumps(meta, indent=1))  # the same marker setup_check writes
+    return model_folder(SAM3_ID)
+
+
 def load_sam3() -> dict:
-    """SAM 3 from your cache (never the internet): {"model", "proc", "dtype"}, or {"error": a plain line}."""
+    """SAM 3 from the cache, downloaded once if a token is set: {"model", "proc", "dtype"} or {"error"}."""
     if _SAM3:
         return _SAM3
     folder = model_folder(SAM3_ID)
+    if folder is None:
+        try:
+            folder = fetch_sam3()
+        except Exception as err:  # noqa: BLE001 - 403 while approval is pending, no network, a full Drive
+            pending = "403" in str(err) or "authorized" in str(err) or "awaiting" in str(err)
+            _SAM3["error"] = (
+                f"SAM 3 could not be downloaded: Meta has not approved your access to {SAM3_ID} yet."
+                if pending
+                else f"SAM 3 could not be downloaded ({type(err).__name__}). SAM 2.1 still works."
+            )
+            return _SAM3
     try:
         from transformers import Sam3Model, Sam3Processor
 
@@ -521,8 +585,9 @@ def load_sam3() -> dict:
     except Exception as err:  # noqa: BLE001 - not cached, no access, an older transformers: all mean "no SAM 3"
         if folder is None:
             _SAM3["error"] = (
-                f"SAM 3 is not in your cache: request access at huggingface.co/{SAM3_ID} (Meta approves by "
-                "hand), then run setup_check.ipynb with your HF token in Colab's 🔑 Secrets as HF_TOKEN."
+                f"SAM 3 is not in your cache and no HF_TOKEN is set: request access at "
+                f"huggingface.co/{SAM3_ID} (Meta approves by hand), add your token in Colab's 🔑 Secrets as "
+                "HF_TOKEN with notebook access on, and run this cell again."
             )
         else:
             _SAM3["error"] = (
@@ -855,4 +920,7 @@ image has one, else the whole image) SAM's mask covers.</div></div>
 #   evaluation only.
 # - When a cell needs a model → `dino` and `sam` are already loaded, nothing is downloaded.
 # - When you skip or fail a `...` stub → `use()` continues with our version, nothing breaks.
-# - When you read a figure → violet works, orange falls short, green is ground truth, teal is a scribble.
+# - When you read a figure → <span style="color:#6A1B9A">■</span> violet works,
+#   <span style="color:#E65100">■</span> orange falls short, <span style="color:#2E7D32">■</span> green is
+#   ground
+#   truth, <span style="color:#00838F">■</span> teal is a scribble.

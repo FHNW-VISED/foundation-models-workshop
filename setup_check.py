@@ -1,6 +1,6 @@
 # %% [markdown]
 # <!-- callout: banner | Setup check · When Foundation Models Fall Short -->
-# **From Off-the-Shelf AI to Problem-Specific Adaptation** · AMLD 2027 · SDS 2027
+# **From Off-the-Shelf AI to Problem-Specific Adaptation** · AMLD 2027
 #
 # Run this notebook **once, in the week before the workshop**. It takes about 5 minutes
 # on a normal connection and leaves everything the workshop needs in a folder of your Google Drive. On the

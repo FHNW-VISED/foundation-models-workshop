@@ -149,6 +149,22 @@ def module_level(body: list[ast.stmt], path: tuple = ()):
             yield from module_level(handler.body, path + ((id(node), f"handler{k}"),))
 
 
+COLOUR_WORD_RE = re.compile(
+    r"(?<![\w$])(light grey|dark grey|violet|purple|orange|green|teal|grey|gray|pink|white|yellow|blue|red)"
+    r"(?![\w-])",
+    re.I,
+)
+SWATCH_RE = re.compile(r"(blacksquare|\\square|■|□|<font color)[^■□]{0,45}$")
+
+
+def unswatched_colours(line: str) -> list[str]:
+    """N-059: colour words in markdown text with no swatch of that colour right before them."""
+    text = re.sub(r"`[^`]*`", "", line)  # code spans are code, not legends
+    if "red, green" in text:  # a list of channels (e.g. RGB), not a legend
+        return []
+    return [m.group(1) for m in COLOUR_WORD_RE.finditer(text) if not SWATCH_RE.search(text[: m.start()])]
+
+
 def exclusive(a: tuple, b: tuple) -> bool:
     """True when two branch paths can never both run: they split at one if/try into different branches."""
     for (node_a, field_a), (node_b, field_b) in zip(a, b, strict=False):
@@ -309,6 +325,9 @@ def main() -> int:
             is_callout = check_callouts(where, src)
             if not is_callout and re.search(r"\bstyle\s*=", src):  # the build owns callout HTML
                 fail(where, "markdown uses style= — Colab strips it; use a callout marker (N-025, N-034)")
+            for line in src.splitlines():
+                if colours := unswatched_colours(line):
+                    fail(where, f"colour named without a swatch {colours}: put one right before it (N-059)")
             for line in src.splitlines():
                 for q in forward_question_refs(line, expected_q):
                     warnings.append(f"WARNING {where}: mentions Q{q} before it is asked (N-052)")

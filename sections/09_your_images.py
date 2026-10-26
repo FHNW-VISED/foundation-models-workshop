@@ -373,9 +373,11 @@ own = pick_images(ASK_UPLOAD, USE_EXAMPLE, MY_IMAGES)
 # <!-- callout: your-turn | Your turn (optional, 4 min): scribble -->
 # Run the next cell: a canvas appears over each image.
 #
-# 1. With the **thing** pen (teal), draw two to five short strokes *on* what you want segmented, on
+# 1. With the **thing** pen (<span style="color:#00838F">■</span> teal), draw two to five short strokes *on*
+#    what you want segmented, on
 #    different parts of it.
-# 2. With the **background** pen (grey), draw two to five strokes on what you do not want, especially near
+# 2. With the **background** pen (<span style="color:#9E9E9E">■</span> grey), draw two to five strokes on
+#    what you do not want, especially near
 #    the boundary and on anything that looks similar.
 # 3. Press **💾 save strokes** under each canvas, then run the "collect strokes" cell further down.
 #
@@ -397,7 +399,8 @@ if not IN_COLAB:
 # Some browsers or extensions block the canvas. The fallback:
 #
 # 1. Open a copy of your image in any paint program (Preview, Paint, a phone's markup tool).
-# 2. Draw the thing strokes in **pure red** (255, 0, 0) and the background strokes in **pure blue**
+# 2. Draw the thing strokes in $\color{#FF0000}{\blacksquare}$ **pure red** (255, 0, 0) and the background
+#    strokes in $\color{#0000FF}{\blacksquare}$ **pure blue**
 #    (0, 0, 255), and save it as PNG.
 # 3. Upload it with the folder icon on the left and put its path in `MY_STROKE_PNGS` below, one per image,
 #    in the order above (`""` skips one). Any size works.
@@ -405,7 +408,8 @@ if not IN_COLAB:
 # %% [markdown]
 # This cell gathers the strokes of every image, counts them, and shows them next to the photos.
 #
-# What to look for: teal strokes on the thing, grey strokes on what you do not want. If an image shows none,
+# What to look for: $\color{#00838F}{\blacksquare}$ teal strokes on the thing,
+# $\color{#9E9E9E}{\blacksquare}$ grey strokes on what you do not want. If an image shows none,
 # the next cells use our generated strokes for it.
 
 # %%
@@ -569,8 +573,10 @@ def run_own_ladder(items: list[dict], n_clicks: int, box_pad: float) -> dict:
 #
 # - Write down which of the three rungs you expect to give the cleanest mask, and which the worst.
 # - Then run the next cell (seconds on a T4, much slower on CPU). Each row is one image: your strokes, the
-#   three masks in violet, and on the example the ground truth in green with the IoU.
-# - What to look for: where the three violet masks differ, and which one respects your strokes.
+#   three masks in <span style="color:#6A1B9A">■</span> violet, and on the example the ground truth in
+#   <span style="color:#2E7D32">■</span> green with the IoU.
+# - What to look for: where the three <span style="color:#6A1B9A">■</span> violet masks differ, and which one
+#   respects your strokes.
 #
 # **Q21.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
 # Where a rung failed, was it:
@@ -602,7 +608,8 @@ own_preds = run_own_ladder(ladder_own, N_OWN_CLICKS, OWN_BOX_PAD)
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the disagreement map -->
-# The map is pink on every pixel that **some** of the three masks mark and **others** do not. A thin rim
+# The map is <span style="color:#D81B60">■</span> pink on every pixel that **some** of the three masks mark
+# and **others** do not. A thin rim
 # along the thing means the rungs agree on *what* it is and differ on the edge. Whole patches mean they
 # disagree on what belongs to the thing.
 
@@ -619,9 +626,12 @@ def disagreement(masks: list[np.ndarray]) -> np.ndarray:
 
 
 # %% [markdown]
-# This cell computes the disagreement of the three rungs on each of your images and shows it in pink.
+# This cell computes the disagreement of the three rungs on each of your images and shows it in
+# $\color{#D81B60}{\blacksquare}$ pink.
 #
-# What to look for: a thin pink rim, or whole pink parts, and whether the pink sits on your strokes.
+# What to look for: a thin $\color{#D81B60}{\blacksquare}$ pink rim, or whole
+# $\color{#D81B60}{\blacksquare}$ pink parts, and whether the $\color{#D81B60}{\blacksquare}$ pink sits on
+# your strokes.
 
 # %%
 # @title Disagreement map of the three rungs { display-mode: "form" }
@@ -642,21 +652,24 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q22.** 🟡 Where is the pink?
+# **Q22.** 🟡 Where is the $\color{#D81B60}{\blacksquare}$ pink?
 #
 # - Along the boundary of the thing?
 # - On whole parts of it?
 # - On something in the background that looks similar?
 #
 # If you could add only two more strokes per image, where would you put them, and with which pen? On the
-# example, compare the retina's pink with the pets'. To test your answer, draw those strokes on the canvas
+# example, compare the retina's $\color{#D81B60}{\blacksquare}$ pink with the pets'. To test your answer,
+# draw those strokes on the canvas
 # of 9.2, save, and run the cells from the stroke collection again.
 #
 # <details><summary>What to look for</summary>
 #
-# - A thin pink rim: the rungs agree on *what* it is, and differ on the exact edge (SAM's sharp boundary
+# - A thin $\color{#D81B60}{\blacksquare}$ pink rim: the rungs agree on *what* it is, and differ on the exact
+#   edge (SAM's sharp boundary
 #   against the head's 16 px squares). More strokes will not fix that.
-# - Whole pink parts: they disagree on what belongs to the thing, usually a part you never stroked. That is
+# - Whole $\color{#D81B60}{\blacksquare}$ pink parts: they disagree on what belongs to the thing, usually a
+#   part you never stroked. That is
 #   where the next stroke pays.
 # - After redrawing, SAM from clicks changes only near the new clicks. The head changes on every image,
 #   because it learns one rule from all strokes: a trained head spreads annotation everywhere.

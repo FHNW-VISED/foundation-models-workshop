@@ -273,8 +273,10 @@ show_boxes(
 )
 
 # %% [markdown]
-# **What to look for.** Green is missed vessels. Each box finds only what lies inside it, so expect a lot of
-# green between the boxes. Compare the middle and right panels: is SAM's answer better than the plain
+# **What to look for.** $\color{#2E7D32}{\blacksquare}$ Green is missed vessels. Each box finds only what
+# lies inside it, so expect a lot of
+# $\color{#2E7D32}{\blacksquare}$ green between the boxes. Compare the middle and right panels: is SAM's
+# answer better than the plain
 # thickened strokes?
 
 # %% [markdown]
@@ -379,7 +381,8 @@ show_masks(
 
 # %% [markdown]
 # **What to look for.** The two trained heads (second and third panel) are not prompted on this image at use
-# time. The two SAM recipes are, with strokes drawn on it. Look at orange (invented) and green (missed):
+# time. The two SAM recipes are, with strokes drawn on it. Look at $\color{#E65100}{\blacksquare}$ orange
+# (invented) and $\color{#2E7D32}{\blacksquare}$ green (missed):
 # which approach mostly invents, which mostly misses?
 
 # %% [markdown]
