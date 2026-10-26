@@ -5,7 +5,7 @@
 # <!-- callout: banner | When Foundation Models Fall Short -->
 # **From Off-the-Shelf AI to Problem-Specific Adaptation**
 #
-# AMLD 2027 · EPFL, 11 March 2027 &nbsp;·&nbsp; SDS 2027 · Zurich, 1 June 2027
+# AMLD 2027 · EPFL, 11 March 2027
 #
 # **The question:** what can modern AI solve out of the box, when do its limitations
 # start to matter, and what should we do next?
