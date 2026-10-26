@@ -171,7 +171,8 @@ def diff_map(image: np.ndarray, prev: np.ndarray, new: np.ndarray, k_prev: str, 
 
 def rung_report(preds: list[np.ndarray]) -> dict:
     """Mean IoU, clDice, recall, precision and marked share of the evaluation region, over SPEC_EVAL."""
-    out = mean_scores([score(p, it) for p, it in zip(preds, SPEC_EVAL, strict=True)])
+    pairs = tqdm(list(zip(preds, SPEC_EVAL, strict=True)), desc="scoring (IoU, clDice)", leave=False)
+    out = mean_scores([score(p, it) for p, it in pairs])
     out["recall"] = part_recall(preds, SPEC_EVAL, "mask")
     pairs = zip(preds, SPEC_EVAL, strict=True)
     out["precision"] = float(np.mean([hidden_recall(it["mask"], p & region(it)) for p, it in pairs]))
@@ -245,6 +246,55 @@ show_extremes(sam_box_masks)
 # 4. Upsample the scores to pixels and mark those above 0.
 
 # %% [markdown]
+# This helper cell defines `run_one_shot`: it builds the two prototypes from one annotated image, scores every
+# evaluation image, prints the numbers and draws the maps.
+
+# %%
+# @title One-shot helper: prototypes from one annotated image { display-mode: "form" }
+def run_one_shot(image_index: int):
+    """Rung 1 from the annotated training image `image_index`: prints the numbers and draws the maps.
+    Returns the annotated item, the similarity map of every evaluation image and the scoring seconds."""
+    if not isinstance(image_index, int) or not 0 <= image_index < len(SPECIALISED["fit"]):
+        raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(SPECIALISED['fit']) - 1}.")
+    side = SPECIALISED["feat_side"]
+    shot = load_item(SPECIALISED, SPECIALISED["fit"][image_index])
+    shot_feat = features_for(SPECIALISED, shot, side)
+    grid, r = tuple(shot_feat.shape[1:]), region(shot)
+    # the rung's supervision: one complete mask of one *training* image (L-005)
+    protos = prototypes(shot_feat, patch_share(shot["mask"] & r, grid), patch_share(~shot["mask"] & r, grid))
+    t0 = time.monotonic()
+    proto_scores = [prototype_score(features_for(SPECIALISED, it, side), protos) for it in SPEC_EVAL]
+    ladder_preds["one_shot"] = [
+        score_to_mask(s, it["mask"].shape) for s, it in zip(proto_scores, SPEC_EVAL, strict=True)
+    ]
+    ladder_report["one_shot"] = rung_report(ladder_preds["one_shot"])
+    proto_sec = round(time.monotonic() - t0, 1)
+    v = ladder_report["one_shot"]
+    print(
+        f"one-shot prototype from {shot['name']} · IoU {v['iou']:.3f} · clDice {v['cldice']:.3f} · recall "
+        f"{v['recall']:.3f} · precision {v['precision']:.3f} · marks {v['marked']:.0%} · "
+        f"{proto_sec} s on {DEVICE}"
+    )
+    print(f"for scale: the section-2 head on five complete masks · IoU {RESULTS['specialised_head_iou']:.3f}")
+    show_masks(
+        [
+            (
+                f"the one annotated image · {shot['name']}",
+                overlay(shot["image"], shot["mask"], THEME["truth"]),
+            ),
+            ("similarity: vessel − background", heat_rgb(proto_scores[k_demo], demo["mask"].shape)),
+            (
+                f"one-shot prototype · IoU {score(ladder_preds['one_shot'][k_demo], demo)['iou']:.2f}",
+                overlay(demo["image"], ladder_preds["one_shot"][k_demo], THEME["fails"]),
+            ),
+            ("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"])),
+        ],
+        width=2.8,
+    )
+    return shot, proto_scores, proto_sec
+
+
+# %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # You saw SAM's box on the three images above (its "marked" share and its error maps). Before running the
 # prototype, write one guess for each:
@@ -253,7 +303,7 @@ show_extremes(sam_box_masks)
 # - Will it find the thin vessels, or only the thick ones?
 
 # %% [markdown]
-# **Q12.** 🟡 Look at the similarity map and the IoU you got:
+# **Q15.** 🟡 Look at the similarity map and the IoU you got:
 #
 # - Which parts of the held-out image look most like the annotated vessels (purple), and which like the
 #   background (orange)?
@@ -264,45 +314,13 @@ show_extremes(sam_box_masks)
 # <!-- callout: your-turn | Your turn: swap the annotated image -->
 # - Run the next cell: it builds the two prototypes from one annotated image, scores every evaluation image
 #   (seconds), and shows the similarity map and the mask on the demo image.
-# - Then set `ONE_SHOT_IMAGE` to 1, 2, … and run it again, to answer Q12.
+# - Then change the field `ONE_SHOT_IMAGE` (the annotated training image: try 1, 2, …) and run it again, to
+#   answer Q15.
 
 # %%
-# Q12 — one-shot: the prototypes of one annotated image, applied to every held-out image
-ONE_SHOT_IMAGE = 0  # which training image is the annotated one; try 1, 2, ...
-if not isinstance(ONE_SHOT_IMAGE, int) or not 0 <= ONE_SHOT_IMAGE < len(SPECIALISED["fit"]):
-    raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(SPECIALISED['fit']) - 1}.")
-side = SPECIALISED["feat_side"]
-shot = load_item(SPECIALISED, SPECIALISED["fit"][ONE_SHOT_IMAGE])
-shot_feat = features_for(SPECIALISED, shot, side)
-grid, r = tuple(shot_feat.shape[1:]), region(shot)
-# the rung's supervision: one complete mask of one *training* image (L-005)
-protos = prototypes(shot_feat, patch_share(shot["mask"] & r, grid), patch_share(~shot["mask"] & r, grid))
-t0 = time.monotonic()
-proto_scores = [prototype_score(features_for(SPECIALISED, it, side), protos) for it in SPEC_EVAL]
-ladder_preds["one_shot"] = [
-    score_to_mask(s, it["mask"].shape) for s, it in zip(proto_scores, SPEC_EVAL, strict=True)
-]
-ladder_report["one_shot"] = rung_report(ladder_preds["one_shot"])
-proto_sec = round(time.monotonic() - t0, 1)
-v = ladder_report["one_shot"]
-print(
-    f"one-shot prototype from {shot['name']} · IoU {v['iou']:.3f} · clDice {v['cldice']:.3f} · recall "
-    f"{v['recall']:.3f} · precision {v['precision']:.3f} · marks {v['marked']:.0%} · "
-    f"{proto_sec} s on {DEVICE}"
-)
-print(f"for scale: the section-2 head on five complete masks · IoU {RESULTS['specialised_head_iou']:.3f}")
-show_masks(
-    [
-        (f"the one annotated image · {shot['name']}", overlay(shot["image"], shot["mask"], THEME["truth"])),
-        ("similarity: vessel − background", heat_rgb(proto_scores[k_demo], demo["mask"].shape)),
-        (
-            f"one-shot prototype · IoU {score(ladder_preds['one_shot'][k_demo], demo)['iou']:.2f}",
-            overlay(demo["image"], ladder_preds["one_shot"][k_demo], THEME["fails"]),
-        ),
-        ("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"])),
-    ],
-    width=2.8,
-)
+# @title Q15 — one-shot: one annotated image, applied to every held-out image { display-mode: "form" }
+ONE_SHOT_IMAGE = 0  # @param {type:"integer"}
+shot, proto_scores, proto_sec = run_one_shot(ONE_SHOT_IMAGE)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -333,7 +351,7 @@ show_masks(
 N_PROTO_CLICKS = 5  # positive clicks, and as many negative ones, per image
 t0 = time.monotonic()
 ladder_preds["one_shot_sam"], proto_clicks = [], []
-for it, s in zip(SPEC_EVAL, proto_scores, strict=True):
+for it, s in tqdm(list(zip(SPEC_EVAL, proto_scores, strict=True)), desc="SAM on the evaluation images"):
     keep = patch_share(region(it), tuple(s.shape))
     pos = top_points(s, keep, N_PROTO_CLICKS, it["mask"].shape, largest=True)
     neg = top_points(s, keep, N_PROTO_CLICKS, it["mask"].shape, largest=False)
@@ -360,7 +378,7 @@ show_clicks(
 )
 
 # %% [markdown]
-# **Q13.** 🔴 Same annotated image, same similarity map, two ways to use it. Compare the prototype mask
+# **Q16.** 🔴 Same annotated image, same similarity map, two ways to use it. Compare the prototype mask
 # with the SAM mask:
 #
 # - Which one draws wider vessels, and which loses thin branches?
@@ -386,7 +404,7 @@ show_clicks(
 # <!-- callout: question | Question for the coffee break -->
 # No code, just think about it over coffee.
 #
-# **Q14.** 🟡 You have 50 fundus images and a 4-hour annotation budget. Perfect labels cost 3 to 5 hours per
+# **Q17.** 🟡 You have 50 fundus images and a 4-hour annotation budget. Perfect labels cost 3 to 5 hours per
 # image, and the cheap ones lie: the label file says "background" wherever nobody looked. Without buying more
 # labels, what could you tell the training about a pixel nobody labelled? Think of at least two options before
 # 4.3.
@@ -465,7 +483,7 @@ show_masks(
 # This cell holds our version of the function you can write below. Open it only if you get stuck.
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
+# @title Reference solution and play example (open only if stuck) { display-mode: "form" }
 def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_px: float | None = None):
     """Reference: strokes as given, unlabelled ignored (or background when far from every vessel stroke)."""
     targets = np.full(scribbles.shape, -1, np.int8)
@@ -475,6 +493,25 @@ def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_p
     targets[scribbles == 1] = 1
     targets[~np.asarray(region, bool)] = -1
     return targets
+
+
+_play_scrib = np.zeros((6, 6), np.uint8)
+_play_scrib[1, :4] = 1  # a vessel stroke
+_play_scrib[4, 1:3] = 2  # a background stroke
+_play_scrib[5, 5] = 2  # a background stroke outside the region
+_play_region = np.ones((6, 6), bool)
+_play_region[:, 5] = False  # the last column is outside the evaluation region
+
+
+def _check_scribble_targets(f):
+    """What `use` compares: the targets of the play map without and with a distance rule."""
+    return [np.asarray(f(_play_scrib, _play_region, d)).astype(int) for d in (None, 2)]
+
+
+def show_scribble_play(fn) -> None:
+    """Print the targets `fn` makes on the 6 x 6 play map."""
+    print("play example · targets with bg_beyond_px=2 (−1 = ignored):")
+    print(fn(_play_scrib, _play_region, 2))
 
 
 # %% [markdown]
@@ -501,20 +538,40 @@ def my_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_px:
     ...
 
 
-_play_scrib = np.zeros((6, 6), np.uint8)
-_play_scrib[1, :4] = 1  # a vessel stroke
-_play_scrib[4, 1:3] = 2  # a background stroke
-_play_scrib[5, 5] = 2  # a background stroke outside the region
-_play_region = np.ones((6, 6), bool)
-_play_region[:, 5] = False  # the last column is outside the evaluation region
 scribble_targets = use(
     my_scribble_targets,
     reference=_ref_scribble_targets,
-    check=lambda f: [np.asarray(f(_play_scrib, _play_region, d)).astype(int) for d in (None, 2)],
+    check=_check_scribble_targets,
     name="scribble_targets",
 )
-print("play example · targets with bg_beyond_px=2 (−1 = ignored):")
-print(scribble_targets(_play_scrib, _play_region, 2))
+show_scribble_play(scribble_targets)
+
+# %% [markdown]
+# This helper cell defines `train_scribble_head`: it trains the section-2 head on the strokes (or loads our
+# checkpoint) and returns the head, its training seconds and the training features.
+
+# %%
+# @title Scribble-head helper: train on the strokes, or load ours { display-mode: "form" }
+def train_scribble_head(train_yourself: bool):
+    """The scribble head of rung 2. Returns the head's tensors, the training seconds and the DINOv3
+    features of the training images (section 6 trains on them too)."""
+    if not isinstance(train_yourself, bool):
+        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+    side = SPECIALISED["feat_side"]
+    feats = [features_for(SPECIALISED, it, side) for it in scrib_train]
+    # the rung's supervision: strokes only; unlabelled pixels and the border are ignored (-1)
+    labels = [scribble_targets(it["scribbles"], region(it)) for it in scrib_train]
+    if train_yourself:
+        head, sec = train_head(feats, labels, HEAD_STEPS)
+        src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, partial cross-entropy"
+    else:
+        head, entry = load_head(SPECIALISED, "scribbles", side)
+        sec = entry["train_sec"]
+        src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
+    print(f"scribble head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
+    if sec > 60:
+        print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+    return head, sec, feats
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -530,23 +587,9 @@ print(scribble_targets(_play_scrib, _play_region, 2))
 # images.
 
 # %%
-TRAIN_YOURSELF = True  # False -> load our precomputed "scribbles" head instead of training
-if not isinstance(TRAIN_YOURSELF, bool):
-    raise SystemExit("TRAIN_YOURSELF must be True or False.")
-
-scrib_feats = [features_for(SPECIALISED, it, side) for it in scrib_train]
-# the rung's supervision: strokes only; unlabelled pixels and the border are ignored (-1), never "background"
-scrib_labels = [scribble_targets(it["scribbles"], region(it)) for it in scrib_train]
-if TRAIN_YOURSELF:
-    scrib_head, scrib_sec = train_head(scrib_feats, scrib_labels, HEAD_STEPS)
-    src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, partial cross-entropy"
-else:
-    scrib_head, entry = load_head(SPECIALISED, "scribbles", side)
-    scrib_sec = entry["train_sec"]
-    src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
-print(f"scribble head @ {side} px · {src} · {scrib_sec:.1f} s on {DEVICE}")
-if scrib_sec > 60:
-    print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+# @title Train the scribble head on the strokes (False = load our checkpoint) { display-mode: "form" }
+TRAIN_YOURSELF = True  # @param {type:"boolean"}
+scrib_head, scrib_sec, scrib_feats = train_scribble_head(TRAIN_YOURSELF)
 
 # %% [markdown]
 # This cell scores the scribble head on the evaluation images with the same five numbers as the other rungs.
@@ -638,7 +681,7 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q15.** 🟡 Read the table and the error maps rung by rung:
+# **Q18.** 🟡 Read the table and the error maps rung by rung:
 #
 # - Which rung has the lowest recall (misses the most, green)? Which has the lowest precision (invents the
 #   most, orange)? Is it the rung with the lowest IoU?
@@ -710,10 +753,66 @@ plt.show()
 # %% [markdown]
 # ### 4.6 🔴 Optional: choose a distance
 #
-# Want to see what the shortcut costs? The next cell tries it on the real scribbles.
+# Want to see what the shortcut costs? A cell below tries it on the real scribbles. First its helper:
+# `try_bg_distance` turns the scribbles into targets with your distance, trains the same head on them,
+# prints its numbers next to the scribble head of 4.3 and draws what the rule did.
+
+# %%
+# @title Distance-rule helper: targets, head, numbers and maps { display-mode: "form" }
+def try_bg_distance(bg_beyond_px: float | None) -> None:
+    """Scribbles plus the rule "farther than `bg_beyond_px` from every vessel stroke = background"
+    (None = ignore every unlabelled pixel). Trains a head, prints its numbers and draws the rule's targets."""
+    if bg_beyond_px is not None and (not isinstance(bg_beyond_px, (int, float)) or bg_beyond_px <= 0):
+        raise SystemExit("BG_BEYOND_PX must be a positive number of pixels, or 0 for none.")
+    side = SPECIALISED["feat_side"]
+    # smoke thumbnails are 4x smaller than the 1024 px crops
+    bg_px = bg_beyond_px / 4 if (SMOKE and bg_beyond_px) else bg_beyond_px
+    far_labels = [scribble_targets(it["scribbles"], region(it), bg_px) for it in scrib_train]
+    # diagnosis only: how much of the true vessel area the rule called background (never used for training)
+    far_pairs = list(zip(far_labels, scrib_train, strict=True))
+    wrong = float(np.mean([((t == 0) & it["mask"]).sum() / max(it["mask"].sum(), 1) for t, it in far_pairs]))
+    far_labelled = float(np.mean([(t >= 0)[region(it)].mean() for t, it in far_pairs]))
+    far_head, far_sec = train_head(scrib_feats, far_labels, HEAD_STEPS)
+    far_preds = [
+        predict_head(far_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+    ]
+    far_report = rung_report(far_preds)
+    RESULTS["scribbles_bg_beyond"] = far_report | {"bg_beyond_px": bg_beyond_px, "vessel_called_bg": wrong}
+    print(
+        f"rule: unlabelled pixels > {bg_beyond_px} px from every vessel stroke = background · labelled "
+        f"{far_labelled:.0%} of the fundus · {wrong:.1%} of the true vessel pixels called background · "
+        f"trained in {far_sec:.1f} s"
+    )
+    print(f"{'scribble head':<28}{COLUMNS}")
+    rows = {"ignore every unlabelled": ladder_report["scribbles"], "your distance": far_report}
+    for name, v in rows.items():
+        nums = f"{v['iou']:>6.3f}{v['cldice']:>8.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
+        print(f"{name:<28}{nums}{v['marked']:>8.0%}")
+    # what the rule did on one training image: its targets, and the true vessels it called background
+    tgt, ex17 = far_labels[0], scrib_train[0]
+    called_bg = (tgt == 0) & ex17["mask"]
+    share_bg = called_bg.sum() / max(ex17["mask"].sum(), 1)
+    show_masks(
+        [
+            (
+                "targets: vessel · background · ignored",
+                overlay(
+                    overlay(ex17["image"], tgt == 0, THEME["background"], 0.5),
+                    ndi.binary_dilation(tgt == 1, iterations=2),
+                    THEME["scribble"],
+                    0.9,
+                ),
+            ),
+            (
+                f"true vessels called background (orange): {share_bg:.1%}",
+                two_colour(ex17["image"], ex17["mask"] & ~called_bg, called_bg),
+            ),
+        ],
+        width=3.8,
+    )
 
 # %% [markdown]
-# **Q16.** 🔴 Compare your distance with the scribble head of 4.3:
+# **Q19.** 🔴 Compare your distance with the scribble head of 4.3:
 #
 # - How many true vessel pixels did your rule call background?
 # - Did recall, precision and IoU on the held-out images move, and in which direction?
@@ -721,60 +820,18 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn: choose a distance -->
-# - Set `BG_BEYOND_PX` (try 20, 80, `None` = ignore every unlabelled pixel) and run the next cell.
+# - Set `BG_BEYOND_PX` (try 20, 80, or 0 = ignore every unlabelled pixel) and run the next cell.
 # - It turns the scribbles into targets with your distance, trains the same head on them (seconds), and
 #   prints its numbers next to the scribble head of 4.3, which ignored every unlabelled pixel.
 # - It also measures how much true vessel your rule mislabels (the hidden ground truth is used for that
 #   diagnosis only, never for training).
-# - Try a few distances before you answer Q16.
+# - Try a few distances before you answer Q19.
 
 # %%
-# Q16 — scribbles plus "far from every vessel stroke = background"
-BG_BEYOND_PX = 40  # pixels, on the 1024 px crops; try 20, 80, None (= ignore every unlabelled pixel)
-if BG_BEYOND_PX is not None and (not isinstance(BG_BEYOND_PX, (int, float)) or BG_BEYOND_PX <= 0):
-    raise SystemExit("BG_BEYOND_PX must be a positive number of pixels, or None.")
-bg_px = BG_BEYOND_PX / 4 if (SMOKE and BG_BEYOND_PX) else BG_BEYOND_PX  # smoke thumbnails are 4× smaller
-far_labels = [scribble_targets(it["scribbles"], region(it), bg_px) for it in scrib_train]
-# diagnosis only: how much of the true vessel area the rule called background (never used for training)
-far_pairs = list(zip(far_labels, scrib_train, strict=True))
-wrong = float(np.mean([((t == 0) & it["mask"]).sum() / max(it["mask"].sum(), 1) for t, it in far_pairs]))
-far_labelled = float(np.mean([(t >= 0)[region(it)].mean() for t, it in far_pairs]))
-far_head, far_sec = train_head(scrib_feats, far_labels, HEAD_STEPS)
-far_preds = [
-    predict_head(far_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
-]
-far_report = rung_report(far_preds)
-RESULTS["scribbles_bg_beyond"] = far_report | {"bg_beyond_px": BG_BEYOND_PX, "vessel_called_bg": wrong}
-print(
-    f"rule: unlabelled pixels > {BG_BEYOND_PX} px from every vessel stroke = background · labelled "
-    f"{far_labelled:.0%} of the fundus · {wrong:.1%} of the true vessel pixels called background · "
-    f"trained in {far_sec:.1f} s"
-)
-print(f"{'scribble head':<28}{COLUMNS}")
-for name, v in {"ignore every unlabelled": ladder_report["scribbles"], "your distance": far_report}.items():
-    nums = f"{v['iou']:>6.3f}{v['cldice']:>8.3f}{v['recall']:>8.3f}{v['precision']:>8.3f}"
-    print(f"{name:<28}{nums}{v['marked']:>8.0%}")
-# what the rule did on one training image: its targets, and the true vessels it called background
-tgt, ex17 = far_labels[0], scrib_train[0]
-called_bg = (tgt == 0) & ex17["mask"]
-show_masks(
-    [
-        (
-            "targets: vessel · background · ignored",
-            overlay(
-                overlay(ex17["image"], tgt == 0, THEME["background"], 0.5),
-                ndi.binary_dilation(tgt == 1, iterations=2),
-                THEME["scribble"],
-                0.9,
-            ),
-        ),
-        (
-            f"true vessels called background (orange): {called_bg.sum() / max(ex17['mask'].sum(), 1):.1%}",
-            two_colour(ex17["image"], ex17["mask"] & ~called_bg, called_bg),
-        ),
-    ],
-    width=3.8,
-)
+# @title Q19 — scribbles plus a distance rule for background { display-mode: "form" }
+# pixels, on the 1024 px crops; 0 = ignore every unlabelled pixel
+BG_BEYOND_PX = 40  # @param {type:"slider", min:0, max:120, step:10}
+try_bg_distance(BG_BEYOND_PX or None)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>

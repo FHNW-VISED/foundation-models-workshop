@@ -203,29 +203,42 @@ except ImportError:  # no IPython: plain text
         print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
 
 # %% [markdown]
+# This helper cell defines `show_my_plan`, which prints what you wrote next to the principle you picked.
+
+
+# %%
+# @title show_my_plan: print your problem, your first step and the principle { display-mode: "form" }
+def show_my_plan(problem: str, principle: int, first_step: str) -> None:
+    """Print the problem and the first step, and the principle (1 to 6) they rest on. Checks nothing."""
+    if not isinstance(principle, int) or not 0 <= principle <= len(PRINCIPLES):
+        raise SystemExit(f"MY_PRINCIPLE must be a whole number from 0 to {len(PRINCIPLES)}.")
+    if not (isinstance(problem, str) and isinstance(first_step, str)):
+        raise SystemExit('MY_PROBLEM and MY_FIRST_STEP must be text in quotes, e.g. "my problem".')
+    if problem or first_step:
+        print(f"problem: {problem or '(not written)'}\nfirst step: {first_step or '(not written)'}")
+        if principle:
+            print(textwrap.fill(PRINCIPLES[principle - 1], width=100, initial_indent="because: "))
+    else:
+        print("nothing written; fine. Keep the question for the train home: what would you measure first?")
+
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn (2 min) -->
-# **Q33.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
+# **Q38.** 🟢 Think of one segmentation or detection problem of your own (work, research, or the images of
 # section 9). Which of the principles above would have changed what you did first, and what number would you
 # measure to check it?
 #
-# - Write the problem and your first step on Monday, as a rule with a number, in the next cell.
+# - Write the problem and your first step on Monday, as a rule with a number, in the form of the next cell
+#   (for example "one box on 20 images, compared with the 'everything' line").
 # - The cell prints them next to the principle you picked and checks nothing.
 
 # %%
-# Q33 — your problem and your first step (leave "" to skip)
-MY_PROBLEM = ""  # e.g. "cracks in drone photos of bridges"
-MY_PRINCIPLE = 0  # the number of the principle above that changes your plan (1–6), or 0 for none
-MY_FIRST_STEP = ""  # e.g. "one box on 20 images, compared with the 'everything' line"
-if not isinstance(MY_PRINCIPLE, int) or not 0 <= MY_PRINCIPLE <= len(PRINCIPLES):
-    raise SystemExit(f"MY_PRINCIPLE must be a whole number from 0 to {len(PRINCIPLES)}.")
-if not (isinstance(MY_PROBLEM, str) and isinstance(MY_FIRST_STEP, str)):
-    raise SystemExit('MY_PROBLEM and MY_FIRST_STEP must be text in quotes, e.g. "my problem".')
-if MY_PROBLEM or MY_FIRST_STEP:
-    print(f"problem: {MY_PROBLEM or '(not written)'}\nfirst step: {MY_FIRST_STEP or '(not written)'}")
-    if MY_PRINCIPLE:
-        print(textwrap.fill(PRINCIPLES[MY_PRINCIPLE - 1], width=100, initial_indent="because: "))
-else:
-    print("nothing written; fine. Keep the question for the train home: what would you measure first?")
+# @title Q38 — your problem and your first step (leave empty to skip) { display-mode: "form" }
+MY_PROBLEM = ""  # @param {type:"string"}
+# The number of the principle above that changes your plan (1 to 6), or 0 for none.
+MY_PRINCIPLE = 0  # @param {type:"slider", min:0, max:6, step:1}
+MY_FIRST_STEP = ""  # @param {type:"string"}
+show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 
 # %% [markdown]
 # <details><summary>A possible answer</summary>

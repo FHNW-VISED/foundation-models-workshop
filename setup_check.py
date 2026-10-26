@@ -144,6 +144,10 @@ import shutil
 import urllib.request
 from collections import defaultdict
 
+from tqdm.auto import tqdm
+
+BIG_FILE = 5 << 20  # files above 5 MB get their own byte-level progress bar
+
 
 def sha256_of(path: Path) -> str:
     h = hashlib.sha256()
@@ -153,15 +157,24 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def fetch(rel: str, dest: Path) -> None:
-    """Copy or download one file via a .part file, so a half-finished download never passes as complete."""
+def fetch(rel: str, dest: Path, size: int = 0) -> None:
+    """Copy or download one file via a .part file, so a half-finished download never passes as complete.
+
+    A file above BIG_FILE bytes shows its own byte-level progress bar (total = Content-Length)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
     if LOCAL_MODE:
         shutil.copyfile(Path(SOURCE) / rel, part)
     else:
         with urllib.request.urlopen(f"{SOURCE}/{rel}", timeout=60) as r, open(part, "wb") as f:
-            shutil.copyfileobj(r, f, 1 << 20)
+            total = int(r.headers.get("Content-Length") or size or 0)
+            if total < BIG_FILE:
+                shutil.copyfileobj(r, f, 1 << 20)
+            else:
+                with tqdm(total=total, unit="B", unit_scale=True, desc=rel, leave=False) as bar:
+                    for chunk in iter(lambda: r.read(1 << 20), b""):
+                        f.write(chunk)
+                        bar.update(len(chunk))
     part.replace(dest)
 
 
@@ -174,7 +187,7 @@ def read_manifest() -> list[dict]:
 def sync_files(files: list[dict]) -> dict[str, dict]:
     """Make CACHE_DIR hold every manifest file with the right checksum. Returns per-group stats."""
     groups: dict[str, dict] = defaultdict(lambda: {"n": 0, "bytes": 0, "cached": 0, "failed": [], "s": 0.0})
-    for entry in files:
+    for entry in tqdm(files, desc="Files", unit="file"):  # one bar over the manifest
         rel, dest = entry["path"], CACHE_DIR / entry["path"]
         group = "/".join(rel.split("/")[:2]) if "/" in rel else rel
         g = groups[group]
@@ -186,13 +199,13 @@ def sync_files(files: list[dict]) -> dict[str, dict]:
         else:
             for attempt in (1, 2):
                 try:
-                    fetch(rel, dest)
+                    fetch(rel, dest, entry["bytes"])
                     if sha256_of(dest) == entry["sha256"]:
                         break
                     dest.unlink()
-                    print(f"  checksum mismatch for {rel} (attempt {attempt})")
+                    tqdm.write(f"  checksum mismatch for {rel} (attempt {attempt})")
                 except Exception as err:  # noqa: BLE001 - reported, the loop continues with the next file
-                    print(f"  {rel}: {type(err).__name__}: {err} (attempt {attempt})")
+                    tqdm.write(f"  {rel}: {type(err).__name__}: {err} (attempt {attempt})")
             else:
                 g["failed"].append(rel)
         g["s"] += time.monotonic() - t

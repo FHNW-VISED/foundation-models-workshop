@@ -337,6 +337,11 @@ def train_all_heads(
         for name, r in regimes.items():
             train = fit[: r["n_train"]] if "n_train" in r else fit
             labels = [labels_for(name, it, probs.get(it["name"])) for it in train]
+            if cfg["key"] == "pets":
+                # the trimap's not-sure band is outside the evaluation region: the loss ignores it (-1),
+                # exactly as the notebook's section 01 does (lab[~region] = -1)
+                pairs = zip(train, labels, strict=True)
+                labels = [np.where(it["fov"], lb, -1).astype(np.int8) for it, lb in pairs]
             tensors, sec = train_head(
                 [feats[it["name"]] for it in train], labels, steps, lr, r["loss"] == "balanced", device
             )
@@ -423,6 +428,12 @@ def main(argv=None) -> int:
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--lr", type=float, default=0.05)
     ap.add_argument("--device", default=None, help="cuda / mps / cpu (default: best available)")
+    ap.add_argument(
+        "--only-pets",
+        action="store_true",
+        help="redo the pets only (labels changed): keep the stored pets features and every specialised file, "
+        "replace the pets rows of heads/index.json",
+    )
     args = ap.parse_args(argv)
     warnings.filterwarnings("ignore")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -434,7 +445,11 @@ def main(argv=None) -> int:
     print(f"device {device} · DINOv3 {DINO_ID} ({DINO_LICENCE}) · SAM {SAM_ID} ({SAM_LICENCE})")
     dino, sam = Dino(device), Sam(device)
     heads_index = []
-    for cfg in (PETS, spec):
+    old_rows = []
+    if args.only_pets:
+        old = json.loads((out / "heads" / "index.json").read_text())["heads"]
+        old_rows = [r for r in old if r["dataset"] != "pets"]
+    for cfg in (PETS,) if args.only_pets else (PETS, spec):
         sub = "pets" if cfg["key"] == "pets" else "specialised"
         root = data_root / sub
         if not root.exists():
@@ -443,17 +458,17 @@ def main(argv=None) -> int:
         items = [read_item(root, it) for it in index["items"]]
         print(f"\n== {cfg['name']}: {len(items)} images from {root.relative_to(ROOT)}")
         resolutions = [SMOKE_LONG_SIDE] if args.smoke else cfg["feature_long_sides"]
-        feats_by_res = {
-            res: extract_features(
-                dino, items, res, None if args.smoke else out / "features" / f"{sub}_{res}.safetensors"
-            )
-            for res in resolutions
-        }
+        def feat_path(res, sub=sub):
+            p = out / "features" / f"{sub}_{res}.safetensors"
+            # --only-pets: features depend on the images only, so an existing file is kept byte for byte
+            return None if args.smoke or (args.only_pets and p.exists()) else p
+
+        feats_by_res = {res: extract_features(dino, items, res, feat_path(res)) for res in resolutions}
         fit = [it for it in items if it["split"] == "fit"]
         probs = pseudo_labels(sam, fit, out / "pseudo_labels" / sub, cfg["metric_extras"])
         heads_index += train_all_heads(cfg, items, feats_by_res, probs, out / "heads", steps, args.lr, device)
     (out / "heads" / "index.json").write_text(
-        json.dumps({"seed": SEED, "model": DINO_ID, "sam": SAM_ID, "heads": heads_index}, indent=1)
+        json.dumps({"seed": SEED, "model": DINO_ID, "sam": SAM_ID, "heads": old_rows + heads_index}, indent=1)
     )
     manifest(out)
     print(f"done in {time.time() - t_all:.0f} s")

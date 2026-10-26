@@ -46,7 +46,7 @@
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
 APPROACH_COLOURS |= {"full_masks": THEME["works"]}
 APPROACH_NAMES |= {"full_masks": "full masks: complete maps (section 2)"}
-ALL_APPROACHES = [  # the short names Q28 accepts
+ALL_APPROACHES = [  # the short names Q33 accepts
     "zero_shot",
     "one_shot",
     "one_shot_sam",
@@ -181,7 +181,7 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction (1 min) -->
-# **Q28.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
+# **Q33.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
 # the **steadiest** (the smallest spread of IoU from image to image)?
 #
 # - Choose your two picks from the dropdowns in the next cell and run it; leave them blank to skip. The
@@ -189,7 +189,7 @@ plt.show()
 #   they landed.
 
 # %%
-# Q28 — your two predictions (pick from the dropdowns, or leave blank to skip)
+# Q33 — your two predictions (pick from the dropdowns, or leave blank to skip)
 MY_WINNER = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
 MY_STEADIEST = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
 for label, pick in (("MY_WINNER", MY_WINNER), ("MY_STEADIEST", MY_STEADIEST)):
@@ -333,7 +333,7 @@ if MY_STEADIEST in by_spread:
 for pick in {MY_WINNER, MY_STEADIEST} - {"", *by_spread}:
     print(f"(your pick {pick} was left out: {SKIPPED.get(pick, 'not run')})")
 if not (MY_WINNER or MY_STEADIEST):
-    print("no prediction written in Q28; fine, but next time guess first: it is the cheapest lesson here")
+    print("no prediction written in Q33; fine, but next time guess first: it is the cheapest lesson here")
 
 # %% [markdown]
 # ### 8.3 The trade-off in one picture
@@ -401,7 +401,7 @@ plt.show()
 # - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
 
 # %% [markdown]
-# **Q29.** 🟡 Pick one approach for each situation and name the column that decided it.
+# **Q34.** 🟡 Pick one approach for each situation and name the column that decided it.
 #
 # - (a) A screening study of 1,000 new images next month.
 # - (b) One difficult image a clinician needs today.
@@ -426,7 +426,7 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 4 min: defend a row -->
-# Use your Q29 answers. **A** defends one row for situation (a), **B** defends another row for situation
+# Use your Q34 answers. **A** defends one row for situation (a), **B** defends another row for situation
 # (c), one minute each, naming the column that decides. Then swap: attack the other's row.
 #
 # - Which column did the defence rest on, and which column of the same row would hurt it most?

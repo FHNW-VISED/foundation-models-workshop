@@ -10,8 +10,9 @@
 # numbers, because section 2 runs the same three cells on the specialised task.
 
 # %% [markdown]
-# This helper cell defines how to turn a person's hint into a SAM prompt, and `show_masks()`, the figure used
-# for every comparison in the notebook (prediction in violet, ground truth in green, prompts in teal).
+# This helper cell defines how to turn a person's hint into a SAM prompt, `show_masks()`, the figure used for
+# every comparison in the notebook (prediction in violet, ground truth in green, prompts in teal), and the
+# small functions that score a mask only inside the scored area (the grey band is left out).
 
 # %%
 # @title Prompts and figure helpers { display-mode: "form" }
@@ -57,6 +58,47 @@ def show_masks(panels: list[tuple[str, np.ndarray]], prompts: dict | None = None
     plt.show()
 
 
+def pet_iou(pred: np.ndarray, item: dict) -> float:
+    """IoU of a boolean mask with the pet, counted only inside the scored area (the grey band is left out)."""
+    r = region(item)
+    return iou(pred & r, item["mask"] & r)
+
+
+def truth_panel(item: dict) -> np.ndarray:
+    """The photo with the ground truth in green; the not-scored band is drawn grey."""
+    return overlay(item["image"], item["mask"], THEME["truth"], unscored=~region(item))
+
+
+def error_panel(item: dict, pred: np.ndarray) -> np.ndarray:
+    """Violet = pet found, orange = false alarm, green = missed, grey = not scored."""
+    r = region(item)
+    pred, truth = pred & r, item["mask"] & r
+    img = overlay(item["image"], pred & truth, THEME["works"], unscored=~r)
+    img = overlay(img, pred & ~truth, THEME["fails"])
+    return overlay(img, truth & ~pred, THEME["truth"])
+
+
+def show_sam_demo(items: list[dict], index: int) -> None:
+    """SAM with one click and with one box on items[index], next to the ground truth."""
+    if not isinstance(index, int) or not 0 <= index < len(items):
+        raise SystemExit(f"DEMO_INDEX must be a whole number from 0 to {len(items) - 1}.")
+    pet = items[index]
+    point, box = click_point(pet), box_prompt(pet)
+    t0 = time.monotonic()
+    by_point = sam.probability(pet["image"], points=[point], labels=[1]) >= 0.5
+    by_box = sam.probability(pet["image"], box=box) >= 0.5
+    print(f"{pet['name']}: two SAM calls in {time.monotonic() - t0:.1f} s on {DEVICE}")
+    works = THEME["works"]
+    show_masks(
+        [
+            ("SAM, one click", overlay(pet["image"], by_point, works)),
+            ("SAM, one box", overlay(pet["image"], by_box, works)),
+            ("ground truth (grey = not scored)", truth_panel(pet)),
+        ],
+        prompts={"point": point, "box": box},
+    )
+
+
 def features_for(dataset: dict, item: dict, long_side: int) -> torch.Tensor:
     """DINOv3 patch features [384, h, w]: from the precomputed file when it exists, else computed now."""
     prefix = "pets" if dataset is PETS else "specialised"
@@ -97,6 +139,11 @@ print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PE
 # %% [markdown]
 # ### 1.1 SAM: one click, one box
 #
+# **What the grey band is.** The Oxford pet photos come with a ground truth drawn by annotators. Around every
+# outline they added a "not sure" strip, about 10 to 20 pixels wide. A pixel in that strip is neither pet nor
+# floor: the annotator said "unknown". We do not score it, so ground-truth pictures show it in grey and a mask
+# is judged only on the rest. The difference between "unknown" and "background" is the idea behind the whole
+# workshop.
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -110,28 +157,31 @@ print(f"evaluation set: {len(PETS_EVAL)} held-out pets · DINOv3 features at {PE
 #
 # - Where do they differ, if at all?
 # - Is the difference at the object's boundary, or is a whole part missing or added?
-# - Try another pet: change the index in `demo = PETS_EVAL[0]` (try 1, 2, ...).
+# - Try another pet: move the `DEMO_INDEX` slider (0 to 11) and run the cell again.
 
 # %% [markdown]
-# This cell runs SAM twice on one held-out pet, once with a single click and once with a box, and shows
-# both masks next to the ground truth, so you can see what a promptable model gives for free.
+# This cell runs SAM twice on the held-out pet you pick, once with a single click and once with a box, and
+# shows both masks next to the ground truth, so you can see what a promptable model gives for free.
 
 # %%
-# Q2 — SAM with one click and with one box on a held-out pet
-demo = PETS_EVAL[0]  # try 1, 2, ...
-point, box = click_point(demo), box_prompt(demo)
-t0 = time.monotonic()
-sam_point = sam.probability(demo["image"], points=[point], labels=[1]) >= 0.5
-sam_box = sam.probability(demo["image"], box=box) >= 0.5
-print(f"{demo['name']}: two SAM calls in {time.monotonic() - t0:.1f} s on {DEVICE}")
-show_masks(
-    [
-        ("SAM, one click", overlay(demo["image"], sam_point, THEME["works"])),
-        ("SAM, one box", overlay(demo["image"], sam_box, THEME["works"])),
-        ("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"])),
-    ],
-    prompts={"point": point, "box": box},
-)
+# @title Q2 — SAM with one click and with one box on a held-out pet { display-mode: "form" }
+DEMO_INDEX = 0  # @param {type:"slider", min:0, max:11, step:1}
+show_sam_demo(PETS_EVAL, DEMO_INDEX)
+
+# %% [markdown]
+# Now drive SAM yourself on the same held-out pets: the widget below takes a click, a box or a word and draws
+# the mask with its IoU against the ground truth (IoU = overlap ÷ union of the two masks: 1 is a perfect
+# match, 0 no overlap; 1.2 explains it). Without Colab it shows one fixed click and one box instead.
+#
+# **Q3.** 🟢 Click on a pet, then click on the floor, then draw a box around the pet.
+#
+# - What does each of the three give you?
+# - What changes when you add a second click on the part SAM missed?
+# - Type `dog` or `cat` in the text box and press "Ask SAM 3" (only if SAM 3 is in your cache).
+
+# %%
+# @title Q3 — Click, box or a word: drive SAM yourself { display-mode: "form" }
+sam_playground(PETS_EVAL, "Pets: click, box, or a word", text_prompt=True, default_text="dog")
 
 # %% [markdown]
 # <!-- callout: theory | Theory: the three tools -->
@@ -155,6 +205,7 @@ show_masks(
 # - Example: the predicted mask and the true mask each cover 100 pixels and share 80. The union is 120
 #   pixels, so IoU = 80 / 120 = 0.67.
 # - 1.0 is a perfect match, 0.0 means no overlap. Section 2 adds one extra metric for thin structures.
+# - On the pets, both masks are first cut to the scored area, so the grey "not sure" band counts for nothing.
 
 # %% [markdown]
 # <!-- callout: your-turn | Your turn (optional, 2 min) -->
@@ -202,18 +253,19 @@ iou = use(my_iou, reference=_ref_iou, check=lambda f: round(float(f(_play_pred, 
 
 # %% [markdown]
 # This cell scores SAM's one-click and one-box masks on every evaluation pet with the IoU you just
-# defined and keeps the mean as this task's zero-shot number, for section 2 to compare.
+# defined (inside the scored area) and keeps the mean as this task's zero-shot number, for section 2 to
+# compare.
 
 # %%
 # @title Score SAM on every held-out pet { display-mode: "form" }
 t0 = time.monotonic()
 zero_shot_all = {"point": [], "box": []}
-for it in PETS_EVAL:
+for it in tqdm(PETS_EVAL, desc="SAM on the held-out pets"):
     pt = click_point(it)
     by_point = sam.probability(it["image"], points=[pt], labels=[1]) >= 0.5
     by_box = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
-    zero_shot_all["point"].append(iou(by_point, it["mask"]))
-    zero_shot_all["box"].append(iou(by_box, it["mask"]))
+    zero_shot_all["point"].append(pet_iou(by_point, it))
+    zero_shot_all["box"].append(pet_iou(by_box, it))
 zero_shot = {k: float(np.mean(v)) for k, v in zero_shot_all.items()}
 RESULTS["pets_zero_shot_iou"] = zero_shot["box"]  # the headline: SAM's best single prompt, one box
 RESULTS["pets_zero_shot_point_iou"] = zero_shot["point"]
@@ -226,7 +278,8 @@ print(
 
 # %% [markdown]
 # A mean hides the spread, so this cell shows the **worst, median and best** held-out pet by one-box IoU:
-# violet where mask and truth agree, orange for a false alarm (extra mask), green for what SAM missed.
+# violet where mask and truth agree, orange for a false alarm (extra mask), green for what SAM missed, grey
+# for the band that is not scored.
 
 # %%
 # @title Worst, median and best pet by IoU { display-mode: "form" }
@@ -235,10 +288,7 @@ panels = []
 for label, pos in (("worst", order[0]), ("median", order[len(order) // 2]), ("best", order[-1])):
     it = PETS_EVAL[int(pos)]
     pred = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
-    img = overlay(it["image"], pred & it["mask"], THEME["works"])
-    img = overlay(img, pred & ~it["mask"], THEME["fails"])
-    img = overlay(img, ~pred & it["mask"], THEME["truth"])
-    panels.append((f"{label} · IoU {zero_shot_all['box'][int(pos)]:.2f}", img))
+    panels.append((f"{label} · IoU {zero_shot_all['box'][int(pos)]:.2f}", error_panel(it, pred)))
 show_masks(panels)
 
 # %% [markdown]
@@ -258,7 +308,7 @@ for it in fig_items:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# **Q3.** 🟡 Look at the PCA images above.
+# **Q4.** 🟡 Look at the PCA images above.
 #
 # - Which pixels share a colour: the whole animal, parts of it (head, fur, legs), or the floor too?
 # - Does the colour follow the object's outline?
@@ -296,7 +346,8 @@ show_masks(panels, width=2.6)
 # %% [markdown]
 # This helper cell defines the head used for every training step in the notebook (that 1 × 1 convolution on
 # standardised patch features, with a balanced loss, where each class gets half the total weight, that
-# ignores pixels labelled −1) plus `load_head()` for our precomputed checkpoints.
+# ignores pixels labelled −1), `load_head()` for our precomputed checkpoints, and `fit_pet_head()`, which
+# trains the pet head or loads ours.
 
 # %%
 # @title Linear head: train, predict, load a checkpoint { display-mode: "form" }
@@ -362,29 +413,41 @@ def load_head(dataset: dict, regime: str, long_side: int | None = None) -> tuple
     return load_file(PRECOMPUTED / entry["file"]), entry
 
 
+def fit_pet_head(train_yourself: bool, n_pets: int, steps: int) -> tuple[list[dict], dict, float, str]:
+    """Train the pet head on the full masks of the first `n_pets` fit pets, or load ours.
+
+    The "not sure" band is labelled -1, so the loss skips it. Returns pets, head, seconds, source line.
+    """
+    if not isinstance(train_yourself, bool):
+        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+    items = [load_item(PETS, it) for it in PETS["fit"][:n_pets]]
+    feats = [features_for(PETS, it, PETS["feat_side"]) for it in items]
+    if not train_yourself:
+        head, entry = load_head(PETS, "full5")
+        src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} pets)"
+        return items, head, entry["train_sec"], src
+    labels = []
+    for it in items:  # full masks: allowed in section 1 only
+        lab = it["mask"].astype(np.int8)
+        lab[~region(it)] = -1
+        labels.append(lab)
+    head, sec = train_head(feats, labels, steps)
+    return items, head, sec, f"trained here on {len(items)} pets, {steps} steps"
+
+
 # %% [markdown]
-# This cell trains the head on the full masks of five fit pets (only sections 1 and 2 use full masks); set
-# `TRAIN_YOURSELF = False` and run it again to load our checkpoint instead.
+# This cell trains the head on the full masks of five fit pets (only sections 1 and 2 use full masks); the
+# grey "not sure" band is left out of its loss. Untick `TRAIN_YOURSELF` and run it again to load our
+# checkpoint instead.
 
 # %%
-TRAIN_YOURSELF = True  # False -> load our precomputed head "full5" instead of training
+# @title Train the linear head on five pets { display-mode: "form" }
+TRAIN_YOURSELF = True  # @param {type:"boolean"}
 N_TRAIN_PETS, HEAD_STEPS = 5, 30 if SMOKE else 200
-if not isinstance(TRAIN_YOURSELF, bool):
-    raise SystemExit("TRAIN_YOURSELF must be True or False.")
-
-train_items = [load_item(PETS, it) for it in PETS["fit"][:N_TRAIN_PETS]]
-train_feats = [features_for(PETS, it, PETS["feat_side"]) for it in train_items]
-if TRAIN_YOURSELF:
-    train_labels = [it["mask"].astype(np.int8) for it in train_items]  # full masks: allowed in section 1 only
-    head_full5, head_sec = train_head(train_feats, train_labels, HEAD_STEPS)
-    head_src = f"trained here on {len(train_items)} pets, {HEAD_STEPS} steps"
-else:
-    head_full5, entry = load_head(PETS, "full5")
-    head_sec = entry["train_sec"]
-    head_src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} pets)"
+train_items, head_full5, head_sec, head_src = fit_pet_head(TRAIN_YOURSELF, N_TRAIN_PETS, HEAD_STEPS)
 print(f"linear head · {head_src} · {head_sec:.1f} s on {DEVICE}")
 if head_sec > 60:
-    print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+    print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoint next time.")
 
 # %% [markdown]
 # This cell runs the head you just trained on one training pet and shows each step (patches, one probability
@@ -432,8 +495,9 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# This cell scores the head on the same evaluation pets as SAM, keeps the mean IoU, and shows three held-out
-# pets with the head's mask next to the ground truth.
+# This cell runs the linear head you trained in 1.4 (5 pets, full masks) on the held-out pets it never saw.
+# For each pet, IoU is the overlap of the head's mask and the ground truth divided by their union, with the
+# grey band left out. It then averages over the pets and shows the worst, median and best one.
 
 # %%
 # @title Score the head on the held-out pets { display-mode: "form" }
@@ -441,7 +505,7 @@ t0 = time.monotonic()
 head_preds = [
     predict_head(head_full5, features_for(PETS, it, PETS["feat_side"]), it["mask"].shape) for it in PETS_EVAL
 ]
-head_ious = [iou(pred, it["mask"]) for pred, it in zip(head_preds, PETS_EVAL, strict=True)]
+head_ious = [pet_iou(pred, it) for pred, it in zip(head_preds, PETS_EVAL, strict=True)]
 RESULTS["pets_head_iou"] = float(np.mean(head_ious))
 RESULTS["pets_head"] = {
     "iou": RESULTS["pets_head_iou"],
@@ -449,16 +513,19 @@ RESULTS["pets_head"] = {
     "train_sec": round(float(head_sec), 2),
     "infer_sec": round(time.monotonic() - t0, 1),
 }
-print(
-    f"linear head on {len(PETS_EVAL)} held-out pets · mean IoU {RESULTS['pets_head_iou']:.3f} "
-    f"(SAM one click: {RESULTS['pets_zero_shot_point_iou']:.3f}, "
-    f"one box: {RESULTS['pets_zero_shot_box_iou']:.3f})"
-)
-panels = []
-for it, pred, v in list(zip(PETS_EVAL, head_preds, head_ious, strict=True))[:3]:
+n_eval = len(PETS_EVAL)
+print(f"Linear head: trained in 1.4 on {len(train_items)} pets with full masks, run on {n_eval} unseen pets.")
+print(f"Score: per-pet IoU with the ground truth (grey band not scored), averaged over the {n_eval} pets.")
+print(f"  linear head       mean IoU {RESULTS['pets_head_iou']:.3f}")
+print(f"  SAM, one click    mean IoU {RESULTS['pets_zero_shot_point_iou']:.3f}  (the 1.2 masks)")
+print(f"  SAM, one box      mean IoU {RESULTS['pets_zero_shot_box_iou']:.3f}  (the 1.2 masks)")
+panels, works = [], THEME["works"]
+order = np.argsort(head_ious)
+for label, pos in (("worst", order[0]), ("median", order[n_eval // 2]), ("best", order[-1])):
+    it = PETS_EVAL[int(pos)]
     panels += [
-        (f"head · IoU {v:.2f}", overlay(it["image"], pred, THEME["works"])),
-        ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
+        (f"head, {label} · IoU {head_ious[int(pos)]:.2f}", overlay(it["image"], head_preds[int(pos)], works)),
+        ("ground truth", truth_panel(it)),
     ]
 show_masks(panels, width=2.6)
 
@@ -473,7 +540,7 @@ show_masks(panels, width=2.6)
 # specialised task.
 
 # %% [markdown]
-# **Q4.** 🟡 Compare the two numbers you got with the prediction you wrote down.
+# **Q5.** 🟡 Compare the two numbers you got with the prediction you wrote down.
 #
 # - Which approach would you pick for 10 000 pet photos, and which for 10 photos?
 # - What does each one ask of a person?
@@ -489,8 +556,7 @@ show_masks(panels, width=2.6)
 
 # %% [markdown]
 # <!-- callout: question | 👥 Optional, 3 min -->
-# Pick different indices in `demo = PETS_EVAL[0]` (Q2), so you and your neighbour see different pictures, and
-# compare.
+# Pick different `DEMO_INDEX` values (Q2), so you and your neighbour see different pictures, and compare.
 #
 # - Did one click fail on either of yours?
 # - If so, was the click on an ambiguous spot (fur against a similar floor, a collar, a second animal)?
@@ -501,15 +567,15 @@ show_masks(panels, width=2.6)
 # %%
 # @title Click on the floor, not the pet { display-mode: "form" }
 it = PETS_EVAL[0]
-floor_ys, floor_xs = np.nonzero(~it["mask"])
+floor_ys, floor_xs = np.nonzero(region(it) & ~it["mask"])  # a floor pixel, not one in the grey band
 k = int(np.random.default_rng([SEED, len(floor_ys)]).integers(len(floor_ys)))
 floor_pt = [float(floor_xs[k]), float(floor_ys[k])]
 by_floor = sam.probability(it["image"], points=[floor_pt], labels=[1]) >= 0.5
-floor_title = f"SAM, click on the floor · IoU {iou(by_floor, it['mask']):.2f}"
+floor_title = f"SAM, click on the floor · IoU {pet_iou(by_floor, it):.2f}"
 show_masks(
     [
         (floor_title, overlay(it["image"], by_floor, THEME["works"])),
-        ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
+        ("ground truth", truth_panel(it)),
     ],
     prompts={"point": floor_pt},
 )

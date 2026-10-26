@@ -33,58 +33,58 @@
   },
   {
    "path": "heads/index.json",
-   "bytes": 7697,
-   "sha256": "168502c8533e0073d3fcf1b32958b87cf3fe863ae5a31543e4e84cef7b96b3c1"
+   "bytes": 7698,
+   "sha256": "26ce267c19ad18bd0e47dab0ffea47151c443a6cadb92b6f98115fe8c35e2605"
   },
   {
    "path": "heads/pets_full5_256.safetensors",
-   "bytes": 5348,
-   "sha256": "308fcfac87e14ef25acfbc94152a8d9fe057baf1877e8dc9c1bb62d363bb5795"
+   "bytes": 5340,
+   "sha256": "3438be7247edd82c3dadd870b223fe9db5b4bbbdfe196ee777e214ed8fce9762"
   },
   {
    "path": "heads/pets_full_256.safetensors",
    "bytes": 5356,
-   "sha256": "aaf659d05e2539c779d59d7351e77f756e296e637d12f890413d0a67fb15a756"
+   "sha256": "34b7aa84a8facb219e872a22803b24bfe6342e481b901557ceacae23e08341c9"
   },
   {
    "path": "heads/pets_hidden_bg_256.safetensors",
    "bytes": 5436,
-   "sha256": "27f0d377bc6f9fc40645d667cd6e9a71d121c5bff45130d889bcc09cc3a84307"
+   "sha256": "6e62b78ca8e77295fb1f7f5b967c0774611871334269fcb4379a49159050be69"
   },
   {
    "path": "heads/pets_hidden_bg_balanced_256.safetensors",
-   "bytes": 5436,
-   "sha256": "ab59a14ebed1b8fda753ebf4b53cfcb1aa37642f495bfdaec668d2df7e984020"
+   "bytes": 5444,
+   "sha256": "760880891dae4536329a1e95c1d9e5c9ce33ef79e02ddfe37aa99647e2348aa6"
   },
   {
    "path": "heads/pets_masked_256.safetensors",
-   "bytes": 5436,
-   "sha256": "fb03eee57c3d0935a24b2caed5ba880ca6863ca3ebe213f2eceb3b0cec0f8a1e"
+   "bytes": 5428,
+   "sha256": "202e12b76f459834e5c68fd388ff201686deb9664d75fe5c30474c1351035f8b"
   },
   {
    "path": "heads/pets_pseudo_256.safetensors",
    "bytes": 5388,
-   "sha256": "8e8eac9bdbf4053eace4558f6ee4582128528611fd9cfe532dd9795933613e09"
+   "sha256": "dbfae1bd50b4014be2f96dbc712c4aab52ad2f892aa316f27c8e7f33fb0dc658"
   },
   {
    "path": "heads/pets_scribbles_256.safetensors",
-   "bytes": 5380,
-   "sha256": "5f1831f7d23c6d180e0a0097ba70bf1b7e3c39a6ef9b3163102572590766d6c4"
+   "bytes": 5372,
+   "sha256": "693237d6ca2959b6c67af2a9e69c6ae2f416d1ff0f7ab090f7195633936520ef"
   },
   {
    "path": "pseudo_labels/pets/chihuahua_17.png",
-   "bytes": 14630,
-   "sha256": "52ddbc7cfcd9b34b53b9cbb76a777bbe68266e10728b869ad7f40883678ebd56"
+   "bytes": 3948,
+   "sha256": "7c9f68474e6cdbfe6c12ebab7da4241cb127e1ebbebd0a4935a2b83965ebd29a"
   },
   {
    "path": "pseudo_labels/pets/english_cocker_spaniel_103.png",
-   "bytes": 20391,
-   "sha256": "530ce752b2e1428f21d735be82e75380bcfb53ecffb33fd82defa0a8e69c7878"
+   "bytes": 22884,
+   "sha256": "7d7e9bcd17a2549bdf839a97331d5c89b982252ab68b5588b3530761a50a2ce4"
   },
   {
    "path": "pseudo_labels/pets/prompts.json",
-   "bytes": 2861,
-   "sha256": "809b48d500814ffaf64ed68a84d7e6a2b5c2c55dc5f6bdfe22cbce19952c23b0"
+   "bytes": 3591,
+   "sha256": "c794acf8909682f67cf7385555cc17570a25d023e7058736b68fdc101323c66a"
   },
   {
    "path": "pseudo_labels/specialised/07_dr.png",

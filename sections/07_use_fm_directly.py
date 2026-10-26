@@ -34,10 +34,11 @@
 # %% [markdown]
 # This helper cell adds a colour for each direct approach and defines the prompts we take from the strokes:
 # the separate strokes of an image, a click at the centre of a stroke, SAM on many (box, click) objects at
-# once, the two direct recipes on a list of images, and a figure that draws boxes.
+# once, the two direct recipes on a list of images, a figure that draws boxes, and the two "try your own
+# number" runs of the questions below.
 
 # %%
-# @title Path 3 helpers: colours, strokes, SAM on many prompts, the two recipes { display-mode: "form" }
+# @title Path 3 helpers: colours, strokes, SAM on many prompts, recipes, try-it runs { display-mode: "form" }
 from matplotlib.patches import Rectangle
 
 APPROACH_COLOURS |= {
@@ -96,7 +97,7 @@ def direct_clicks(items: list[dict], n: int) -> tuple[list[np.ndarray], list[tup
     """Recipe 1: n vessel clicks and n background clicks spread along the strokes of each image, one SAM
     prompt per image. Returns the masks and each image's (vessel, background) clicks."""
     preds, clicks = [], []
-    for it in items:
+    for it in tqdm(items, desc="SAM, stroke clicks", leave=False):
         pos, neg = stroke_points(it, 1, n), stroke_points(it, 2, n)
         preds.append(
             sam.probability(it["image"], points=pos + neg, labels=[1] * len(pos) + [0] * len(neg)) >= 0.5
@@ -110,7 +111,7 @@ def direct_boxes(items: list[dict], pad: int, with_click: bool) -> tuple[list[np
     click at the stroke's centre if `with_click`; the masks of all strokes are combined. Returns the masks
     and each image's (boxes, clicks)."""
     preds, prompts = [], []
-    for it in items:
+    for it in tqdm(items, desc="SAM, one box per stroke", leave=False):
         strokes = stroke_masks(it, 1)
         boxes = [[float(v) for v in stroke_box(s, pad)] for s in strokes]
         clicks = [stroke_click(s) for s in strokes] if with_click else None
@@ -132,6 +133,40 @@ def show_boxes(panels: list[tuple[str, np.ndarray, list | None]], width: float =
             ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=1, color=THEME["scribble"]))
     plt.tight_layout()
     plt.show()
+
+
+def try_clicks(n_clicks: int) -> None:
+    """Run the click recipe with `n_clicks` per kind on every evaluation image and print it under the default
+    of 20. Stores the numbers in RESULTS["sam_direct_clicks_try"]."""
+    if not isinstance(n_clicks, int) or n_clicks < 1:
+        raise SystemExit("N_CLICKS_TRY must be a whole number of at least 1.")
+    preds, _ = direct_clicks(SPEC_EVAL, n_clicks)
+    RESULTS["sam_direct_clicks_try"] = rung_report(preds) | {"n_clicks": n_clicks}
+    print_path2(
+        {
+            f"{N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} clicks (default)": path3_report["sam_clicks"],
+            f"{n_clicks} + {n_clicks} clicks (yours)": RESULTS["sam_direct_clicks_try"],
+        }
+    )
+
+
+def try_boxes(box_pad: int, with_click: bool) -> None:
+    """Run the box recipe with a margin of `box_pad` px (of the 1024 px crop) and the centre click on or off
+    on every evaluation image and print it under the default. Stores the numbers in
+    RESULTS["sam_direct_boxes_try"]."""
+    if not isinstance(box_pad, int) or box_pad < 0 or not isinstance(with_click, bool):
+        raise SystemExit("BOX_PAD_TRY must be a whole number ≥ 0 and WITH_CLICK_TRY True or False.")
+    pad = max(box_pad // 4, 0) if SMOKE else box_pad  # smoke thumbnails are 4× smaller
+    preds, _ = direct_boxes(SPEC_EVAL, pad, with_click)
+    RESULTS["sam_direct_boxes_try"] = rung_report(preds) | {"pad": box_pad, "with_click": with_click}
+    print_path2(
+        {
+            f"pad {BOX_PAD} px, with click (default)": path3_report["sam_boxes"],
+            f"pad {box_pad} px, {'with' if with_click else 'no'} click (yours)": RESULTS[
+                "sam_direct_boxes_try"
+            ],
+        }
+    )
 
 
 # %% [markdown]
@@ -160,31 +195,19 @@ print_path2({"sam_clicks": path3_report["sam_clicks"]})
 print(f"{'section 2: SAM, 20 vessel clicks only':<46}{RESULTS['sam_prompt_ladder']['20 points']:>6.3f}")
 
 # %% [markdown]
-# **Q25.** 🔴 (optional) Did the "not here" clicks pull SAM's mask onto the vessels (compare the row with
-# section 2's vessel-only clicks)? Change the number of clicks per kind and run the next cell: does SAM do
-# better with fewer clicks or with more? Why would that be, given that every prompt set describes one object?
-#
-# ```python
-# N_CLICKS_TRY = 5   # try 1, 5, 50
-# ```
+# **Q29.** 🔴 (optional) Did the "not here" clicks pull SAM's mask onto the vessels (compare the row with
+# section 2's vessel-only clicks)? Move the slider in the next cell to 1, 5 and 50 and run it each time: does
+# SAM do better with fewer clicks or with more? Why would that be, given that every prompt set describes one
+# object?
 
 # %% [markdown]
 # This cell runs the same recipe with your number of clicks on every evaluation image and prints it under the
 # default of 20.
 
 # %%
-# Q25 — fewer or more stroke clicks for SAM
-N_CLICKS_TRY = 5  # try 1, 5, 50
-if not isinstance(N_CLICKS_TRY, int) or N_CLICKS_TRY < 1:
-    raise SystemExit("N_CLICKS_TRY must be a whole number of at least 1.")
-try_preds, _ = direct_clicks(SPEC_EVAL, N_CLICKS_TRY)
-RESULTS["sam_direct_clicks_try"] = rung_report(try_preds) | {"n_clicks": N_CLICKS_TRY}
-print_path2(
-    {
-        f"{N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} clicks (default)": path3_report["sam_clicks"],
-        f"{N_CLICKS_TRY} + {N_CLICKS_TRY} clicks (yours)": RESULTS["sam_direct_clicks_try"],
-    }
-)
+# @title Q29 — fewer or more stroke clicks for SAM { display-mode: "form" }
+N_CLICKS_TRY = 5  # @param {type:"slider", min:1, max:50, step:1}
+try_clicks(N_CLICKS_TRY)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -217,6 +240,7 @@ print_path2(
 # %% [markdown]
 # This helper cell defines `stroke_box`, the box around one stroke: the min and max of its columns and rows,
 # grown by a margin and clipped to the image.
+
 
 # %%
 # @title stroke_box: the box around one stroke { display-mode: "form" }
@@ -298,36 +322,19 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q26.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
-# moved, recall or precision? Then grow the boxes and drop the centre click in the next cell. What does a
-# larger box let SAM find, and what does it cost?
-#
-# ```python
-# BOX_PAD_TRY = 16      # slider: try 0, 16, 32 (px of the 1024 px crop)
-# WITH_CLICK_TRY = True  # tick box: untick for the box alone
-# ```
+# **Q30.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
+# moved, recall or precision? Then grow the boxes (try 0, 16 and 32 px of the 1024 px crop) and untick the
+# centre click in the next cell. What does a larger box let SAM find, and what does it cost?
 
 # %% [markdown]
 # This cell runs the box recipe with your margin and click setting on every evaluation image and prints it
 # under the default.
 
 # %%
-# Q26 — larger or smaller boxes, with or without the centre click
+# @title Q30 — larger or smaller boxes, with or without the centre click { display-mode: "form" }
 BOX_PAD_TRY = 16  # @param {type:"slider", min:0, max:48, step:8}
 WITH_CLICK_TRY = True  # @param {type:"boolean"}
-if not isinstance(BOX_PAD_TRY, int) or BOX_PAD_TRY < 0 or not isinstance(WITH_CLICK_TRY, bool):
-    raise SystemExit("BOX_PAD_TRY must be a whole number ≥ 0 and WITH_CLICK_TRY True or False.")
-pad_try = max(BOX_PAD_TRY // 4, 0) if SMOKE else BOX_PAD_TRY  # smoke thumbnails are 4× smaller
-try_preds, _ = direct_boxes(SPEC_EVAL, pad_try, WITH_CLICK_TRY)
-RESULTS["sam_direct_boxes_try"] = rung_report(try_preds) | {"pad": BOX_PAD_TRY, "with_click": WITH_CLICK_TRY}
-print_path2(
-    {
-        f"pad {BOX_PAD} px, with click (default)": path3_report["sam_boxes"],
-        f"pad {BOX_PAD_TRY} px, {'with' if WITH_CLICK_TRY else 'no'} click (yours)": RESULTS[
-            "sam_direct_boxes_try"
-        ],
-    }
-)
+try_boxes(BOX_PAD_TRY, WITH_CLICK_TRY)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -444,34 +451,29 @@ show_masks(
 # - If it is not in your cache, the next cell says so and stops.
 # - The cell loads it from your cache only (never from the internet), in fp16 on a GPU, runs your phrase on
 #   every evaluation image and keeps the union of the instances it finds.
+# - Two cells below, you can type words yourself and see the answer on one image at a time.
 
 # %% [markdown]
 # <!-- callout: question | Question (optional) -->
-# Run the next cell if you have SAM 3, then try other words by editing `SAM3_TEXT` in its code (open the
-# collapsed cell).
+# Run the next cell if you have SAM 3. Pick a phrase from the list in its form, or type your own.
 #
-# **Q27.** 🔴 Does a word find the vessels better than your strokes did? Try a few phrasings
+# **Q31.** 🔴 Does a word find the vessels better than your strokes did? Try a few phrasings
 # (`"blood vessel"`, `"vessel"`, `"artery"`, `"dark line"`, `"retina"`). Which words work, and what does that
 # tell you about the images SAM 3 learnt its concepts from?
 
 # %%
-# @title Q27 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache) { display-mode: "form" }
-SAM3_TEXT = "blood vessel"  # @param {type:"string"}
+# @title Q31 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache) { display-mode: "form" }
+SAM3_TEXT = "blood vessel"  # @param ["blood vessel", "vessel", "red line", "optic disc"] {allow-input: true}
 SAM3_ID, SAM3_LICENCE = "facebook/sam3", "SAM License (Meta)"
 if not isinstance(SAM3_TEXT, str) or not SAM3_TEXT.strip():
     raise SystemExit('SAM3_TEXT must be a short phrase in quotes, e.g. "blood vessel".')
 RESULTS["sam3_text_iou"] = None
-sam3 = None
-try:
-    from transformers import Sam3Model, Sam3Processor
-
-    sam3_dtype = torch.float16 if DEVICE == "cuda" else torch.float32  # fp16 on a T4, never bf16 (SPEC §5)
-    sam3_src = str(model_folder(SAM3_ID) or SAM3_ID)  # plain files on Drive (setup_check), else the hub id
-    sam3_proc = Sam3Processor.from_pretrained(sam3_src, local_files_only=True)
-    sam3 = Sam3Model.from_pretrained(sam3_src, local_files_only=True, dtype=sam3_dtype).eval().to(DEVICE)
+s3 = load_sam3()  # from 00: loads SAM 3 once, shared with the playgrounds, so a T4 never holds two copies
+sam3, sam3_proc, sam3_dtype = s3.get("model"), s3.get("proc"), s3.get("dtype")
+if sam3 is not None:
     print(f"SAM 3 · source {SAM3_ID} · licence {SAM3_LICENCE} · {str(sam3_dtype).split('.')[-1]} on {DEVICE}")
-except Exception as err:  # noqa: BLE001 - not cached, no access, an older transformers: all mean "skip"
-    RESULTS["sam3_note"] = f"SAM 3 not available in this session ({type(err).__name__}); it is optional"
+else:
+    RESULTS["sam3_note"] = "SAM 3 not available in this session; it is optional"
     print(
         "ℹ️ SAM 3 is not in your cache, so this optional cell stops here. To try it later: request access on "
         f"huggingface.co/{SAM3_ID}, then run setup_check.ipynb with your HF token. Nothing else needs it."
@@ -479,7 +481,7 @@ except Exception as err:  # noqa: BLE001 - not cached, no access, an older trans
 if sam3 is not None:
     try:
         t0, sam3_preds = time.monotonic(), []
-        for it in SPEC_EVAL:
+        for it in tqdm(SPEC_EVAL, desc="SAM 3, one phrase", leave=False):
             inputs = sam3_proc(images=it["image"], text=SAM3_TEXT.strip(), return_tensors="pt").to(DEVICE)
             inputs["pixel_values"] = inputs["pixel_values"].to(sam3_dtype)
             with torch.no_grad():
@@ -524,6 +526,23 @@ if sam3 is not None:
 #   strokes of 7.2.
 #
 # </details>
+
+# %% [markdown]
+# The next cell is a playground. It shows one image at a time. Type a few words and press "Ask SAM 3", or
+# click and drag on the image to prompt SAM 2.1 instead, and the mask and its score appear at once.
+
+# %% [markdown]
+# **Q32.** 🔴 (optional) Type a few words on the retina images and on the pets. Which words find the
+# vessels, and which find the eye? Does a word that works on a pet also work on a vessel?
+
+# %%
+# @title Q32 — 🔴 Ask SAM 3 with a word, or click { display-mode: "form" }
+sam_playground(
+    SPEC_EVAL + PETS_EVAL[:3],
+    "Ask SAM 3 with a word, or click",
+    text_prompt=True,
+    default_text="blood vessel",
+)
 
 # %% [markdown]
 # Want to try this on a photo of your own? Section 9 lets you draw the strokes yourself.

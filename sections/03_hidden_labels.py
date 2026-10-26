@@ -12,9 +12,9 @@
 # file. Nothing in it says "I stopped here": every pixel they did not paint is stored as background, exactly
 # like the pixels that really are background.
 #
-# We make such a file ourselves by hiding about half of the vessels from the ground truth, train the
-# section-2 head on it the obvious way, and score it on the vessels we hid. From here on the full masks are
-# used for scoring only.
+# We make such a file ourselves by hiding about half of the vessels from the ground truth (3.1), train the
+# section-2 head on it the obvious way (3.3), and score it on the vessels we hid (3.2). From here on the full
+# masks are used for scoring only.
 
 # %% [markdown]
 # <!-- callout: theory | Theory: incomplete supervision -->
@@ -85,8 +85,9 @@ def two_colour(
 # ### 3.1 Make a half-finished label file
 #
 # This cell hides about half of the vessel segments (the share comes from the dataset config) of the five
-# retina training images of section 2.5 and shows one of them: the full truth we keep for scoring, the labels
-# training may use, and what the label file now wrongly calls background.
+# retina training images of section 2.5 and shows one of them. Two words from here on: **painted** vessels
+# are the ones left in the label file, **hidden** vessels are in the full ground truth but the file leaves
+# them unpainted, so it calls them background.
 
 # %%
 # @title Hide half of the vessel segments and look at the result { display-mode: "form" }
@@ -109,211 +110,102 @@ ex = miss_train[0]
 show_masks(
     [
         (ex["name"], ex["image"]),
-        ("ground truth · evaluation only", overlay(ex["image"], ex["mask"], THEME["truth"])),
-        ("labels training sees: vessel", overlay(ex["image"], ex["visible"], THEME["scribble"])),
+        ("full ground truth · evaluation only", overlay(ex["image"], ex["mask"], THEME["truth"])),
+        ("painted: what training may use", overlay(ex["image"], ex["visible"], THEME["scribble"])),
         ('hidden: the file says "background"', overlay(ex["image"], ex["hidden"], THEME["fails"])),
     ],
     width=2.8,
 )
 
 # %% [markdown]
-# ### 3.2 A metric for the missing vessels: recall
+# ### 3.2 Two numbers: hidden vessels found, and precision
 
 # %% [markdown]
-# <!-- callout: theory | Theory: recall and precision -->
-# **Recall** = found ÷ there, **precision** = right ÷ marked; IoU mixes them, and here we want them apart
-# (our question is recall on the hidden vessels).
+# <!-- callout: theory | Theory: hidden vessels found, and precision -->
+# **Hidden vessels found** = of the hidden vessel pixels (3.1), the share the model marks as vessel. It is
+# the usual *recall*, counted on the hidden pixels only. **Precision** = of the pixels the model marks, the
+# share that really are vessel.
 #
-# - Recall: 400 hidden vessel pixels, the prediction marks 120 of them: 120 ÷ 400 = 30%.
-# - Precision: it marked 150 pixels and 120 are vessels: 120 ÷ 150 = 80%.
+# - Hidden vessels found: 400 hidden vessel pixels, the model marks 120 of them: 120 ÷ 400 = 30%.
+# - Precision: the model marked 150 pixels in total and 120 are vessels: 120 ÷ 150 = 80%.
+#
+# IoU mixes the two into one number. Here we want them apart, because the question is how many hidden
+# vessels the model finds.
 
 # %% [markdown]
-# This helper cell defines `hidden_recall(pred, hidden)`: the share of the `hidden` pixels that the prediction
-# marks (0.0 when nothing is hidden). Every recall below uses it.
+# This helper cell defines `hidden_recall(pred, hidden)` (the share of the `hidden` pixels that the
+# prediction marks, 0.0 when nothing is hidden), `marked_precision(pred, truth)`, and `hidden_panels`, the
+# three-picture figure used in the rest of the section.
+
 
 # %%
-# @title hidden_recall: the share of the hidden pixels found { display-mode: "form" }
+# @title hidden_recall, marked_precision and the "found / missed" figure { display-mode: "form" }
 def hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
     """Share of the `hidden` pixels that `pred` marks as foreground; 0.0 when `hidden` is empty."""
     hidden = np.asarray(hidden, bool)
     return float(np.asarray(pred, bool)[hidden].mean()) if hidden.any() else 0.0
 
 
-# %% [markdown]
-# ### 3.3 The naive baseline: missing = background
-#
-# The naive recipe is what you get by passing the label file straight into the textbook loss: every pixel not
-# painted as vessel is a background target, and plain binary cross-entropy counts every pixel equally.
-#
-# Two things change from section 2.5, the labels and the loss weighting. The hidden labels cause the gap in
-# the chart below; the plain loss only makes the head believe them more strictly, and 3.4 separates the two.
-# Everything else is the same: the same five images, DINOv3 features, linear head and steps.
+def marked_precision(pred: np.ndarray, truth: np.ndarray) -> float:
+    """Share of the pixels `pred` marks that are foreground in `truth`; 0.0 when `pred` marks nothing."""
+    pred = np.asarray(pred, bool)
+    return float(np.asarray(truth, bool)[pred].mean()) if pred.any() else 0.0
+
+
+def found_panel(item: dict, pred: np.ndarray, label: str = "") -> tuple[str, np.ndarray]:
+    """One picture: painted vessels in teal, hidden vessels the model found in violet, missed in orange."""
+    hidden = item["hidden"] & region(item)
+    found, missed = hidden & pred, hidden & ~pred
+    base = overlay(item["image"], item["visible"], THEME["scribble"])
+    n = int(hidden.sum())
+    title = f"{label}found {int(found.sum())} of {n} hidden px = {hidden_recall(pred, hidden):.0%}"
+    return title, two_colour(base, found, missed)
+
+
+def hidden_panels(item: dict, pred: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    """The three pictures: the label file (painted), the hidden vessels, and found / missed by `pred`."""
+    base = overlay(item["image"], item["visible"], THEME["scribble"])
+    hidden_pic = overlay(base, item["hidden"] & region(item), THEME["fails"])
+    return [("label file: painted vessels", base), ("hidden: the file says background", hidden_pic)] + [
+        found_panel(item, pred)
+    ]
+
 
 # %% [markdown]
-# A playful extreme first, to have a scale: this cell scores a fake model that believes the label file
-# perfectly (its prediction is the file itself), and it comes back as the grey bars in the chart below.
+# A first example, with no training: the "believer" is a fake model that believes the label file perfectly,
+# so its prediction is the file itself. Colours in every picture of this section: **teal** = painted
+# vessels, **orange** = hidden vessels (in the third picture: hidden and missed), **violet** = hidden and
+# found by the model.
 
 # %%
-# @title Playful test: a model that believes the label file perfectly { display-mode: "form" }
+# @title Worked example: a model that copies the label file { display-mode: "form" }
 believer = [it["visible"] for it in miss_train]  # its prediction is the file itself
 b_rec_hidden = part_recall(believer, miss_train, "hidden")
 b_rec_visible = part_recall(believer, miss_train, "visible")
 b_pairs = list(zip(believer, miss_train, strict=True))
-b_precision = float(np.mean([hidden_recall(it["mask"], b & region(it)) for b, it in b_pairs]))
+b_precision = float(np.mean([marked_precision(b & region(it), it["mask"]) for b, it in b_pairs]))
 b_iou = float(np.mean([iou(b & region(it), it["mask"] & region(it)) for b, it in b_pairs]))
 print(
-    f"believes the file perfectly · recall on hidden vessels {b_rec_hidden:.0%} · on visible vessels "
-    f"{b_rec_visible:.0%} · precision {b_precision:.0%} · IoU {b_iou:.2f}"
+    f"believer · hidden vessels found {b_rec_hidden:.0%} · painted vessels found {b_rec_visible:.0%} · "
+    f"precision {b_precision:.0%} · IoU {b_iou:.2f}"
 )
+show_masks(hidden_panels(miss_train[0], believer[0]), width=2.9)
 
 # %% [markdown]
-# <!-- callout: question | 🤔 Your prediction -->
-# The head was told that about half of the vessels in these five images are background. Write two guesses.
+# ### 3.3 The naive baseline: missing = background
 #
-# - On those hidden vessels, will its recall be near the section-2 head's, about half of it, or close to
-#   zero (like the believer above)?
-# - On new images, will it mark more pixels than the section-2 head, or fewer?
+# "Naive" means: pass the label file straight into the textbook loss, with no thought about what the
+# unpainted pixels mean. Here is what that does to our file.
 
 # %% [markdown]
-# This cell trains the naive head on the incomplete labels only (the fundus border is ignored, as in 2.5) and
-# prints the seconds it took; if it is slow, set `TRAIN_YOURSELF = False` and run it again to load our
-# checkpoint, trained the same way on all fit images.
-
-# %%
-TRAIN_YOURSELF = True  # False -> load our precomputed "hidden_bg" head instead of training
-if not isinstance(TRAIN_YOURSELF, bool):
-    raise SystemExit("TRAIN_YOURSELF must be True or False.")
-
-side = SPECIALISED["feat_side"]
-miss_feats = [features_for(SPECIALISED, it, side) for it in miss_train]
-# missing = background: the label file as it is. The hidden ground truth never enters training (L-005).
-naive_labels = [np.where(region(it), it["visible"], -1).astype(np.int8) for it in miss_train]
-if TRAIN_YOURSELF:
-    naive_head, naive_sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=False)
-    src = f"trained here on {len(miss_train)} images, {HEAD_STEPS} steps, plain cross-entropy"
-else:
-    naive_head, entry = load_head(SPECIALISED, "hidden_bg", side)
-    naive_sec = entry["train_sec"]
-    src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
-print(f"naive head @ {side} px · {src} · {naive_sec:.1f} s on {DEVICE}")
-if naive_sec > 60:
-    print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
-
-# %% [markdown]
-# This cell scores the naive head and the section-2 head (full masks) on the vessel pixels we hid, the ones
-# training saw, and every vessel of the held-out images, and plots the recalls next to the believer's.
-
-# %%
-# @title Score both heads on hidden, visible and held-out vessels { display-mode: "form" }
-full_head = spec_heads[side][0]  # section 2.5: same features, trained on full masks
-HEADS = {"full masks (section 2)": full_head, "naive: missing = background": naive_head}
-t0 = time.monotonic()
-naive_report = {}
-for name, tensors in HEADS.items():
-    fit_preds = [
-        predict_head(tensors, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
-    ]
-    held_preds = [
-        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
-    ]
-    held = mean_scores([score(p, it) for p, it in zip(held_preds, SPEC_EVAL, strict=True)])
-    # precision = the share of the marked pixels that are true vessels
-    held_pairs = zip(held_preds, SPEC_EVAL, strict=True)
-    precision = [hidden_recall(it["mask"], p & region(it)) for p, it in held_pairs]
-    naive_report[name] = {
-        "recall_hidden_fit": part_recall(fit_preds, miss_train, "hidden"),
-        "recall_visible_fit": part_recall(fit_preds, miss_train, "visible"),
-        "recall_held": part_recall(held_preds, SPEC_EVAL, "mask"),
-        "precision_held": float(np.mean(precision)),
-        "iou_held": held["iou"],
-        "cldice_held": held["cldice"],
-        "fit_preds": fit_preds,
-        "held_preds": held_preds,
-    }
-infer_sec = round(time.monotonic() - t0, 1)
-
-naive = naive_report["naive: missing = background"]
-RESULTS["naive_recall_hidden_fg"] = naive["recall_hidden_fit"]  # recall on the vessels hidden in training
-RESULTS["naive_head"] = {k: v for k, v in naive.items() if not k.endswith("_preds")} | {
-    "long_side": side,
-    "n_train": len(miss_train),
-    "hidden_share": hidden_share,
-    "train_sec": round(float(naive_sec), 2),
-    "infer_sec": infer_sec,
-}
-
-GROUPS = {
-    "recall_hidden_fit": "hidden vessels\n(told: background)",
-    "recall_visible_fit": "visible vessels\n(told: vessel)",
-    "recall_held": "held-out images\n(all vessels)",
-}
-print(f"{'head':<30}{'recall: hidden':>15}{'visible':>9}{'held-out':>10}   held-out IoU / clDice / precision")
-for name, r in naive_report.items():
-    print(
-        f"{name:<30}{r['recall_hidden_fit']:>15.3f}{r['recall_visible_fit']:>9.3f}{r['recall_held']:>10.3f}"
-        f"   {r['iou_held']:.3f} / {r['cldice_held']:.3f} / {r['precision_held']:.3f}"
-    )
-
-x = np.arange(len(GROUPS))
-fig, ax = plt.subplots(figsize=(6.4, 3))
-# the believer (its prediction is the file) only exists on the training images: no bar for the held-out group
-believer_bars = {0: b_rec_hidden, 1: b_rec_visible}
-ax.bar(
-    [x[i] - 0.27 for i in believer_bars], list(believer_bars.values()), 0.26, color=THEME["background"],
-    label="believer: the file itself",
-)
-for shift, name, colour in zip((0.0, 0.27), HEADS, (THEME["works"], THEME["fails"]), strict=True):
-    ax.bar(x + shift, [naive_report[name][g] for g in GROUPS], 0.26, color=colour, label=name)
-ax.set_xticks(x, list(GROUPS.values()), fontsize=8)
-ax.set_ylabel("recall (share of vessel pixels found)")
-ax.set_ylim(0, 1.3)
-ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-ax.set_title("Which vessels does each head still find?")
-ax.legend(fontsize=8, frameon=False, loc="upper right", ncol=1)
-plt.tight_layout()
-plt.show()
-
-# %% [markdown]
-# This cell shows the naive head's worst, typical (median) and best training image by recall on the hidden
-# vessels: violet is a hidden vessel pixel it still found, green one it missed.
-
-# %%
-# @title Worst, typical and best training image by hidden recall { display-mode: "form" }
-per_image = [hidden_recall(p, it["hidden"]) for p, it in zip(naive["fit_preds"], miss_train, strict=True)]
-rank = np.argsort(per_image)
-panels = []
-for label, k in (("worst", rank[0]), ("typical (median)", rank[len(rank) // 2]), ("best", rank[-1])):
-    it, pred = miss_train[k], naive["fit_preds"][k]
-    found, missed = it["hidden"] & pred, it["hidden"] & ~pred
-    panels.append(
-        (
-            f"{label} · found {int(found.sum())} of {int(it['hidden'].sum())} hidden px = {per_image[k]:.0%}",
-            two_colour(it["image"], found, missed, THEME["truth"]),
-        )
-    )
-show_masks(panels, width=3.4)
-
-# %% [markdown]
-# <!-- callout: question | Question -->
-# **Q10.** 🟡 Look at the worst, typical and best images above: which hidden vessels did the naive head
-# miss (green), and which did it still find (violet)? Then run the next cell, which draws the naive head's
-# predictions on the held-out demo image of section 2 next to the section-2 head's (no new training, no model
-# calls): does it fail the same way (too wide, the disc, the whole eye) or differently?
-
-# %%
-# Q10 — the naive head on the held-out demo image, next to the section-2 head
-k = next(i for i, e in enumerate(SPEC_EVAL) if e is demo)
-show_masks(
-    [
-        (
-            f"{name} · IoU {score(r['held_preds'][k], demo)['iou']:.2f}",
-            overlay(demo["image"], r["held_preds"][k], THEME["fails"]),
-        )
-        for name, r in naive_report.items()
-    ]
-    + [("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"]))],
-    width=3.0,
-)
+# <!-- callout: theory | Theory: why missing = background goes wrong -->
+# 1. The annotator painted about half of the vessels and stopped (the label file of 3.1).
+# 2. The simplest training reads every unpainted pixel as "background", hidden vessels included.
+# 3. So the head sees two vessel patches that look the same: one labelled "vessel", one labelled
+#    "background" (the picture below shows such a pair).
+# 4. The head must give both patches one answer. Which answer will it settle on? Guess below, then train it.
+#
+# What we measure: the hidden vessels found (3.2), next to the section-2 head's.
 
 # %% [markdown]
 # This cell shows two look-alike patches from a training image, one the annotator painted (target 1) and one
@@ -351,7 +243,7 @@ else:
     fig, axes = plt.subplots(1, 2, figsize=(4.4, 2.4))
     for ax, centre, title, colour in (
         (axes[0], vis_centre, "target 1: painted", THEME["scribble"]),
-        (axes[1], hid_centre, "target 0: never reached", THEME["background"]),
+        (axes[1], hid_centre, "target 0: never reached", THEME["fails"]),
     ):
         ax.imshow(pic_crop(pic_item["image"], centre))
         ax.set_title(title, fontsize=9, color=colour)
@@ -365,28 +257,203 @@ else:
     plt.show()
 
 # %% [markdown]
-# <!-- callout: theory | Theory: why missing = background fails, step by step -->
-# 1. The annotator traces vessels A, B and C, then stops. Vessels D and E are never painted.
-# 2. The file stores D and E as 0, the same value as real background.
-# 3. Training sees patches that look like A with target 1, and patches that look like D (the same features)
-#    with target 0.
-# 4. For look-alike patches, plain cross-entropy settles on the share that was labelled. If half of the
-#    vessels like A are hidden, p comes out near 0.5.
-# 5. p near 0.5 sits on the threshold, so small differences tip many vessels to "background". The head keeps
-#    the clearest, thickest vessels and drops the rest.
+# <!-- callout: question | 🤔 Your prediction -->
+# The head is told that about half of the vessels in these five images are background. Write two guesses.
 #
-# Consequence: recall on the hidden vessels falls, while precision stays high.
+# - Of the hidden vessel pixels, how many will it find? Near the section-2 head's share, about half of it, or
+#   close to zero (like the believer of 3.2)?
+# - On new images, will it mark more pixels than the section-2 head, or fewer?
+
+# %% [markdown]
+# This helper cell defines `fit_naive`: it reads the label file as it is (no pixel is ignored except the
+# fundus border, as in 2.5) and trains the head with the plain loss, or loads our checkpoint, trained the
+# same way on all fit images.
+
+
+# %%
+# @title fit_naive: train the naive head, or load our checkpoint { display-mode: "form" }
+def fit_naive(train_yourself: bool) -> tuple[dict, float, list[torch.Tensor], list[np.ndarray]]:
+    """Naive head on the label file: returns (head, seconds, features, labels). The hidden ground truth never
+    enters training (L-005)."""
+    if not isinstance(train_yourself, bool):
+        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+    side = SPECIALISED["feat_side"]
+    feats = [features_for(SPECIALISED, it, side) for it in miss_train]
+    labels = [np.where(region(it), it["visible"], -1).astype(np.int8) for it in miss_train]  # unpainted = 0
+    if train_yourself:
+        head, sec = train_head(feats, labels, HEAD_STEPS, balanced=False)
+        src = f"trained here on {len(miss_train)} images, {HEAD_STEPS} steps, plain cross-entropy"
+    else:
+        head, entry = load_head(SPECIALISED, "hidden_bg", side)
+        sec = entry["train_sec"]
+        src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
+    print(f"naive head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
+    if sec > 60:
+        print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoint next time.")
+    return head, sec, feats, labels
+
+
+# %% [markdown]
+# This cell trains the naive head and prints the seconds it took; untick `TRAIN_YOURSELF` and run it again
+# to load our checkpoint.
+
+# %%
+# @title Train the naive head { display-mode: "form" }
+TRAIN_YOURSELF = True  # @param {type:"boolean"}
+side = SPECIALISED["feat_side"]
+naive_head, naive_sec, miss_feats, naive_labels = fit_naive(TRAIN_YOURSELF)
+
+# %% [markdown]
+# This cell scores the naive head and the section-2 head (full masks) on the vessel pixels we hid, the ones
+# training saw, and every vessel of the held-out images, and plots them next to the believer's.
+
+# %%
+# @title Score both heads on hidden, painted and held-out vessels { display-mode: "form" }
+full_head = spec_heads[side][0]  # section 2.5: same features, trained on full masks
+HEADS = {"full masks (section 2)": full_head, "naive: missing = background": naive_head}
+t0 = time.monotonic()
+naive_report = {}
+for name, tensors in HEADS.items():
+    fit_preds = [
+        predict_head(tensors, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
+    ]
+    held_preds = [
+        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+    ]
+    held = mean_scores([score(p, it) for p, it in zip(held_preds, SPEC_EVAL, strict=True)])
+    held_pairs = zip(held_preds, SPEC_EVAL, strict=True)
+    precision = [marked_precision(p & region(it), it["mask"]) for p, it in held_pairs]
+    naive_report[name] = {
+        "recall_hidden_fit": part_recall(fit_preds, miss_train, "hidden"),
+        "recall_visible_fit": part_recall(fit_preds, miss_train, "visible"),
+        "recall_held": part_recall(held_preds, SPEC_EVAL, "mask"),
+        "precision_held": float(np.mean(precision)),
+        "iou_held": held["iou"],
+        "cldice_held": held["cldice"],
+        "fit_preds": fit_preds,
+        "held_preds": held_preds,
+    }
+infer_sec = round(time.monotonic() - t0, 1)
+
+naive = naive_report["naive: missing = background"]
+RESULTS["naive_recall_hidden_fg"] = naive["recall_hidden_fit"]  # recall on the vessels hidden in training
+RESULTS["naive_head"] = {k: v for k, v in naive.items() if not k.endswith("_preds")} | {
+    "long_side": side,
+    "n_train": len(miss_train),
+    "hidden_share": hidden_share,
+    "train_sec": round(float(naive_sec), 2),
+    "infer_sec": infer_sec,
+}
+
+GROUPS = {
+    "recall_hidden_fit": "hidden vessels\n(told: background)",
+    "recall_visible_fit": "painted vessels\n(told: vessel)",
+    "recall_held": "held-out images\n(all vessels)",
+}
+print(f"{'head':<30}{'hidden found':>13}{'painted':>9}{'held-out':>10}   held-out IoU / clDice / precision")
+for name, r in naive_report.items():
+    print(
+        f"{name:<30}{r['recall_hidden_fit']:>13.3f}{r['recall_visible_fit']:>9.3f}{r['recall_held']:>10.3f}"
+        f"   {r['iou_held']:.3f} / {r['cldice_held']:.3f} / {r['precision_held']:.3f}"
+    )
+
+x = np.arange(len(GROUPS))
+fig, ax = plt.subplots(figsize=(6.4, 3))
+# the believer (its prediction is the file) only exists on the training images: no bar for the held-out group
+believer_bars = {0: b_rec_hidden, 1: b_rec_visible}
+ax.bar(
+    [x[i] - 0.27 for i in believer_bars],
+    list(believer_bars.values()),
+    0.26,
+    color=THEME["background"],
+    label="believer: the file itself",
+)
+for shift, name, colour in zip((0.0, 0.27), HEADS, (THEME["works"], THEME["fails"]), strict=True):
+    ax.bar(x + shift, [naive_report[name][g] for g in GROUPS], 0.26, color=colour, label=name)
+ax.set_xticks(x, list(GROUPS.values()), fontsize=8)
+ax.set_ylabel("share of vessel pixels found")
+ax.set_ylim(0, 1.3)
+ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+ax.set_title("Which vessels does each head find?")
+ax.legend(fontsize=8, frameon=False, loc="upper right", ncol=1)
+plt.tight_layout()
+plt.show()
+
+# %% [markdown]
+# <!-- callout: theory | Theory: why the head settles there -->
+# 1. For two identical patches with opposite labels, the loss is lowest when the head answers "about 50 %
+#    vessel" for both.
+# 2. 50 % sits on the threshold, so faint and thin vessels fall just below it and are marked as background.
+# 3. The head misses vessels, even painted ones. What it does mark is mostly the clearest vessels, so it is
+#    mostly right: it looks precise.
+#
+# Check this against your guess and the numbers above.
+
+# %% [markdown]
+# This cell shows the naive head's worst, typical (median) and best training image by hidden vessels found:
+# violet is a hidden vessel pixel it found, orange one it missed, teal what was painted.
+
+# %%
+# @title Worst, typical and best training image by hidden vessels found { display-mode: "form" }
+per_image = [hidden_recall(p, it["hidden"]) for p, it in zip(naive["fit_preds"], miss_train, strict=True)]
+rank = np.argsort(per_image)
+show_masks(
+    [
+        found_panel(miss_train[k], naive["fit_preds"][k], f"{label} · ")
+        for label, k in (("worst", rank[0]), ("typical (median)", rank[len(rank) // 2]), ("best", rank[-1]))
+    ],
+    width=3.4,
+)
+
+# %% [markdown]
+# This helper cell defines `show_naive_on_image(k)`: it draws both heads' predictions on held-out image `k`
+# (no new training, no model calls), each titled with the share of the fundus it marked and its IoU.
+
+
+# %%
+# @title show_naive_on_image: both heads on one held-out image { display-mode: "form" }
+def show_naive_on_image(k: int) -> None:
+    """Both heads' predictions on SPEC_EVAL[k] next to its ground truth, with the share of fundus marked."""
+    if not isinstance(k, int) or not 0 <= k < len(SPEC_EVAL):
+        raise SystemExit(f"DEMO_IMAGE must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
+    item = SPEC_EVAL[k]
+    panels = []
+    for name, r in naive_report.items():
+        pred = r["held_preds"][k]
+        marked = pred[region(item)].mean()
+        panels.append(
+            (
+                f"{name}\nmarked {marked:.0%} · IoU {score(pred, item)['iou']:.2f}",
+                overlay(item["image"], pred, THEME["fails"]),
+            )
+        )
+    panels.append(("ground truth", overlay(item["image"], item["mask"], THEME["truth"])))
+    show_masks(panels, width=3.0)
+
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# **Q12.** 🟡 Look at the worst, typical and best images above: which hidden vessels did the naive head
+# miss (orange), and which did it still find (violet)? Then run the next cell, which draws the naive head's
+# predictions on a held-out image next to the section-2 head's (image 0 is the demo image of section 2; set
+# `DEMO_IMAGE` to look at others): does it fail the same way (too wide, the disc, the whole eye) or
+# differently?
+
+# %%
+# @title Q12 — the naive head on a held-out image { display-mode: "form" }
+DEMO_IMAGE = 0  # @param {type:"integer"}
+show_naive_on_image(DEMO_IMAGE)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
 # - The naive head did what the labels told it: it kept the clearest vessels, on the hidden segments, on new
-#   images, and often even on the visible segments it was shown.
+#   images, and often even on the painted segments it was shown.
 # - Compare the precision column: what it does mark is mostly right. The section-2 head failed by being too
 #   generous (vessels as wide as a patch); this one fails by being too stingy.
 # - Look at the held-out IoU of the two heads: it can be close, because IoU rewards the precision the naive
-#   head gained as much as it punishes the recall it lost. One number would have hidden the failure.
-# - Same features, same head: the only thing that changed is what we told it about the unlabelled pixels.
+#   head gained as much as it punishes the vessels it lost. One number would have hidden the failure.
+# - Same features, same head: the only thing that changed is what we told it about the unpainted pixels.
 #
 # </details>
 
@@ -399,42 +466,119 @@ else:
 # - On your own data, keep a small, fully labelled evaluation set, even if training uses cheap labels.
 
 # %% [markdown]
+# **Try it: hide more or fewer vessels.** The next helper rebuilds the label file with a different share of
+# hidden segments, trains the naive head again on it (a few seconds), and prints the result next to the
+# default one.
+
+# %%
+# @title naive_with_hidden_share: rebuild the label file, retrain, score { display-mode: "form" }
+_HELD_FEATS: dict = {}
+
+
+def naive_with_hidden_share(percent: int) -> None:
+    """Hide `percent` % of the vessel segments (the 3.1 helper), train the plain head on that label file
+    (the 3.3 helper), and print hidden vessels found and held-out precision next to the default run."""
+    if not isinstance(percent, int) or not 0 <= percent <= 90:
+        raise SystemExit("HIDE_PERCENT must be a whole number from 0 to 90.")
+    thin = SPECIALISED["thin_structures"]
+    visibles = [
+        it["mask"] if percent == 0 else hide_units(it["mask"], percent / 100, hide_rng(it["name"]), thin)
+        for it in miss_train
+    ]
+    labels = [np.where(region(it), v, -1).astype(np.int8) for it, v in zip(miss_train, visibles, strict=True)]
+    head, sec = train_head(miss_feats, labels, HEAD_STEPS, balanced=False)
+    trial = [dict(it, visible=v, hidden=it["mask"] & ~v) for it, v in zip(miss_train, visibles, strict=True)]
+    fit_preds = [predict_head(head, f, it["mask"].shape) for f, it in zip(miss_feats, trial, strict=True)]
+    held_preds = []
+    for it in SPEC_EVAL:
+        if it["name"] not in _HELD_FEATS:
+            _HELD_FEATS[it["name"]] = features_for(SPECIALISED, it, SPECIALISED["feat_side"])
+        held_preds.append(predict_head(head, _HELD_FEATS[it["name"]], it["mask"].shape))
+    shown = next((it for it in trial if it["hidden"].any()), None)  # first image that has hidden vessels
+    has_hidden = shown is not None
+    rows = {
+        f"default ({MISSING['hidden_fraction']:.0%} of segments)": (
+            naive["recall_hidden_fit"],
+            naive["recall_visible_fit"],
+            naive["precision_held"],
+        ),
+        f"this run ({percent}% of segments)": (
+            part_recall(fit_preds, trial, "hidden") if has_hidden else float("nan"),
+            part_recall(fit_preds, trial, "visible"),
+            float(
+                np.mean(
+                    [
+                        marked_precision(p & region(it), it["mask"])
+                        for p, it in zip(held_preds, SPEC_EVAL, strict=True)
+                    ]
+                )
+            ),
+        ),
+    }
+    share = np.mean([it["hidden"].sum() / max(it["mask"].sum(), 1) for it in trial])
+    print(f"trained in {sec:.1f} s on {DEVICE} · {share:.0%} of the vessel pixels hidden")
+    print(f"{'':<28}{'hidden found':>13}{'painted found':>15}{'held-out precision':>20}")
+    for name, (hid, vis, prec) in rows.items():
+        print(f"{name:<28}{hid:>13.2f}{vis:>15.2f}{prec:>20.2f}")
+    if has_hidden:
+        show_masks(hidden_panels(shown, fit_preds[trial.index(shown)]), width=2.9)
+    else:
+        print(
+            "Nothing is hidden at 0%, so there is no 'hidden found' to report: the head sees the full masks."
+        )
+
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# **Q13.** 🟡 Write down a guess first: how will "hidden found" and "precision" change as you hide more of
+# the vessels? Then run the next cell with `HIDE_PERCENT` at 10, 50 and 90. For each of the two numbers,
+# say what happened, and what it means for an annotator who stops early.
+
+# %%
+# @title Q13 — hide more or fewer vessels, retrain the naive head { display-mode: "form" }
+HIDE_PERCENT = 70  # @param {type:"slider", min:0, max:90, step:10}
+naive_with_hidden_share(HIDE_PERCENT)
+
+# %% [markdown]
 # ### 3.4 🔴 Optional: is it the labels, or the loss?
 #
 # Plain cross-entropy is one of the two changes from section 2.5: the heads of sections 1 and 2 used the
 # balanced loss.
 
 # %% [markdown]
-# **Q11.** 🔴 Train the same naive labels with the balanced loss of section 2.5 and compare its recall on the
-# hidden vessels with the plain head's. Does reweighting fix "missing = background"? What did it fix?
+# **Q14.** 🔴 Train the same naive labels with the balanced loss of section 2.5 (`balanced=True` in
+# `train_head`) and compare its hidden vessels found with the plain head's. Does reweighting fix
+# "missing = background"? What did it fix?
 #
-# ```python
-# head, sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=True)
-# ```
-#
-# This cell trains that balanced variant on the same incomplete labels (seconds) and prints its recall next
-# to the plain head's.
+# The next cell trains that balanced variant on the same incomplete labels (seconds) and prints both.
+
 
 # %%
-# Q11 — the same "missing = background" labels with the balanced loss of section 2.5
-balanced_head, balanced_sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=True)
-bal_fit = [
-    predict_head(balanced_head, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
-]
-bal_hidden, bal_visible = (part_recall(bal_fit, miss_train, part) for part in ("hidden", "visible"))
-RESULTS["naive_balanced_recall_hidden_fg"] = bal_hidden
-print(f"balanced head · trained in {balanced_sec:.1f} s on {DEVICE}")
-print(f"{'loss':<12}{'recall: hidden':>15}{'visible':>9}")
-print(f"{'plain':<12}{naive['recall_hidden_fit']:>15.3f}{naive['recall_visible_fit']:>9.3f}")
-print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
+# @title compare_balanced_loss: the balanced head next to the plain one { display-mode: "form" }
+def compare_balanced_loss() -> dict:
+    """Train the balanced head on the naive labels, print its recalls next to the plain head's, return it."""
+    head, sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=True)
+    preds = [predict_head(head, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)]
+    hidden, painted = (part_recall(preds, miss_train, part) for part in ("hidden", "visible"))
+    RESULTS["naive_balanced_recall_hidden_fg"] = hidden
+    print(f"balanced head · trained in {sec:.1f} s on {DEVICE}")
+    print(f"{'loss':<12}{'hidden found':>13}{'painted':>9}")
+    print(f"{'plain':<12}{naive['recall_hidden_fit']:>13.3f}{naive['recall_visible_fit']:>9.3f}")
+    print(f"{'balanced':<12}{hidden:>13.3f}{painted:>9.3f}")
+    return head
+
+
+# %%
+# @title Q14 — 🔴 the same "missing = background" labels with the balanced loss { display-mode: "form" }
+balanced_head = compare_balanced_loss()
 
 # %% [markdown]
-# <!-- callout: go-deeper | Q11: what to look for -->
+# <!-- callout: go-deeper | Q14: what to look for -->
 # - Reweighting usually recovers a lot of the hidden vessels. It does not fix the labels, it fixes the
 #   *proportion*: missing = background told the head that vessels are about half as common as they are, and
 #   the balanced loss stops caring about proportions.
 # - It works here for two reasons that need not hold on your data: we hid segments *at random*, so the hidden
-#   ones look like the visible ones, and a linear head is too simple to memorise which segment was hidden.
+#   ones look like the painted ones, and a linear head is too simple to memorise which segment was hidden.
 # - If annotators systematically skip the thin capillaries, the head learns "thin = background", and no class
 #   weight undoes that.
 # - Section 5 fixes the cause instead: tell the loss which pixels are unknown.
@@ -443,10 +587,10 @@ print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 # <!-- callout: takeaway | Takeaway -->
 # - **A label file with only vessel and background** → ask how it was made: an unpainted pixel may mean
 #   "unknown", not "background".
-# - **A head trained with "missing = background"** → expect a stingy model (precision stays high, recall on
-#   what was left out collapses), so also measure recall on a small, fully labelled set.
+# - **A head trained with "missing = background"** → expect a stingy model (precision stays high, the vessels
+#   left out are mostly not found), so also measure the hidden vessels found on a small, fully labelled set.
 # - **A balanced loss that wins the recall back** → do not trust it for systematic gaps: it works when the
 #   gaps are random, not when thin vessels are skipped.
 # - **Three failures so far** (SAM finds the eye, the head is limited by its 16 px patches, naive training
 #   believes the file) → none of these is a model-size problem we have tested; each needs different
-#   supervision. This section's recall on the hidden vessels is the baseline to beat; section 4 starts on how.
+#   supervision. The hidden vessels found in this section is the baseline to beat; section 4 starts on how.

@@ -25,12 +25,12 @@
 #   an NDA.
 
 # %% [markdown]
-# This helper cell defines the tools of this section: shrinking an image, our example images, a drawing
-# canvas with two pens, and the code that turns a drawing (or a PNG you painted elsewhere) into a stroke
-# map: 0 nothing, 1 the thing, 2 background, as in section 4.
+# This helper cell defines the tools of this section: shrinking an image, our example images, picking your
+# images, a drawing canvas with two pens, and the code that turns a drawing (or a PNG you painted elsewhere)
+# into a stroke map: 0 nothing, 1 the thing, 2 background, as in section 4.
 
 # %%
-# @title Your images: example, canvas, stroke decoding { display-mode: "form" }
+# @title Your images: example, canvas, picking images, stroke decoding { display-mode: "form" }
 import base64
 import io
 import uuid
@@ -204,9 +204,118 @@ def show_strokes(items: list[dict]) -> None:
         grow = max(1, max(it["image"].shape[:2]) // 256)
         thick = {v: ndi.binary_dilation(it["scribbles"] == v, iterations=grow) for v in (1, 2)}
         drawn = overlay(it["image"], thick[2], THEME["background"], 0.9)
-        drawn = overlay(drawn, thick[1], THEME["scribble"], 0.9)
+        drawn = overlay(drawn, thick[1], THEME["scribble"], 0.9, dim=False)
         panels += [(it["name"], it["image"]), (f"strokes · {it['stroke_source']}", drawn)]
     show_masks(panels, width=2.6)
+
+
+def pick_images(ask_upload: bool, use_example: bool, my_images: list) -> list[dict]:
+    """The images of this section: uploaded in Colab if `ask_upload`, else the files listed in `my_images`
+    (up to 3, each shrunk to OWN_MAX_SIDE), else our example. Prints and shows them."""
+    if (
+        not isinstance(ask_upload, bool)
+        or not isinstance(use_example, bool)
+        or not isinstance(my_images, list)
+    ):
+        raise SystemExit(
+            "ASK_UPLOAD, USE_EXAMPLE must be True or False; MY_IMAGES a list of paths in quotes."
+        )
+    missing = [p for p in my_images if not Path(p).is_file()]
+    if missing:
+        raise SystemExit(f"not found: {missing}. Upload with the folder icon on the left and copy each path.")
+    seed_everything()
+    OWN_STROKES.clear()  # a fresh start: strokes from an earlier run belong to earlier images
+    own_paths = [Path(p) for p in my_images]
+    if ask_upload and IN_COLAB and not use_example and not own_paths:  # opt-in: Run all never waits here
+        from google.colab import files
+
+        print("Pick 1 to 3 images (JPEG or PNG), or press Cancel to use our example.")
+        upload_dir = Path("/content/own_images")  # this session's disk only; gone when the session ends
+        upload_dir.mkdir(exist_ok=True)
+        try:
+            uploaded = files.upload()
+        except Exception as err:  # noqa: BLE001 - a cancelled upload raises in some Colab versions
+            print(f"(upload stopped: {type(err).__name__})")
+            uploaded = {}
+        for fname, data in uploaded.items():
+            (upload_dir / fname).write_bytes(data)
+            own_paths.append(upload_dir / fname)
+    if len(own_paths) > 3:
+        print(f"ℹ️ {len(own_paths)} images: keeping the first 3, so every step stays short.")
+        own_paths = own_paths[:3]
+    images = []
+    for p in own_paths if not use_example else []:
+        try:
+            images.append(
+                own_item(p.stem, shrink(np.array(Image.open(p).convert("RGB")), OWN_MAX_SIDE), "yours")
+            )
+        except Exception as err:  # noqa: BLE001 - any unreadable file gets the same plain message
+            print(
+                f"⚠️ {p.name}: could not read it as an image ({type(err).__name__}), skipped. Use JPEG or PNG."
+            )
+    if not images:
+        images = example_items(OWN_MAX_SIDE)
+        print("ℹ️ Using our example: two held-out pets and one retina image, with generated strokes.")
+    sizes = ", ".join(f"{it['name']} {it['image'].shape[1]}×{it['image'].shape[0]}" for it in images)
+    print(f"{len(images)} image(s) · {sizes} · {images[0]['source']}")
+    show_masks([(it["name"], it["image"]) for it in images], width=3.0)
+    return images
+
+
+def stroke_effort(items: list[dict]) -> tuple[dict[int, int], float]:
+    """Number of strokes per kind (1 thing, 2 background) over `items`, and the minutes they cost to draw."""
+    n_strokes = {v: sum(len(stroke_masks(it, v)) for it in items) for v in (1, 2)}
+    return n_strokes, effort_minutes(n_strokes=n_strokes[1] + n_strokes[2])
+
+
+def collect_strokes(stroke_pngs: list) -> list[dict]:
+    """Give every image of OWN its strokes (your PNGs, then the canvas, then the generated strokes of the
+    example), print the counts and show them. Returns the images the ladder will run on: the ones with a
+    thing stroke, or our example if there are none (or no background stroke at all)."""
+    if not isinstance(stroke_pngs, list) or len(stroke_pngs) > len(OWN):
+        raise SystemExit(
+            f"MY_STROKE_PNGS must be a list of at most {len(OWN)} paths, one per image, in order."
+        )
+    for k, p in enumerate(stroke_pngs):
+        if p and not Path(p).is_file():
+            raise SystemExit(f"{p} not found. Upload it with the folder icon on the left and copy its path.")
+        if p:
+            OWN_STROKES[k] = decode_strokes(Path(p).read_bytes(), OWN[k]["image"].shape[:2])
+    for k, it in enumerate(OWN):
+        if k in OWN_STROKES:
+            it["scribbles"], it["stroke_source"] = OWN_STROKES[k], "drawn by you"
+        elif it["auto"] is not None:  # the example, not redrawn: generated strokes through the canvas decoder
+            it["scribbles"] = decode_strokes(strokes_png(it["auto"]), it["image"].shape[:2])
+            it["stroke_source"] = "generated"
+        else:
+            it["scribbles"], it["stroke_source"] = np.zeros(it["image"].shape[:2], np.uint8), "none yet"
+    no_thing = [it["name"] for it in OWN if not (it["scribbles"] == 1).any()]
+    if no_thing:
+        print(
+            f"⚠️ no 'thing' stroke on {no_thing}: skipped. Draw one, press 💾 save, and run this cell again."
+        )
+    ladder = [it for it in OWN if (it["scribbles"] == 1).any()]
+    if not any((it["scribbles"] == 2).any() for it in ladder):
+        print(
+            "⚠️ No background stroke on any image, and the head needs both kinds. Draw at least one background"
+        )
+        print("   stroke and save. Until then the ladder runs on our example, so the notebook keeps going.")
+        ladder = []
+    if not ladder:
+        ladder = example_items(OWN_MAX_SIDE)
+        for it in ladder:
+            it["scribbles"] = decode_strokes(strokes_png(it["auto"]), it["image"].shape[:2])
+            it["stroke_source"] = "generated"
+    n_strokes, minutes = stroke_effort(ladder)
+    print(
+        f"{len(ladder)} image(s) · {n_strokes[1]} thing strokes, {n_strokes[2]} background strokes · "
+        f"≈ {minutes:.1f} min at {SPECIALISED['annotation_effort']['seconds_per_stroke']} s per stroke"
+    )
+    show_strokes(ladder)
+    return ladder
+
+
+OWN_MAX_SIDE = 256 if SMOKE else 1024  # long side, in pixels, after shrinking
 
 
 if IN_COLAB:
@@ -232,53 +341,15 @@ if IN_COLAB:
 
 # %% [markdown]
 # This cell uploads your images only if `ASK_UPLOAD` is ticked (in Colab), shrinks each one to at most
-# 1024 px on its long side, and shows them.
+# 1024 px on its long side, and shows them. Tick `USE_EXAMPLE` to keep our example even if you listed
+# images.
 
 # %%
+# @title Choose your images { display-mode: "form" }
 ASK_UPLOAD = False  # @param {type:"boolean"}
-# ASK_UPLOAD: set True to upload your own images; False uses the bundled example images.
-USE_EXAMPLE = False  # True -> use our example images even if you uploaded or listed your own
-MY_IMAGES = []  # or paths uploaded with the folder icon, e.g. ["/content/leaf1.jpg", "/content/leaf2.jpg"]
-OWN_MAX_SIDE = 256 if SMOKE else 1024  # long side, in pixels, after shrinking
-if not isinstance(ASK_UPLOAD, bool) or not isinstance(USE_EXAMPLE, bool) or not isinstance(MY_IMAGES, list):
-    raise SystemExit("ASK_UPLOAD, USE_EXAMPLE must be True or False; MY_IMAGES a list of paths in quotes.")
-missing = [p for p in MY_IMAGES if not Path(p).is_file()]
-if missing:
-    raise SystemExit(f"not found: {missing}. Upload with the folder icon on the left and copy each path.")
-
-seed_everything()
-OWN_STROKES.clear()  # a fresh start: strokes from an earlier run belong to earlier images
-own_paths = [Path(p) for p in MY_IMAGES]
-if ASK_UPLOAD and IN_COLAB and not USE_EXAMPLE and not own_paths:  # opt-in: Run all never waits here
-    from google.colab import files
-
-    print("Pick 1 to 3 images (JPEG or PNG), or press Cancel to use our example.")
-    upload_dir = Path("/content/own_images")  # this session's disk only; gone when the session ends
-    upload_dir.mkdir(exist_ok=True)
-    try:
-        uploaded = files.upload()
-    except Exception as err:  # noqa: BLE001 - a cancelled upload raises in some Colab versions
-        print(f"(upload stopped: {type(err).__name__})")
-        uploaded = {}
-    for fname, data in uploaded.items():
-        (upload_dir / fname).write_bytes(data)
-        own_paths.append(upload_dir / fname)
-if len(own_paths) > 3:
-    print(f"ℹ️ {len(own_paths)} images: keeping the first 3, so every step stays short.")
-    own_paths = own_paths[:3]
-
-OWN = []
-for p in own_paths if not USE_EXAMPLE else []:
-    try:
-        OWN.append(own_item(p.stem, shrink(np.array(Image.open(p).convert("RGB")), OWN_MAX_SIDE), "yours"))
-    except Exception as err:  # noqa: BLE001 - any unreadable file gets the same plain message
-        print(f"⚠️ {p.name}: could not read it as an image ({type(err).__name__}), skipped. JPEG or PNG work.")
-if not OWN:
-    OWN = example_items(OWN_MAX_SIDE)
-    print("ℹ️ Using our example: two held-out pets and one retina image, with generated strokes.")
-sizes = ", ".join(f"{it['name']} {it['image'].shape[1]}×{it['image'].shape[0]}" for it in OWN)
-print(f"{len(OWN)} image(s) · {sizes} · {OWN[0]['source']}")
-show_masks([(it["name"], it["image"]) for it in OWN], width=3.0)
+USE_EXAMPLE = False  # @param {type:"boolean"}
+MY_IMAGES = []  # @param {type:"raw"}
+OWN = pick_images(ASK_UPLOAD, USE_EXAMPLE, MY_IMAGES)
 
 # %% [markdown]
 # ### 9.2 Draw your strokes 🖍️
@@ -322,44 +393,19 @@ if not IN_COLAB:
 # generated strokes for the example), counts them and shows them.
 
 # %%
-MY_STROKE_PNGS = []  # fallback, e.g. ["/content/leaf1_strokes.png", ""]: one path (or "") per image, in order
-if not isinstance(MY_STROKE_PNGS, list) or len(MY_STROKE_PNGS) > len(OWN):
-    raise SystemExit(f"MY_STROKE_PNGS must be a list of at most {len(OWN)} paths, one per image, in order.")
-for k, p in enumerate(MY_STROKE_PNGS):
-    if p and not Path(p).is_file():
-        raise SystemExit(f"{p} not found. Upload it with the folder icon on the left and copy its path.")
-    if p:
-        OWN_STROKES[k] = decode_strokes(Path(p).read_bytes(), OWN[k]["image"].shape[:2])
+# @title Collect your strokes { display-mode: "form" }
+MY_STROKE_PNGS = []  # @param {type:"raw"}
+LADDER_OWN = collect_strokes(MY_STROKE_PNGS)
 
-for k, it in enumerate(OWN):
-    if k in OWN_STROKES:
-        it["scribbles"], it["stroke_source"] = OWN_STROKES[k], "drawn by you"
-    elif it["auto"] is not None:  # the example, not redrawn: generated strokes through the canvas decoder
-        it["scribbles"] = decode_strokes(strokes_png(it["auto"]), it["image"].shape[:2])
-        it["stroke_source"] = "generated"
-    else:
-        it["scribbles"], it["stroke_source"] = np.zeros(it["image"].shape[:2], np.uint8), "none yet"
-no_thing = [it["name"] for it in OWN if not (it["scribbles"] == 1).any()]
-if no_thing:
-    print(f"⚠️ no 'thing' stroke on {no_thing}: skipped. Draw one, press 💾 save, and run this cell again.")
-LADDER_OWN = [it for it in OWN if (it["scribbles"] == 1).any()]
-if not any((it["scribbles"] == 2).any() for it in LADDER_OWN):
-    print("⚠️ No background stroke on any image, and the head needs both kinds. Draw at least one background")
-    print("   stroke and save. Until then the ladder runs on our example, so the notebook keeps going.")
-    LADDER_OWN = []
-if not LADDER_OWN:
-    LADDER_OWN = example_items(OWN_MAX_SIDE)
-    for it in LADDER_OWN:
-        it["scribbles"] = decode_strokes(strokes_png(it["auto"]), it["image"].shape[:2])
-        it["stroke_source"] = "generated"
+# %% [markdown]
+# <!-- callout: your-turn | Your turn (optional, 2 min): prompt SAM yourself -->
+# Before the ladder runs, try SAM by hand on your images. Click on the thing, shift-click on what you do not
+# want, drag a box, or type a few words and press "Ask SAM 3". This is the same canvas idea as above, with
+# SAM answering at once.
 
-own_n_strokes = {v: sum(len(stroke_masks(it, v)) for it in LADDER_OWN) for v in (1, 2)}
-own_effort = effort_minutes(n_strokes=own_n_strokes[1] + own_n_strokes[2])
-print(
-    f"{len(LADDER_OWN)} image(s) · {own_n_strokes[1]} thing strokes, {own_n_strokes[2]} background strokes · "
-    f"≈ {own_effort:.1f} min at {SPECIALISED['annotation_effort']['seconds_per_stroke']} s per stroke"
-)
-show_strokes(LADDER_OWN)
+# %%
+# @title Prompt SAM on your images { display-mode: "form" }
+sam_playground(OWN, "Your images: click, box, or a word", text_prompt=True)
 
 # %% [markdown]
 # ### 9.3 The ladder on your images
@@ -376,10 +422,11 @@ show_strokes(LADDER_OWN)
 
 # %% [markdown]
 # This helper cell defines the three rungs on a list of images, plus the only check we have without a ground
-# truth: how much of your thing strokes a mask covers, and how much of your background strokes it spares.
+# truth (how much of your thing strokes a mask covers, and how much of your background strokes it spares),
+# and the table and panels that show them.
 
 # %%
-# @title The ladder on your images: box, head on your strokes, SAM from clicks { display-mode: "form" }
+# @title The ladder on your images: three rungs, scoring, panels { display-mode: "form" }
 OWN_APPROACHES = ("zero_shot", "scribbles", "sam_clicks")  # the colours and names of sections 4 and 7
 
 
@@ -396,7 +443,7 @@ def own_ladder(items: list[dict], n_clicks: int, box_pad: float, feat_side: int,
     """The three rungs on `items`. Returns masks per approach (one per image), seconds per approach, and the
     seconds the head took to train."""
     preds, sec = {k: [] for k in OWN_APPROACHES}, dict.fromkeys(OWN_APPROACHES, 0.0)
-    for it in items:  # SAM: the image is encoded once, then both prompts reuse it
+    for it in tqdm(items, desc="SAM on your images", leave=False):  # the image is encoded once, then reused
         t0 = time.monotonic()
         preds["zero_shot"].append(sam.probability(it["image"], box=strokes_box(it, box_pad)) >= 0.5)
         t1 = time.monotonic()
@@ -424,6 +471,83 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
     return float(pred[s == 1].mean()), spared
 
 
+def score_own_ladder(items: list[dict], preds: dict, sec: dict) -> dict:
+    """Per approach: the share of the image marked, the two stroke checks, the seconds, and (the example
+    only, its ground truth scores and never trains: L-005) the IoU inside the evaluation region."""
+    has_truth = all(it["mask"] is not None for it in items)
+    report = {}
+    for k in OWN_APPROACHES:
+        agree = [stroke_agreement(p, it) for p, it in zip(preds[k], items, strict=True)]
+        report[k] = {
+            "marked": float(np.mean([p.mean() for p in preds[k]])),
+            "thing_strokes_covered": float(np.mean([a[0] for a in agree])),
+            "bg_strokes_spared": float(np.nanmean([a[1] for a in agree])),
+            "seconds": round(sec[k], 1),
+        }
+        if has_truth:
+            pairs = zip(preds[k], items, strict=True)
+            report[k]["iou"] = float(
+                np.mean([iou(p & region(it), it["mask"] & region(it)) for p, it in pairs])
+            )
+    return report
+
+
+def show_own_ladder(items: list[dict], preds: dict, report: dict) -> None:
+    """The table of the three rungs, then one row of panels per image: strokes, the three masks, and the
+    ground truth when there is one."""
+    has_truth = all(it["mask"] is not None for it in items)
+    print(
+        f"{'approach':<36}{'marks':>7}{'thing ✓':>9}{'bg ✓':>7}{'s':>6}"
+        + (f"{'IoU':>7}" if has_truth else "")
+    )
+    for k in OWN_APPROACHES:
+        v = report[k]
+        print(
+            f"{APPROACH_NAMES[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
+            f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
+        )
+    print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
+    print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
+    for n, it in enumerate(items):
+        panels = [
+            (f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9))
+        ]
+        for k in OWN_APPROACHES:
+            r_n = region(it)
+            tag = f" · IoU {iou(preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
+            title = f"{APPROACH_NAMES[k].split(':')[0]}{tag}"
+            panels.append((title, overlay(it["image"], preds[k][n], APPROACH_COLOURS[k])))
+        if has_truth:
+            panels.append(("ground truth · scoring only", overlay(it["image"], it["mask"], THEME["truth"])))
+        show_masks(panels, width=2.6)
+
+
+def run_own_ladder(items: list[dict], n_clicks: int, box_pad: float) -> dict:
+    """Q35: the three rungs on `items`, the table and the panels. Stores RESULTS["own_images"] and
+    RESULTS["own_images_ok"]. Returns the masks per approach (one per image)."""
+    if not isinstance(n_clicks, int) or not 1 <= n_clicks <= 50:
+        raise SystemExit("N_OWN_CLICKS must be a whole number from 1 to 50.")
+    if not isinstance(box_pad, (int, float)) or not 0 <= box_pad <= 0.5:
+        raise SystemExit("OWN_BOX_PAD must be a number from 0 to 0.5 (a share of the image's long side).")
+    seed_everything()
+    preds, sec, train_sec = own_ladder(items, n_clicks, box_pad, 256 if SMOKE else 512, HEAD_STEPS)
+    if train_sec > 60:
+        print("ℹ️ Slow session? The head trained for over a minute: fewer or smaller images make it faster.")
+    report = score_own_ladder(items, preds, sec)
+    show_own_ladder(items, preds, report)
+    n_strokes, minutes = stroke_effort(items)
+    RESULTS["own_images"] = {
+        "source": items[0]["source"],
+        "n_images": len(items),
+        "n_strokes": n_strokes[1] + n_strokes[2],
+        "effort_min": round(minutes, 2),
+        "head_train_sec": round(float(train_sec), 2),
+        "approaches": report,
+    }
+    RESULTS["own_images_ok"] = all(len(preds[k]) == len(items) for k in OWN_APPROACHES)  # SPEC §9
+    return preds
+
+
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction (1 min) -->
 # Look at your images and strokes above. Is your thing an "object" in SAM's sense (compact, a clear inside
@@ -433,7 +557,7 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 # - Then run the next cell (seconds on a T4, much slower on CPU): it shows each image with the three masks
 #   in the approach colours of sections 4 and 7, and the IoU on the example.
 #
-# **Q30.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
+# **Q35.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
 # Where a rung failed, was it:
 #
 # - SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too much)?
@@ -441,64 +565,12 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 # - your strokes (a part of the thing you never touched)?
 
 # %%
-# Q30 — the ladder on your images: zero-shot SAM, your scribble head, SAM from your strokes
-N_OWN_CLICKS = 10  # clicks per kind (thing / background) and image, spread along your strokes
-OWN_BOX_PAD = 0.05  # zero-shot box: your thing strokes' bounding box, grown by this share of the long side
-OWN_FEAT_SIDE = 256 if SMOKE else 512  # DINOv3 resolution for the head (long side, pixels)
-if not isinstance(N_OWN_CLICKS, int) or not 1 <= N_OWN_CLICKS <= 50:
-    raise SystemExit("N_OWN_CLICKS must be a whole number from 1 to 50.")
-if not isinstance(OWN_BOX_PAD, (int, float)) or not 0 <= OWN_BOX_PAD <= 0.5:
-    raise SystemExit("OWN_BOX_PAD must be a number from 0 to 0.5 (a share of the image's long side).")
-
-seed_everything()
-own_preds, own_sec, own_train_sec = own_ladder(
-    LADDER_OWN, N_OWN_CLICKS, OWN_BOX_PAD, OWN_FEAT_SIDE, HEAD_STEPS
-)
-if own_train_sec > 60:
-    print("ℹ️ Slow session? The head trained for over a minute: fewer or smaller images make it faster.")
-has_truth = all(it["mask"] is not None for it in LADDER_OWN)
-own_report = {}
-print(f"{'approach':<36}{'marks':>7}{'thing ✓':>9}{'bg ✓':>7}{'s':>6}" + (f"{'IoU':>7}" if has_truth else ""))
-for k in OWN_APPROACHES:
-    agree = [stroke_agreement(p, it) for p, it in zip(own_preds[k], LADDER_OWN, strict=True)]
-    own_report[k] = {
-        "marked": float(np.mean([p.mean() for p in own_preds[k]])),
-        "thing_strokes_covered": float(np.mean([a[0] for a in agree])),
-        "bg_strokes_spared": float(np.nanmean([a[1] for a in agree])),
-        "seconds": round(own_sec[k], 1),
-    }
-    if has_truth:  # the example only: its ground truth scores, it never trains (L-005)
-        pairs = zip(own_preds[k], LADDER_OWN, strict=True)
-        own_report[k]["iou"] = float(
-            np.mean([iou(p & region(it), it["mask"] & region(it)) for p, it in pairs])
-        )
-    v = own_report[k]
-    print(
-        f"{APPROACH_NAMES[k]:<36}{v['marked']:>7.0%}{v['thing_strokes_covered']:>9.0%}"
-        f"{v['bg_strokes_spared']:>7.0%}{v['seconds']:>6.1f}" + (f"{v['iou']:>7.3f}" if has_truth else "")
-    )
-print("thing ✓ = share of your thing-stroke pixels inside the mask (100 % = all covered)")
-print("bg ✓ = share of your background-stroke pixels outside the mask (100 % = none marked)")
-for n, it in enumerate(LADDER_OWN):
-    panels = [(f"{it['name']} · strokes", overlay(it["image"], it["scribbles"] > 0, THEME["scribble"], 0.9))]
-    for k in OWN_APPROACHES:
-        r_n = region(it)
-        tag = f" · IoU {iou(own_preds[k][n] & r_n, it['mask'] & r_n):.2f}" if has_truth else ""
-        title = f"{APPROACH_NAMES[k].split(':')[0]}{tag}"
-        panels.append((title, overlay(it["image"], own_preds[k][n], APPROACH_COLOURS[k])))
-    if has_truth:
-        panels.append(("ground truth · scoring only", overlay(it["image"], it["mask"], THEME["truth"])))
-    show_masks(panels, width=2.6)
-
-RESULTS["own_images"] = {
-    "source": LADDER_OWN[0]["source"],
-    "n_images": len(LADDER_OWN),
-    "n_strokes": own_n_strokes[1] + own_n_strokes[2],
-    "effort_min": round(own_effort, 2),
-    "head_train_sec": round(float(own_train_sec), 2),
-    "approaches": own_report,
-}
-RESULTS["own_images_ok"] = all(len(own_preds[k]) == len(LADDER_OWN) for k in OWN_APPROACHES)  # SPEC §9
+# @title Q35 — the ladder on your images: box, scribble head, SAM clicks { display-mode: "form" }
+# Clicks per kind (thing / background) and image, spread along your strokes.
+N_OWN_CLICKS = 10  # @param {type:"slider", min:1, max:50, step:1}
+# Zero-shot box: your thing strokes' bounding box, grown by this share of the long side.
+OWN_BOX_PAD = 0.05  # @param {type:"slider", min:0, max:0.5, step:0.05}
+own_preds = run_own_ladder(LADDER_OWN, N_OWN_CLICKS, OWN_BOX_PAD)
 
 # %% [markdown]
 # <!-- callout: go-deeper | How to read the stroke checks and the masks -->
@@ -542,6 +614,7 @@ RESULTS["own_images_ok"] = all(len(own_preds[k]) == len(LADDER_OWN) for k in OWN
 # - **Hint:** `np.stack` puts the masks on a new first axis; `.any(0)` and `.all(0)` reduce along it.
 #
 # The cell checks your version on the three play masks above and continues with ours if you skip it.
+
 
 # %%
 # @title Reference solution (open only if stuck) { display-mode: "form" }
@@ -587,7 +660,7 @@ for it, d in zip(LADDER_OWN, own_disagree, strict=True):
 show_masks(panels, width=2.8)
 
 # %% [markdown]
-# **Q31.** 🟡 Where is the orange?
+# **Q36.** 🟡 Where is the orange?
 #
 # - Along the boundary of the thing?
 # - On whole parts of it?
@@ -609,7 +682,7 @@ show_masks(panels, width=2.8)
 # </details>
 
 # %% [markdown]
-# **Q32.** 🔴 Test your answer to Q31.
+# **Q37.** 🔴 Test your answer to Q36.
 #
 # 1. Draw your two extra strokes per image on the canvas of 9.2. Draw over the old ones; they stay until
 #    you press clear. On the example, a saved canvas replaces the generated strokes, so draw a full set.

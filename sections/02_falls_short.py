@@ -14,23 +14,87 @@
 # resolution, to see whether the limit is the prompt or the patch size.
 
 # %% [markdown]
-# This helper cell defines what this section measures with: the evaluation region (the fundus, not the
-# black border), skeletons for the thin-structure metric, clicks spread along a person's scribbles, and a
-# figure that marks every click.
+# This helper cell defines what this section measures with: skeletons for the thin-structure metric (cached,
+# because clDice is slow on near-solid masks), clicks spread along a person's scribbles, and the figure
+# helpers that title every prediction with how much of the fundus it marked.
 
 # %%
-# @title Thin-structure helpers: region, skeleton, clicks, figure { display-mode: "form" }
+# @title Thin-structure helpers: skeleton, score, clicks, figures { display-mode: "form" }
+import hashlib
+
+from scipy import ndimage as ndi
 from skimage.morphology import skeletonize
 
-
-def region(item: dict) -> np.ndarray:
-    """Where we score: the field of view if the dataset has one, else the whole image."""
-    return item["fov"] if item.get("fov") is not None else np.ones_like(item["mask"])
+_SKEL_CACHE: dict = {}  # prediction skeletons by mask content: {(shape, hash): flat pixel indices}
+_SKEL_CACHE_MAX = 300
 
 
 def skeleton(mask: np.ndarray) -> np.ndarray:
     """The one-pixel-wide centre line of a boolean mask."""
     return skeletonize(np.asarray(mask, bool))
+
+
+def blob_skeleton(mask: np.ndarray) -> np.ndarray:
+    """Centre line of a mask that fills most of the image, found at half resolution. Thinning a near-solid
+    1024 px mask takes ~0.8 s and its centre line is a short stub either way; at half size it takes ~0.1 s and
+    gave the same clDice on our retina crops."""
+    out = np.zeros_like(mask)
+    ys, xs = np.nonzero(skeleton(mask[::2, ::2]))
+    out[ys * 2, xs * 2] = True
+    return out & mask
+
+
+def cached_skeleton(mask: np.ndarray) -> np.ndarray:
+    """skeleton(mask), but a mask seen before is not skeletonised again, and a near-solid one goes faster."""
+    mask = np.asarray(mask, bool)
+    key = (mask.shape, hashlib.blake2b(np.packbits(mask), digest_size=16).digest())
+    if key not in _SKEL_CACHE:
+        if len(_SKEL_CACHE) >= _SKEL_CACHE_MAX:
+            _SKEL_CACHE.pop(next(iter(_SKEL_CACHE)))  # drop the oldest
+        sk = blob_skeleton(mask) if mask.mean() > 0.6 else skeleton(mask)
+        _SKEL_CACHE[key] = np.flatnonzero(sk)
+    out = np.zeros(mask.shape, bool)
+    out.flat[_SKEL_CACHE[key]] = True
+    return out
+
+
+def truth_skeleton(item: dict) -> np.ndarray:
+    """The true centre line inside the evaluation region, computed once per item and kept on it."""
+    if "_skel" not in item:
+        item["_skel"] = skeleton(item["mask"] & region(item))
+    return item["_skel"]
+
+
+def score(pred: np.ndarray, item: dict) -> dict:
+    """IoU and clDice of a boolean prediction, both inside the evaluation region."""
+    r = region(item)
+    p, t = pred & r, item["mask"] & r
+    return {"iou": iou(p, t), "cldice": cldice(p, t, cached_skeleton(p), truth_skeleton(item))}
+
+
+def everything_score(item: dict) -> dict:
+    """Score of "everything in the evaluation region is foreground", computed once per item."""
+    if "_everything" not in item:
+        item["_everything"] = score(region(item).copy(), item)
+    return item["_everything"]
+
+
+def mean_scores(scores: list[dict]) -> dict:
+    return {k: float(np.mean([s[k] for s in scores])) for k in scores[0]}
+
+
+def marked_pct(pred: np.ndarray, item: dict) -> str:
+    """How much of the evaluation region a prediction marks, e.g. "marked 98 %"."""
+    return f"marked {100 * pred[region(item)].mean():.0f} %"
+
+
+def pred_title(label: str, pred: np.ndarray, item: dict, s: dict | None = None, with_cldice: bool = True):
+    """Panel title: what made the mask, then IoU, clDice (from 2.2 on) and the share of the fundus marked."""
+    if not with_cldice:  # before 2.2 introduces clDice
+        r = region(item)
+        return f"{label}\nIoU {iou(pred & r, item['mask'] & r):.2f} · {marked_pct(pred, item)}"
+    s = s or score(pred, item)
+    return f"{label}\nIoU {s['iou']:.2f} · clDice {s['cldice']:.2f} · {marked_pct(pred, item)}"
 
 
 def scribble_points(item: dict, n: int) -> list[list[float]]:
@@ -47,22 +111,12 @@ def scribble_points(item: dict, n: int) -> list[list[float]]:
     return [[float(x), float(y)] for x, y in chosen]
 
 
-def score(pred: np.ndarray, item: dict) -> dict:
-    """IoU and clDice of a boolean prediction, both inside the evaluation region."""
-    r = region(item)
-    return {"iou": iou(pred & r, item["mask"] & r), "cldice": cldice(pred & r, item["mask"] & r)}
-
-
-def mean_scores(scores: list[dict]) -> dict:
-    return {k: float(np.mean([s[k] for s in scores])) for k in scores[0]}
-
-
 def show_clicks(panels: list[tuple[str, np.ndarray, list | None]], width: float = 2.6):
     """One row of panels (title, RGB image, clicks or None[, box]); stars = clicks, frame = box."""
     fig, axes = plt.subplots(1, len(panels), figsize=(width * len(panels), width))
     for ax, (title, img, pts, *extra) in zip(np.atleast_1d(axes), panels, strict=True):
         ax.imshow(img)
-        ax.set_title(title)
+        ax.set_title(title, fontsize=8)
         ax.axis("off")
         if extra and extra[0] is not None:  # an optional box (x0, y0, x1, y1)
             bx0, by0, bx1, by1 = extra[0]
@@ -141,6 +195,47 @@ print(
 # ### 2.1 SAM: one click, one box, again
 
 # %% [markdown]
+# This helper cell defines what the first cell of 2.1 runs: SAM with one click and with one box on one
+# held-out image, the share of the fundus each mask marks, and the three-panel figure.
+
+# %%
+# @title Helper: SAM with one click and one box on a retina image { display-mode: "form" }
+def pick_demo(index: int) -> dict:
+    """The held-out retina image with this index; a plain message when the index does not exist."""
+    if not isinstance(index, int) or not 0 <= index < len(SPEC_EVAL):
+        raise SystemExit(f"IMAGE must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
+    return SPEC_EVAL[index]
+
+
+def click_and_box(item: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Run SAM on one click and on one box, print the shares of the fundus they mark, draw the figure."""
+    point, box = click_point(item), box_prompt(item)
+    t0 = time.monotonic()
+    by_click = sam.probability(item["image"], points=[point], labels=[1]) >= 0.5
+    by_box = sam.probability(item["image"], box=box) >= 0.5
+    print(f"{item['name']}: two SAM calls in {time.monotonic() - t0:.1f} s on {DEVICE}")
+    shares = {"click mask": by_click, "box mask": by_box, "true vessels": item["mask"]}
+    marked = " · ".join(f"{k} {m[region(item)].mean():.0%}" for k, m in shares.items())
+    print(f"share of the fundus marked · {marked}")
+    show_masks(
+        [
+            (
+                pred_title("SAM, one click", by_click, item, with_cldice=False),
+                overlay(item["image"], by_click, THEME["fails"]),
+            ),
+            (
+                pred_title("SAM, one box", by_box, item, with_cldice=False),
+                overlay(item["image"], by_box, THEME["fails"]),
+            ),
+            (f"ground truth\nvessels cover {100 * item['mask'][region(item)].mean():.0f} % of the fundus",
+             overlay(item["image"], item["mask"], THEME["truth"])),
+        ],
+        prompts={"point": point, "box": box},
+    )
+    return by_click, by_box
+
+
+# %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # Before you run the next cell (the section-1 cell on a retina image: one click on a vessel, then a box
 # around all of them), guess: what will SAM segment from one click on a thin line? And what is "the object"
@@ -148,108 +243,201 @@ print(
 #
 # Then run it and compare the panels with the pets in section 1.
 #
-# **Q5.** 🟡 What did SAM segment from the click, and from the box: a vessel, part of the tree, a blob, the
+# **Q6.** 🟡 What did SAM segment from the click, and from the box: a vessel, part of the tree, a blob, the
 # whole fundus? Use the printed shares: the true vessels cover a small share of the fundus, so a mask that
-# marks far more is not tracing vessels. Try two other images by changing the index (on a CPU session there
+# marks far more is not tracing vessels. Try two other images with the `IMAGE` field (on a CPU session there
 # are 12 held-out images).
-#
-# ```python
-# demo = SPEC_EVAL[0]   # try 1, 2, ...
-# ```
 
 # %%
-# Q5 — SAM with one click and with one box on a held-out specialised image
-demo = SPEC_EVAL[0]  # try 1, 2, ...
-point, box = click_point(demo), box_prompt(demo)
-t0 = time.monotonic()
-sam_point = sam.probability(demo["image"], points=[point], labels=[1]) >= 0.5
-sam_box = sam.probability(demo["image"], box=box) >= 0.5
-print(f"{demo['name']}: two SAM calls in {time.monotonic() - t0:.1f} s on {DEVICE}")
-shares = {"click mask": sam_point, "box mask": sam_box, "true vessels": demo["mask"]}
-marked = " · ".join(f"{name} {m[region(demo)].mean():.0%}" for name, m in shares.items())
-print(f"share of the fundus marked · {marked}")
-show_masks(
-    [
-        ("SAM, one click", overlay(demo["image"], sam_point, THEME["fails"])),
-        ("SAM, one box", overlay(demo["image"], sam_box, THEME["fails"])),
-        ("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"])),
-    ],
-    prompts={"point": point, "box": box},
-)
+# @title Q6 — SAM with one click and with one box on a held-out retina image { display-mode: "form" }
+IMAGE = 0  # @param {type:"integer"}
+demo = pick_demo(IMAGE)
+sam_point, sam_box = click_and_box(demo)
+
+# %% [markdown]
+# **Try it yourself.** Section 1's SAM could mark a pet. Now see whether you can make it mark only the
+# vessels: click on one vessel, click along several, or draw a small box around a few of them, and watch what
+# SAM marks each time.
+#
+# **Q7.** 🟡 Can you get SAM to mark only the vessels? Try one click on a vessel, several clicks along it
+# and a small box. What does SAM mark each time: the vessel, the tree, or something bigger?
+
+# %%
+# @title Q7 — Try it: make SAM mark only the vessels { display-mode: "form" }
+sam_playground(SPEC_EVAL, "Retina: try to get only the vessels")
 
 # %% [markdown]
 # ### 2.2 A second number for thin structures: clDice
 
 # %% [markdown]
 # <!-- callout: theory | Theory: clDice -->
-# **Why IoU misleads on thin vessels.** IoU counts pixels, and thick vessels hold most of them.
+# IoU counts pixels, and thick vessels hold most of them. So a prediction that draws every vessel twice as
+# wide loses a lot of IoU although nothing is missed, and one that misses all the capillaries loses little
+# IoU although a large part of the tree's length is gone.
 #
-# - Draw every vessel twice as wide as it is: nothing is missed, yet IoU drops to about 0.5.
-# - Miss all the capillaries: they hold few pixels, so IoU barely moves.
+# **clDice** compares *centre lines* (each vessel thinned to a one-pixel line) instead:
 #
-# **clDice** compares *centre lines* instead: `tprec` (how much of what you drew is real vessel) and `tsens`
-# (how much of the real vessel you drew), combined by harmonic mean.
-#
-# 1. `tprec` = prediction centre line inside the truth ÷ prediction centre line (invented branches lower it).
-# 2. `tsens` = true centre line inside the prediction ÷ true centre line (missed branches lower it).
+# 1. `tprec` = the part of the prediction's centre line that lies inside the true vessels. Invented
+#    branches lower it.
+# 2. `tsens` = the part of the true centre line that lies inside the prediction. Missed branches lower it.
 # 3. clDice = 2 · tprec · tsens ÷ (tprec + tsens). Example: tprec 1.0 and tsens 0.25 give 0.40.
+#
+# The workshop is not about vessels, so this is the only place clDice gets this much room. The figure below
+# shows all of it on a made-up vessel tree.
+
+# %% [markdown]
+# This collapsed cell is the reference clDice, the three steps above as code. Later cells score masks with it,
+# and the figure below uses it too; you do not need to read it.
+
+# %%
+# @title Reference: clDice (tprec, tsens, harmonic mean) { display-mode: "form" }
+def cldice_parts(pred: np.ndarray, truth: np.ndarray, sk_pred=None, sk_truth=None) -> tuple:
+    """tprec, tsens and the two centre lines of two boolean masks (skeletons are computed when not given)."""
+    sk_pred = skeleton(pred) if sk_pred is None else sk_pred
+    sk_truth = skeleton(truth) if sk_truth is None else sk_truth
+    if not sk_pred.any() or not sk_truth.any():
+        return 0.0, 0.0, sk_pred, sk_truth
+    tprec = float((sk_pred & truth).sum() / sk_pred.sum())
+    tsens = float((sk_truth & pred).sum() / sk_truth.sum())
+    return tprec, tsens, sk_pred, sk_truth
+
+
+def cldice(pred: np.ndarray, truth: np.ndarray, sk_pred=None, sk_truth=None) -> float:
+    """clDice: harmonic mean of topology precision and topology sensitivity (0.0 when a skeleton is empty)."""
+    tprec, tsens, _, _ = cldice_parts(pred, truth, sk_pred, sk_truth)
+    return 2 * tprec * tsens / (tprec + tsens) if tprec + tsens else 0.0
+
+
+# %% [markdown]
+# This collapsed cell builds the made-up vessel tree and the figure of the next cell, so that cell stays a
+# single line.
+
+# %%
+# @title Helper: the made-up vessel tree and the clDice figure { display-mode: "form" }
+TOY_CASES = ["too wide", "capillaries missed", "blob"]
+
+
+def vessel_toy(scale: float = 1.0, min_radius: int = 0, size: int = 128) -> np.ndarray:
+    """A made-up vessel tree: a thick trunk, two branches, six capillaries. `scale` widens every vessel;
+    `min_radius` leaves out the vessels thinner than that (2 drops the capillaries)."""
+    from skimage.draw import line
+
+    tree = [  # (x, y) corners of each vessel and its radius in pixels
+        ([(0, 25), (30, 32), (60, 40), (100, 36), (127, 48)], 6),  # trunk
+        ([(60, 40), (95, 20), (115, 4)], 3),  # branch up
+        ([(60, 40), (48, 80), (70, 110), (75, 127)], 3),  # branch down
+        ([(30, 32), (20, 10), (25, 2)], 1),  # capillaries from here on
+        ([(48, 80), (25, 90), (8, 110)], 1),
+        ([(48, 80), (30, 60), (8, 55)], 1),
+        ([(100, 36), (112, 65), (105, 95)], 1),
+        ([(100, 36), (85, 60), (95, 85)], 1),
+        ([(70, 110), (100, 115), (125, 105)], 1),
+    ]
+    out = np.zeros((size, size), bool)
+    for corners, radius in tree:
+        if radius < min_radius:
+            continue
+        centre = np.zeros((size, size), bool)
+        for (x0, y0), (x1, y1) in zip(corners[:-1], corners[1:], strict=True):
+            rr, cc = line(y0, x0, y1, x1)
+            centre[rr, cc] = True
+        out |= ndi.distance_transform_edt(~centre) <= radius * scale
+    return out
+
+
+def toy_prediction(case: str, size: int = 128) -> np.ndarray:
+    """The prediction of one case: every vessel twice as wide, no capillaries, or one big disc."""
+    if case == "too wide":
+        return vessel_toy(scale=2.0)
+    if case == "capillaries missed":
+        return vessel_toy(min_radius=2)
+    yy, xx = np.mgrid[:size, :size]
+    return (yy - size / 2) ** 2 + (xx - size / 2) ** 2 <= (0.7 * size) ** 2
+
+
+def explain_cldice(case: str) -> None:
+    """Draw truth and prediction with their centre lines, what tprec and tsens count, and IoU vs clDice."""
+    if case not in TOY_CASES:
+        raise SystemExit(f"CASE must be one of {TOY_CASES}.")
+    truth = vessel_toy()
+
+    def paint(img, mask, colour, alpha=1.0):
+        img = img.copy()
+        img[mask] = (1 - alpha) * img[mask] + alpha * hex_rgb(colour)
+        return img
+
+    def thick(mask):  # a 1 px line is drawn 3 px wide so it shows up
+        return ndi.binary_dilation(mask, np.ones((3, 3), bool))
+
+    blank = np.full(truth.shape + (3,), 0.97)
+    results = {}
+    for name in TOY_CASES:
+        pred = toy_prediction(name)
+        tprec, tsens, sk_pred, sk_truth = cldice_parts(pred, truth)
+        both = (iou(pred, truth), cldice(pred, truth, sk_pred, sk_truth))
+        results[name] = (pred, tprec, tsens, sk_pred, sk_truth, *both)
+    pred, tprec, tsens, sk_pred, sk_truth, iou_c, cld_c = results[case]
+    white = "#FFFFFF"
+    n_in, n_all = int((sk_pred & truth).sum()), int(sk_pred.sum())
+    m_in, m_all = int((sk_truth & pred).sum()), int(sk_truth.sum())
+
+    fig, axes = plt.subplots(1, 5, figsize=(15, 3.6), gridspec_kw={"width_ratios": [1, 1, 1, 1, 1.25]})
+    img = paint(paint(blank, truth, THEME["truth"], 0.6), sk_truth, white)
+    axes[0].imshow(img)
+    axes[0].set_title("made-up truth (green)\nand its centre line (white)", fontsize=8)
+    img = paint(paint(blank, pred, THEME["background"], 0.85), sk_pred, white)
+    axes[1].imshow(img)
+    marked = 100 * pred.mean()
+    axes[1].set_title(
+        f"prediction: {case}\nIoU {iou_c:.2f} · clDice {cld_c:.2f} · marked {marked:.0f} %", fontsize=8
+    )
+    img = paint(blank, truth, THEME["truth"], 0.35)
+    img = paint(paint(img, thick(sk_pred & ~truth), THEME["fails"]), thick(sk_pred & truth), THEME["works"])
+    axes[2].imshow(img)
+    axes[2].set_title(
+        f"tprec = {tprec:.2f}\n{n_in} of {n_all} prediction centre-line pixels\n"
+        "inside the truth (violet = counted)", fontsize=8)
+    img = paint(blank, pred, THEME["background"], 0.5)
+    img = paint(paint(img, thick(sk_truth & ~pred), THEME["fails"]), thick(sk_truth & pred), THEME["works"])
+    axes[3].imshow(img)
+    axes[3].set_title(
+        f"tsens = {tsens:.2f}\n{m_in} of {m_all} true centre-line pixels\n"
+        "inside the prediction (violet = counted)", fontsize=8)
+    for ax in axes[:4]:
+        ax.axis("off")
+
+    x = np.arange(len(TOY_CASES))
+    vals = [(results[c][5], results[c][6]) for c in TOY_CASES]
+    axes[4].bar(x - 0.2, [v[0] for v in vals], 0.4, color=THEME["background"], label="IoU")
+    axes[4].bar(x + 0.2, [v[1] for v in vals], 0.4, color=THEME["works"], label="clDice")
+    for xi, (a, b) in zip(x, vals, strict=True):
+        axes[4].text(xi - 0.2, a + 0.02, f"{a:.2f}", ha="center", fontsize=7)
+        axes[4].text(xi + 0.2, b + 0.02, f"{b:.2f}", ha="center", fontsize=7)
+    axes[4].set_xticks(x, [c.replace(" ", "\n", 1) for c in TOY_CASES], fontsize=8)
+    axes[4].get_xticklabels()[TOY_CASES.index(case)].set_fontweight("bold")
+    axes[4].set_ylim(0, 1.15)
+    axes[4].set_title("IoU vs clDice, all three cases", fontsize=8)
+    axes[4].legend(fontsize=7, frameon=False, loc="upper right")
+    plt.tight_layout()
+    plt.show()
+
+
+# %% [markdown]
+# This cell draws clDice on a made-up vessel tree (a thick trunk, two branches and six capillaries). Pick a
+# case in the `CASE` field and the figure redraws: truth and prediction, each with its centre line, then the
+# centre-line pixels that `tprec` and `tsens` count, and IoU next to clDice for all three cases. A blob's
+# centre line is a short stub in its middle: here the stub misses every vessel, so clDice is 0.
+
+# %%
+# @title See clDice on a made-up vessel tree { display-mode: "form", run: "auto" }
+CASE = "too wide"  # @param ["too wide", "capillaries missed", "blob"]
+explain_cldice(CASE)
 
 # %% [markdown]
 # <!-- callout: go-deeper | Where clDice comes from -->
 # clDice is from Shit et al., "clDice: a novel topology-preserving loss function for tubular structure
 # segmentation", CVPR 2021.
 
-# %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 3 min) -->
-# Fill `my_cldice`: two boolean masks in, one float out.
-#
-# - `skeleton(mask)` gives the centre line.
-# - `tprec` = pixels of `skeleton(pred)` inside `truth`, divided by the pixels of `skeleton(pred)`.
-# - `tsens` = the same with the roles swapped.
-# - Return 0.0 when either skeleton is empty.
-#
-# The cell checks your version on two play masks (a good trace and a blob that covers everything) and
-# continues with ours if you skip it. Stuck? Open the collapsed "Reference solution" cell above it.
-
-# %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_cldice(pred: np.ndarray, truth: np.ndarray) -> float:
-    """Reference: harmonic mean of topology precision and topology sensitivity."""
-    sk_pred, sk_truth = skeleton(pred), skeleton(truth)
-    if not sk_pred.any() or not sk_truth.any():
-        return 0.0
-    tprec = float((sk_pred & truth).sum() / sk_pred.sum())
-    tsens = float((sk_truth & pred).sum() / sk_truth.sum())
-    return 2 * tprec * tsens / (tprec + tsens) if tprec + tsens else 0.0
-
-
-# %%
-# ✍️ YOUR CODE
-def my_cldice(pred: np.ndarray, truth: np.ndarray) -> float:
-    """clDice of two boolean masks: 2·tprec·tsens / (tprec + tsens); 0.0 when either skeleton is empty.
-    e.g. 0.71"""
-    ...
-
-
-_play_truth = np.zeros((12, 12), bool)
-_play_truth[2:4, :] = True  # a horizontal vessel, 2 px wide
-_play_truth[:, 9:11] = True  # crossed by a vertical one
-_play_trace = np.zeros((12, 12), bool)
-_play_trace[1:5, :] = True  # the horizontal vessel, drawn too wide; the vertical one missed
-_play_blob = np.ones((12, 12), bool)  # "everything is vessel"
-cldice = use(
-    my_cldice,
-    reference=_ref_cldice,
-    check=lambda f: [round(float(f(p, _play_truth)), 4) for p in (_play_trace, _play_blob)],
-    name="cldice",
-)
-print(
-    f"play example · IoU / clDice of the wide trace: {iou(_play_trace, _play_truth):.2f} / "
-    f"{cldice(_play_trace, _play_truth):.2f} · of the blob: {iou(_play_blob, _play_truth):.2f} / "
-    f"{cldice(_play_blob, _play_truth):.2f}"
-)
-
-# %% [markdown]
 # ### 2.3 Escalating prompts: 1 → 5 → 20 clicks, and a box
 #
 # If one click is ambiguous, maybe more clicks tell SAM what we mean. Each step tells SAM something new:
@@ -283,7 +471,7 @@ ladder_cover = {name: [] for name in LADDER}
 ladder_demo = {}  # the demo image's masks and clicks, for the figure below
 sam_box_masks = []  # every image's box mask, for the gallery in 2.6
 everything = []
-for it in SPEC_EVAL:
+for it in tqdm(SPEC_EVAL, desc="SAM prompt ladder"):
     r = region(it)
     for name, n in LADDER.items():
         pts = scribble_points(it, n) if n else None
@@ -296,7 +484,7 @@ for it in SPEC_EVAL:
         if it is demo:
             ladder_demo[name] = (pred, pts, box_prompt(it) if not n else None)
     sam_box_masks.append(pred)  # the last setting is the box
-    everything.append(score(r.copy(), it))
+    everything.append(everything_score(it))
 ladder_mean = {name: mean_scores(s) for name, s in ladder_scores.items()}
 everything_mean = mean_scores(everything)
 spec_sec = round(time.monotonic() - t0, 1)
@@ -313,7 +501,8 @@ print(f"SAM prompt ladder on {len(SPEC_EVAL)} held-out images · {spec_sec} s on
 print(f"{'setting':<12}{'IoU':>7}{'clDice':>8}{'marked':>8}")
 for name, v in ladder_mean.items():
     print(f"{name:<12}{v['iou']:>7.3f}{v['cldice']:>8.3f}{np.mean(ladder_cover[name]):>8.0%}")
-print(f"{'everything':<12}{everything_mean['iou']:>7.3f}{everything_mean['cldice']:>8.3f}{1:>8.0%}")
+print(f"{'everything':<12}{everything_mean['iou']:>7.3f}{'—':>8}{1:>8.0%}")
+print("(no clDice for 'everything': its centre line is a stub of a few pixels, so it scores 0 or 1 by luck)")
 
 fig, ax = plt.subplots(figsize=(6.4, 3))
 names = list(ladder_mean)
@@ -328,12 +517,15 @@ plt.tight_layout()
 plt.show()
 
 show_clicks(
-    [(f"SAM, {k}", overlay(demo["image"], m, THEME["fails"]), p, b) for k, (m, p, b) in ladder_demo.items()]
+    [
+        (pred_title(f"SAM, {k}", m, demo), overlay(demo["image"], m, THEME["fails"]), p, b)
+        for k, (m, p, b) in ladder_demo.items()
+    ]
     + [("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"]), None)]
 )
 
 # %% [markdown]
-# **Q6.** 🟡 Compare the ladder with your prediction. Read the table row by row: IoU, clDice, and *marked*
+# **Q8.** 🟡 Compare the ladder with your prediction. Read the table row by row: IoU, clDice, and *marked*
 # (the share of the fundus SAM marked). How to read a row: IoU 0.30 with 70% marked, against a grey line at
 # 0.29, is a big mask that is barely better than marking everything.
 #
@@ -379,7 +571,7 @@ for it in fig_items:
 show_masks(panels, width=2.6)
 
 # %% [markdown]
-# **Q7.** 🔴 Do the thick vessels share a colour at all, across the three images? Which of the optic disc
+# **Q9.** 🔴 Do the thick vessels share a colour at all, across the three images? Which of the optic disc
 # (bright round patch), the dark border and the vessels stands out most from its surroundings? Compare with
 # the pets, where one direction separated animal from floor.
 #
@@ -410,6 +602,42 @@ show_masks(panels, width=2.6)
 # same idea.
 
 # %% [markdown]
+# This collapsed cell defines how the two heads get trained (or loaded) on the five fit retina images, at the
+# two resolutions.
+
+# %%
+# @title Helper: train one head per resolution, or load ours { display-mode: "form" }
+N_TRAIN_SPEC, HEAD_STEPS = 5, 30 if SMOKE else 200
+SIDES = SPECIALISED["feature_long_sides"]  # [512, 1024]: the two resolutions we compare
+SIDES = [side // 4 for side in SIDES] if SMOKE else SIDES  # smoke thumbnails are 256 px
+
+
+def fit_spec_heads(train_yourself: bool) -> tuple[list[dict], dict]:
+    """Train one linear head per resolution on the first N_TRAIN_SPEC fit images (or load ours).
+
+    The border is labelled -1, so the loss skips it. Returns the fit images and {long side: (head, seconds)}.
+    """
+    if not isinstance(train_yourself, bool):
+        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+    items = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:N_TRAIN_SPEC]]
+    heads = {}
+    for side in SIDES:
+        if train_yourself:
+            feats = [features_for(SPECIALISED, it, side) for it in items]
+            labels = [np.where(region(it), it["mask"], -1).astype(np.int8) for it in items]
+            heads[side] = train_head(feats, labels, HEAD_STEPS)
+            src = f"trained here on {len(items)} images, {HEAD_STEPS} steps"
+        else:
+            tensors, entry = load_head(SPECIALISED, "full", side)
+            heads[side] = (tensors, entry["train_sec"])
+            src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
+        print(f"linear head @ {side} px · {src} · {heads[side][1]:.1f} s on {DEVICE}")
+    if sum(sec for _, sec in heads.values()) > 60:
+        print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoints next time.")
+    return items, heads
+
+
+# %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # With *perfect* labels, write two guesses.
 #
@@ -418,32 +646,13 @@ show_masks(panels, width=2.6)
 
 # %% [markdown]
 # This cell trains one head per resolution on the five fit images and prints the seconds it took; if it is
-# slow, set `TRAIN_YOURSELF = False` and run it again to load our checkpoints (trained the same way on all
-# fit images).
+# slow, untick `TRAIN_YOURSELF` and run it again to load our checkpoints (trained the same way on all fit
+# images).
 
 # %%
-TRAIN_YOURSELF = True  # False -> load our precomputed "full" heads instead of training
-N_TRAIN_SPEC, HEAD_STEPS = 5, 30 if SMOKE else 200
-SIDES = SPECIALISED["feature_long_sides"]  # [512, 1024]: the two resolutions we compare
-SIDES = [s // 4 for s in SIDES] if SMOKE else SIDES  # smoke thumbnails are 256 px
-if not isinstance(TRAIN_YOURSELF, bool):
-    raise SystemExit("TRAIN_YOURSELF must be True or False.")
-
-spec_train = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:N_TRAIN_SPEC]]
-spec_heads = {}  # long side -> (head tensors, training seconds)
-for side in SIDES:
-    if TRAIN_YOURSELF:
-        feats = [features_for(SPECIALISED, it, side) for it in spec_train]
-        labels = [np.where(region(it), it["mask"], -1).astype(np.int8) for it in spec_train]  # border ignored
-        spec_heads[side] = train_head(feats, labels, HEAD_STEPS)
-        src = f"trained here on {len(spec_train)} images, {HEAD_STEPS} steps"
-    else:
-        tensors, entry = load_head(SPECIALISED, "full", side)
-        spec_heads[side] = (tensors, entry["train_sec"])
-        src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
-    print(f"linear head @ {side} px · {src} · {spec_heads[side][1]:.1f} s on {DEVICE}")
-if sum(sec for _, sec in spec_heads.values()) > 60:
-    print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoints next time.")
+# @title Train the two heads here (or load ours) { display-mode: "form" }
+TRAIN_YOURSELF = True  # @param {type:"boolean"}
+spec_train, spec_heads = fit_spec_heads(TRAIN_YOURSELF)
 
 # %% [markdown]
 # This cell scores both heads on the evaluation images with IoU and clDice and zooms into the centre of the
@@ -455,7 +664,8 @@ t0 = time.monotonic()
 head_preds, res_scores = {}, {}
 for side, (tensors, _) in spec_heads.items():
     head_preds[side] = [
-        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape)
+        for it in tqdm(SPEC_EVAL, desc=f"head @ {side} px")
     ]
     res_scores[side] = mean_scores([score(p, it) for p, it in zip(head_preds[side], SPEC_EVAL, strict=True)])
 lo, hi = min(SIDES), max(SIDES)
@@ -479,41 +689,46 @@ zoom = (slice(h // 4, 3 * h // 4), slice(w // 4, 3 * w // 4))  # the central qua
 show_masks(
     [
         (
-            f"head @ {s} px · IoU {score(head_preds[s][k], demo)['iou']:.2f}",
+            pred_title(f"linear head on DINOv3\nfeatures @ {s} px (centre zoom)", head_preds[s][k], demo),
             overlay(demo["image"], head_preds[s][k], THEME["fails"])[zoom],
         )
         for s in SIDES
     ]
-    +[("ground truth", overlay(demo["image"], demo["mask"], THEME["truth"])[zoom])],
+    + [("ground truth (centre zoom)", overlay(demo["image"], demo["mask"], THEME["truth"])[zoom])],
     width=3.0,
 )
 
 # %% [markdown]
-# This cell puts the section-1 numbers next to this section's, the same three tools on both tasks, so the gap
-# is one picture.
+# This cell puts the section-1 numbers on pets next to this section's numbers on retina vessels, for the same
+# two tools: SAM (prompted with one click or one box) and a linear head on DINOv3 features. Both tools score
+# high on pets and low on vessels. That gap is the point of section 2: the tools are the same, only the task
+# changed.
 
 # %%
-# @title Pets vs the specialised task, side by side { display-mode: "form" }
+# @title Pets vs vessels: the same two tools, high on pets and low on vessels { display-mode: "form" }
 rows = {
-    "SAM, one click": (RESULTS["pets_zero_shot_point_iou"], RESULTS["specialised_zero_shot_point_iou"]),
-    "SAM, one box": (RESULTS["pets_zero_shot_box_iou"], RESULTS["specialised_zero_shot_box_iou"]),
-    "linear head": (RESULTS["pets_head_iou"], RESULTS["specialised_head_iou"]),
+    "SAM,\none click": (RESULTS["pets_zero_shot_point_iou"], RESULTS["specialised_zero_shot_point_iou"]),
+    "SAM,\none box": (RESULTS["pets_zero_shot_box_iou"], RESULTS["specialised_zero_shot_box_iou"]),
+    "linear head on\nDINOv3 features": (RESULTS["pets_head_iou"], RESULTS["specialised_head_iou"]),
 }
-print(f"{'tool':<16}{'pets IoU':>10}{'specialised IoU':>17}")
-for name, (p, s) in rows.items():
-    print(f"{name:<16}{p:>10.3f}{s:>17.3f}")
-print(f"{'everything':<16}{'':>10}{RESULTS['specialised_everything_iou']:>17.3f}")
+print(f"{'tool':<32}{'pets IoU':>10}{'vessels IoU':>13}")
+for name, (p, v) in rows.items():
+    print(f"{name.replace(chr(10), ' '):<32}{p:>10.3f}{v:>13.3f}")
+print(f"{'everything is foreground':<32}{'':>10}{RESULTS['specialised_everything_iou']:>13.3f}")
 
 x = np.arange(len(rows))
-fig, ax = plt.subplots(figsize=(6.4, 3))
-ax.bar(x - 0.2, [v[0] for v in rows.values()], 0.4, color=THEME["works"], label=PETS["name"])
-ax.bar(x + 0.2, [v[1] for v in rows.values()], 0.4, color=THEME["fails"], label=SPECIALISED["name"])
+fig, ax = plt.subplots(figsize=(6.4, 3.2))
+ax.bar(
+    x - 0.2, [v[0] for v in rows.values()], 0.4, color=THEME["works"], label=f"{PETS['name']} (easy task)"
+)
+ax.bar(x + 0.2, [v[1] for v in rows.values()], 0.4, color=THEME["fails"],
+       label=f"{SPECIALISED['name']} (specialised task)")
 ax.axhline(RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--",
-           label='specialised, "everything is foreground"')
-ax.set_xticks(x, list(rows))
+           label='vessels, "everything is foreground"')
+ax.set_xticks(x, list(rows), fontsize=8)
 ax.set_ylabel("mean IoU on held-out images")
 ax.set_ylim(0, 1)
-ax.set_title("Same tools, two tasks")
+ax.set_title("Same two tools, two tasks: pets vs vessels")
 ax.legend(fontsize=8, frameon=False)
 plt.tight_layout()
 plt.show()
@@ -539,42 +754,59 @@ plt.show()
 # box, the head, and the ground truth.
 
 # %% [markdown]
-# <!-- callout: question | Question -->
-# Run the next cell: it draws the failure gallery from the predictions you already have, with each image's
-# IoU and clDice in the titles.
-#
-# **Q8.** 🟡 Read the IoU and clDice in each title. For the worst image, is the failure the same kind for SAM
-# and for the head? Pick from: missed thin vessels, vessels drawn too wide, the optic disc or the border
-# marked as vessel, whole regions marked. Page with the start index:
-#
-# ```python
-# GALLERY_START = 0   # 0 = the three worst; try 3, 6, ...
-# ```
+# This collapsed cell defines the failure gallery: it ranks the evaluation images by the head's IoU, worst
+# first, and draws three at a time.
 
 # %%
-# Q8 — the failure gallery, worst images first
-GALLERY_START = 0  # 0 = the three worst; try 3, 6, ...
-if not isinstance(GALLERY_START, int) or not 0 <= GALLERY_START < len(SPEC_EVAL):
-    raise SystemExit(f"GALLERY_START must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
-gallery = [score(p, it) for p, it in zip(head_preds[hi], SPEC_EVAL, strict=True)]
-order = np.argsort([s["iou"] for s in gallery])
-for k in order[GALLERY_START : GALLERY_START + 3]:
-    it, sam_s, head_s = SPEC_EVAL[k], ladder_scores["box"][k], gallery[k]
+# @title Helper: the failure gallery, worst images first { display-mode: "form" }
+def gallery_row(label: str, k: int, scores: list[dict]) -> None:
+    """One row for evaluation image k: the photo, SAM with a box, the head, and the ground truth."""
+    it, sam_s, head_s = SPEC_EVAL[k], ladder_scores["box"][k], scores[k]
     show_masks(
         [
-            (it["name"], it["image"]),
+            (f"{label}{it['name']}", it["image"]),
             (
-                f"SAM box · IoU {sam_s['iou']:.2f} · clDice {sam_s['cldice']:.2f}",
+                pred_title("SAM, one box", sam_box_masks[k], it, sam_s),
                 overlay(it["image"], sam_box_masks[k], THEME["fails"]),
             ),
             (
-                f"head @ {hi} px · IoU {head_s['iou']:.2f} · clDice {head_s['cldice']:.2f}",
+                pred_title(f"linear head on DINOv3\nfeatures @ {hi} px", head_preds[hi][k], it, head_s),
                 overlay(it["image"], head_preds[hi][k], THEME["fails"]),
             ),
-            ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
+            (
+                f"ground truth\nvessels cover {100 * it['mask'][region(it)].mean():.0f} % of the fundus",
+                overlay(it["image"], it["mask"], THEME["truth"]),
+            ),
         ],
         width=2.8,
     )
+
+
+def show_gallery(start: int) -> tuple[list[dict], np.ndarray]:
+    """Draw the three images from rank `start` (0 = worst). Returns every head score and the ranking."""
+    if not isinstance(start, int) or not 0 <= start < len(SPEC_EVAL):
+        raise SystemExit(f"GALLERY_START must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
+    scores = [score(p, it) for p, it in zip(head_preds[hi], SPEC_EVAL, strict=True)]
+    ranking = np.argsort([s["iou"] for s in scores])
+    for k in ranking[start : start + 3]:
+        gallery_row("", int(k), scores)
+    return scores, ranking
+
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell: it draws the failure gallery from the predictions you already have, with each image's
+# IoU, clDice and marked share in the titles.
+#
+# **Q10.** 🟡 Read the IoU, clDice and *marked* share in each title. For the worst image, is the failure the
+# same kind for SAM and for the head? Pick from: missed thin vessels, vessels drawn too wide, the optic disc
+# or the border marked as vessel, whole regions marked. Page with the `GALLERY_START` field (0 = the three
+# worst; try 3, 6, ...).
+
+# %%
+# @title Q10 — The failure gallery, worst images first { display-mode: "form" }
+GALLERY_START = 0  # @param {type:"integer"}
+gallery, order = show_gallery(GALLERY_START)
 
 # %% [markdown]
 # Secondary visual: this cell shows the typical (median) and the best image of the same ranking, to see what
@@ -583,22 +815,7 @@ for k in order[GALLERY_START : GALLERY_START + 3]:
 # %%
 # @title For contrast: the typical and the best image of the ranking { display-mode: "form" }
 for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1])):
-    it, sam_s, head_s = SPEC_EVAL[k], ladder_scores["box"][k], gallery[k]
-    show_masks(
-        [
-            (f"{label} · {it['name']}", it["image"]),
-            (
-                f"SAM box · IoU {sam_s['iou']:.2f} · clDice {sam_s['cldice']:.2f}",
-                overlay(it["image"], sam_box_masks[k], THEME["fails"]),
-            ),
-            (
-                f"head @ {hi} px · IoU {head_s['iou']:.2f} · clDice {head_s['cldice']:.2f}",
-                overlay(it["image"], head_preds[hi][k], THEME["fails"]),
-            ),
-            ("ground truth", overlay(it["image"], it["mask"], THEME["truth"])),
-        ],
-        width=2.8,
-    )
+    gallery_row(f"{label} · ", int(k), gallery)
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 5 min: whose image fails worst? -->
@@ -615,14 +832,14 @@ for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1
 # - SAM tends to fail *globally*: it marks a whole region or one thick vessel, because it seeks an object.
 # - The head fails *locally*: it finds the thick vessels, draws them as wide as a patch, and loses the
 #   capillaries, because it can only label 16 px squares.
-# - On the whole fundus both get worse, since every vessel is now thinner than a patch (optional 2.9 below).
+# - On the whole fundus both get worse, since every vessel is now thinner than a patch (optional 2.8 below).
 #
 # </details>
 #
 # ### 2.7 A checklist for a new problem
 
 # %% [markdown]
-# **Q9.** 🟡 Use what is on screen as a checklist: the "everything is foreground" line in the ladder, the
+# **Q11.** 🟡 Use what is on screen as a checklist: the "everything is foreground" line in the ladder, the
 # 512 versus 1024 px chart, and IoU next to clDice. A colleague segments cracks in concrete and reports:
 #
 # - SAM with one box: IoU 0.31.
@@ -644,61 +861,7 @@ for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1
 # </details>
 
 # %% [markdown]
-# ### 2.8 🔴 Optional: what if the model paints only the thick trunk?
-#
-# Back to the two numbers of 2.2, now on a real retina image: three fake predictions next to the truth, the
-# playful one being a model that paints only the thick trunk: violet marks the true centre line the
-# prediction covers, green the part it misses, grey is the prediction.
-
-# %%
-# @title Playful test: what if the model paints only the thick trunk? { display-mode: "form" }
-from scipy import ndimage as ndi
-
-sim = SPEC_EVAL[0]
-sim_truth = sim["mask"] & region(sim)
-sim_line = skeleton(sim_truth)
-sim_width = float(sim_truth.sum() / max(sim_line.sum(), 1))  # mean vessel width in px
-sim_dist = ndi.distance_transform_edt(sim_truth)  # distance of each vessel pixel to the vessel edge
-sim_cut = np.percentile(sim_dist[sim_truth], 60)  # keep the 40 % thickest vessel pixels
-fakes = {
-    "trunk only": ndi.binary_dilation(sim_dist >= sim_cut, iterations=max(int(sim_cut), 1)) & sim_truth,
-    "2× too wide": ndi.binary_dilation(sim_truth, iterations=max(int(round(sim_width / 2)), 1)) & region(sim),
-    '"everything"': region(sim),
-}
-fat = max(1, max(sim_truth.shape) // 400)  # draw the 1 px centre line a few px thick so it is visible
-
-
-def trace_panel(pred: np.ndarray) -> np.ndarray:
-    """The prediction in grey; the true centre line violet where covered, green where missed."""
-    img = overlay(sim["image"], pred, THEME["background"])
-    img = overlay(img, ndi.binary_dilation(sim_line & pred, iterations=fat), THEME["works"], alpha=1.0)
-    return overlay(img, ndi.binary_dilation(sim_line & ~pred, iterations=fat), THEME["truth"], alpha=1.0)
-
-
-panels = [
-    (
-        "truth and its centre line",
-        overlay(
-            overlay(sim["image"], sim_truth, THEME["truth"]),
-            ndi.binary_dilation(sim_line, iterations=fat),
-            "#FFFFFF",
-            alpha=1.0,
-        ),
-    )
-]
-for name, pred in fakes.items():
-    found = float((sim_line & pred).sum() / max(sim_line.sum(), 1))
-    panels.append(
-        (
-            f"{name} · IoU {iou(pred, sim_truth):.2f} · clDice {cldice(pred, sim_truth):.2f}\n"
-            f"true centre line covered: {found:.0%}",
-            trace_panel(pred),
-        )
-    )
-show_masks(panels, width=3.0)
-
-# %% [markdown]
-# ### 2.9 🔴 Optional: the whole fundus
+# ### 2.8 🔴 Optional: the whole fundus
 #
 # The gallery shows 1024 px crops. This cell runs SAM with a box and the head on the whole fundus of the demo
 # image shrunk to 1024 px (vessels only 1–3 px wide), next to the truth.
@@ -716,13 +879,12 @@ full = {
 full_sam = sam.probability(full["image"], box=box_prompt(full)) >= 0.5
 full_feat = dino.features(full["image"], max(full["image"].shape[:2]))
 full_head = predict_head(spec_heads[hi][0], full_feat, full["mask"].shape)
-full_masks = {"SAM box": full_sam, f"head @ {hi} px": full_head}
+full_masks = {"SAM, one box": full_sam, f"linear head on DINOv3\nfeatures @ {hi} px": full_head}
 full_s = {name: score(m, full) for name, m in full_masks.items()}
 show_masks(
     [(f"whole fundus · {meta['name']}", full["image"])]
     + [
-        (f"{name} · IoU {full_s[name]['iou']:.2f} · clDice {full_s[name]['cldice']:.2f}",
-         overlay(full["image"], m, THEME["fails"]))
+        (pred_title(name, m, full, full_s[name]), overlay(full["image"], m, THEME["fails"]))
         for name, m in full_masks.items()
     ]
     + [("ground truth", overlay(full["image"], full["mask"], THEME["truth"]))],
