@@ -285,7 +285,83 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 # - Which one would you most like to check on your own data next week?
 
 # %% [markdown]
-# ### 10.3 What you can do now
+# ### 10.3 How far from the state of the art?
+#
+# The best IoU of the day is far from a finished vessel map, so it is fair to ask whether the methods are
+# worth anything. The next cell puts your bars next to three reference points that were measured outside this
+# notebook:
+#
+# - **A small U-Net trained from scratch on the same five complete masks** (a plain convolutional network
+#   that works on the pixels, no foundation model). We trained it on our 1024 px crops for about three
+#   minutes on a laptop and scored it on the same 25 held-out images, with the cut chosen on the training
+#   images.
+# - **ESRVS** (Xu & Zhang, PRCV 2026, [arXiv:2607.24453](https://arxiv.org/abs/2607.24453)): DINOv3
+#   features and pseudo-labels, the ingredients of section 6, with **one** labelled image and 31 unlabelled
+#   ones, and a real decoder (Mask2Former) at 1024 px.
+# - **The best published fully supervised models on HRF**, trained on 15 complete masks: Dice 0.81 to 0.82
+#   (Little W-Net, Galdran et al. 2020, [arXiv:2009.01907](https://arxiv.org/abs/2009.01907), and Shin et
+#   al., MedIA 2019, in its Table 2).
+#
+# The papers report Dice; the cell converts it to IoU (IoU = Dice ÷ (2 − Dice)). Their splits and image sizes
+# differ from ours, so read them as the right order of magnitude, not as an exact ranking.
+#
+# What to look for: the gap between your best bar and the references, and which reference uses the same
+# ingredients as the notebook.
+
+# %%
+# @title Your results next to the state of the art { display-mode: "form" }
+def dice_to_iou(dice: float) -> float:
+    """IoU from a Dice score of the same masks: IoU = Dice / (2 - Dice)."""
+    return dice / (2 - dice)
+
+
+sota_references = [  # (label, IoU, where it comes from): measured outside this notebook, see the text above
+    ("small U-Net from scratch · same 5 complete masks", 0.581, "our run on these crops, 2026-10-26"),
+    ("ESRVS · DINOv3 + pseudo-labels · 1 labelled image", dice_to_iou(0.7263), "arXiv:2607.24453, Table 3"),
+    ("best published · 15 complete masks", dice_to_iou(0.8104), "Little W-Net, arXiv:2009.01907, Table 2"),
+]
+sota_rows = [(label, value, colour, False) for label, value, colour in story[1:]]  # the specialised task
+sota_rows += [(label, value, "#BDBDBD", True) for label, value, _ in sota_references]
+fig, ax = plt.subplots(figsize=(8, 4.2))
+for y, (_label, value, colour, outside) in enumerate(sota_rows[::-1]):
+    edge = "#616161" if outside else colour
+    ax.barh(y, value, color=colour, hatch="//" if outside else None, edgecolor=edge)
+    ax.text(value + 0.01, y, f"{value:.2f}", va="center", fontsize=8, color="#311B92")
+ax.set_yticks(range(len(sota_rows)), [r[0] for r in sota_rows[::-1]], fontsize=8)
+ax.axvline(everything_iou, color=THEME["background"], ls="--")
+ax.set_xlim(0, 1)
+ax.set_xlabel("mean IoU on held-out retina images")
+ax.set_title("Your session (solid) and three reference points (hatched)")
+add_key(
+    fig,
+    [
+        ("solid: your session (colour = the approach, as in section 8)", "#455A64"),
+        ("measured outside this notebook (hatched)", "#BDBDBD"),
+        ('IoU of marking everything (dashed line)', THEME["background"]),
+    ],
+)
+plt.show()
+for label, value, source in sota_references:
+    print(f"{label:<52} IoU {value:.2f} · {source}")
+
+# %% [markdown]
+# <!-- callout: takeaway | Why it was not all for nothing -->
+# - **The limit you met is the patch, not the idea.** Every head today decides per 16 px patch, and the
+#   vessels are 4 to 20 px wide (section 2.4). A small U-Net that sees the pixels reaches IoU 0.58 on the same
+#   five complete masks, about twice our full-mask head (0.28 on our run). Choosing the cut on the training
+#   images alone lifts our head from 0.28 to 0.33, so part of the gap is also a default threshold.
+# - **Complete masks are what the U-Net needs.** Those five masks cost 15 to 25 hours of annotation. Trained
+#   on the strokes alone, the same U-Net marked almost the whole fundus (IoU 0.11 on our run), below the
+#   scribble head on foundation-model features (0.17). Cheap labels need the foundation model.
+# - **The same ingredients, at full strength, are close to the top.** ESRVS combines DINOv3 features,
+#   pseudo-labels and one labelled image with a decoder that works at pixel level, and keeps about 97 % of
+#   its fully supervised Dice on HRF.
+# - **What you would change first on a real project:** a decoder that sees the pixels on top of the frozen
+#   features, the threshold chosen on a few fully labelled images, and the unlabelled images of your archive
+#   as pseudo-label material.
+
+# %% [markdown]
+# ### 10.4 What you can do now
 
 # %% [markdown]
 # At the end you can:

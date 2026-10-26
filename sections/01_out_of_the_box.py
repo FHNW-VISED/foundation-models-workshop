@@ -61,6 +61,66 @@ def _key_handle(entry):
     return Patch(fc=label, ec="#888888", lw=0.5, label=key)  # (text, colour)
 
 
+ROLES = {  # the tag in a panel's corner: what the panel is (the colours follow the theme)
+    "input": ("INPUT", THEME["scribble"]),
+    "prediction": ("PREDICTION", THEME["works"]),
+    "errors": ("PREDICTION vs TRUTH", THEME["works"]),
+    "truth": ("TRUTH (scoring only)", THEME["truth"]),
+    "map": ("SCORE MAP", THEME["score"]),
+}
+
+
+def tag_panel(ax, role: str | None) -> None:
+    """Write the panel's role (input, prediction, errors, truth, map) in a coloured tag in its top-left
+    corner and draw a frame in the same colour, so an input is never mistaken for a prediction."""
+    if role is None:
+        return
+    text, colour = ROLES[role]
+    ax.text(0.02, 0.98, text, transform=ax.transAxes, ha="left", va="top", fontsize=7, color="white",
+            fontweight="bold", bbox={"boxstyle": "round,pad=0.25", "fc": colour, "ec": "none"})
+    ax.axis("on")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_edgecolor(colour)
+        spine.set_linewidth(2.5)
+
+
+def browse_figures(figures: list, labels: list[str], title: str) -> None:
+    """Show one figure at a time with ◀ ▶ buttons and a slider: `figures` are matplotlib figures (closed
+    here), `labels` one line each. Pure HTML + JavaScript, so it needs no running Python and works in Colab
+    and Jupyter; without JavaScript only the first figure shows."""
+    import base64
+    import io
+    import uuid
+
+    from IPython.display import HTML, display
+
+    pngs = []
+    for fig in figures:
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=80)
+        plt.close(fig)
+        pngs.append("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode())
+    uid, n = uuid.uuid4().hex[:8], len(pngs)
+    data = json.dumps({"png": pngs, "label": labels})
+    display(HTML(f"""
+<div style="font-family:sans-serif"><b>{title}</b><br>
+<button id="prev{uid}">◀</button> <input id="pick{uid}" type="range" min="0" max="{n - 1}" value="0"
+ style="width:240px;vertical-align:middle"> <button id="next{uid}">▶</button>
+<span id="lab{uid}" style="margin-left:8px"></span><br>
+<img id="img{uid}" src="{pngs[0]}" style="max-width:100%"></div>
+<script>(function() {{
+const d = {data}, pick = document.getElementById("pick{uid}");
+function show(k) {{ k = (k + {n}) % {n}; pick.value = k;
+  document.getElementById("img{uid}").src = d.png[k];
+  document.getElementById("lab{uid}").textContent = (k + 1) + " / {n} · " + d.label[k]; }}
+document.getElementById("prev{uid}").onclick = () => show(+pick.value - 1);
+document.getElementById("next{uid}").onclick = () => show(+pick.value + 1);
+pick.oninput = () => show(+pick.value);
+show(0); }})();</script>"""))
+
+
 def add_key(fig, entries: list | None, note: str | None = None) -> None:
     """Lay out `fig`, then add a colour key and an optional one-line note under it (it grows a little).
 
@@ -96,21 +156,26 @@ def show_masks(
     legend: list | None = None,
     note: str | None = None,
     ncols: int | None = None,
+    roles: list | None = None,
+    show: bool = True,
 ):
     """One row of RGB panels (title, image), or several rows of `ncols` panels each.
 
     `prompts` = {"point": [x, y], "box": [x0, y0, x1, y1]} drawn on every panel, or a list with one such dict
-    (or None) per panel. `legend` = colour-key entries for add_key(); `note` = one italic line under it."""
+    (or None) per panel. `legend` = colour-key entries for add_key(); `note` = one italic line under it.
+    `roles` = one tag per panel ("input", "prediction", "errors", "truth", "map" or None), see tag_panel().
+    `show=False` returns the figure instead of drawing it (for browse_figures)."""
     ncols = ncols or len(panels)
     nrows = -(-len(panels) // ncols)
     fig, axes = plt.subplots(nrows, ncols, figsize=(width * ncols, width * nrows))
     axes = np.atleast_1d(axes).ravel()
     for ax in axes[len(panels):]:
         ax.axis("off")
-    for ax, (title, img) in zip(axes, panels, strict=False):
+    for ax, (title, img), role in zip(axes, panels, roles or [None] * len(panels), strict=False):
         ax.imshow(img)
         ax.set_title(title, fontsize=8 if ncols > 3 else 9)
         ax.axis("off")
+        tag_panel(ax, role)
     per_panel = prompts if isinstance(prompts, list) else [prompts] * len(panels)
     for ax, p in zip(axes, per_panel, strict=False):
         if not p:
@@ -124,6 +189,8 @@ def show_masks(
             rect.set_edgecolor(THEME["scribble"])
             ax.add_patch(rect)
     add_key(fig, legend, note)
+    if not show:
+        return fig
     plt.show()
 
 
@@ -499,8 +566,8 @@ if head_sec > 60:
 # This cell runs the head you just trained on one training pet and shows each step (patches, one probability
 # per patch, the upsampled map, the final mask), then works through one patch by hand. The
 # $\color{#00838F}{\blacksquare}$ teal square marks
-# that patch; $\square$ white to $\color{#6A1B9A}{\blacksquare}$ violet is the probability p of "pet"
-# ($\square$ white 0, $\color{#6A1B9A}{\blacksquare}$ violet 1). What to look for: the map in
+# that patch; the probability p of "pet" runs from $\color{#424242}{\blacksquare}$ dark grey (0) through
+# $\square$ white (0.5) to $\color{#1565C0}{\blacksquare}$ blue (1). What to look for: the map in
 # panel 2 is coarse (one value per patch), and panels 3 and 4 only smooth and threshold it.
 
 # %%
@@ -523,7 +590,6 @@ total, p_patch = float(hscore[py, px]), float(hprob[py, px])
 print(f"patch (row {py}, col {px}) · f = [{f_head}, … 384 numbers]")
 print(f"w · f + b = {dot:.2f} + ({bias:.2f}) = {total:.2f} → p = σ({total:.2f}) = {p_patch:.2f}")
 
-prob_cmap = mpl.colors.LinearSegmentedColormap.from_list("prob", ["#FFFFFF", THEME["works"]])
 H, W = hx["mask"].shape
 fig, axes = plt.subplots(1, 4, figsize=(11.6, 3.4))
 axes[0].imshow(hx["image"])
@@ -532,19 +598,21 @@ axes[0].hlines(np.arange(0, H + 1, H / gh), 0, W, colors="white", linewidths=0.4
 cell_box = plt.Rectangle((px * W / gw, py * H / gh), W / gw, H / gh, fill=False, ec=THEME["scribble"], lw=2)
 axes[0].add_patch(cell_box)
 axes[0].set_title("1 · image cut into patches\n(white lines = the grid)", fontsize=9)
-axes[1].imshow(hprob.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1, interpolation="nearest")
+axes[1].imshow(hprob.cpu().numpy(), cmap=score_cmap, vmin=0, vmax=1, interpolation="nearest")
 axes[1].add_patch(plt.Rectangle((px - 0.5, py - 0.5), 1, 1, fill=False, ec=THEME["scribble"], lw=2))
-axes[1].set_title("2 · one p per patch\n(white 0, violet 1)", fontsize=9)
-axes[2].imshow(hup.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1)
+axes[1].set_title("2 · one p per patch\n(grey 0, white 0.5, blue 1)", fontsize=9)
+axes[2].imshow(hup.cpu().numpy(), cmap=score_cmap, vmin=0, vmax=1)
 axes[2].set_title("3 · upsampled\nto the image", fontsize=9)
 axes[3].imshow(overlay(hx["image"], predict_head(head_full5, hfeat, hx["mask"].shape), THEME["works"]))
 axes[3].set_title("4 · p > 0.5 → pet\n(violet = predicted pet)", fontsize=9)
-for ax in axes:
+for ax, role in zip(axes, ("input", "map", "map", "prediction"), strict=True):
     ax.axis("off")
+    tag_panel(ax, role)
 add_key(
     fig,
     [("box", "patch worked through in the printout"), ("16 px patch grid (panel 1)", "#FFFFFF"),
-     ("p near 1 = pet (panels 2-4)", THEME["works"]), ("p near 0 = background", "#F2F2F2")],
+     ("p near 1 = pet (panels 2-3)", THEME["score"]), ("p = 0.5: unsure", "#FFFFFF"),
+     ("p near 0 = background", "#424242"), ("mask: p > 0.5 (panel 4)", THEME["works"])],
     note="Panel 4 is the head's mask: violet = pixels with p above 0.5.",
 )
 plt.show()
