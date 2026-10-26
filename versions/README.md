@@ -11,3 +11,4 @@ Never edit a version folder.
 | v02 | 2026-10-21 | Transfer pass: your EDA review applied here, bugs #16 #17 fixed (PR #20) | 5c7c9f9 |
 | v03 | 2026-10-26 | rules sync N-050–N-052 + lint checks (PR #22) | d391250 |
 | v04 | 2026-10-26 | cuts 2026-10-26 (round 1 + 2 decisions) | c990866 |
+| v05 | 2026-10-26 | reorders: Q12, Q16, Q17 before their cells (N-052) | 2893a93 |

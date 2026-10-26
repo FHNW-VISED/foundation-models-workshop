@@ -253,6 +253,14 @@ show_extremes(sam_box_masks)
 # - Will it find the thin vessels, or only the thick ones?
 
 # %% [markdown]
+# **Q12.** 🟡 Look at the similarity map and the IoU you got:
+#
+# - Which parts of the held-out image look most like the annotated vessels (purple), and which like the
+#   background (orange)?
+# - Pick another annotated image: does the held-out IoU move much?
+# - What does that say about relying on a single example?
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn: swap the annotated image -->
 # - Run the next cell: it builds the two prototypes from one annotated image, scores every evaluation image
 #   (seconds), and shows the similarity map and the mask on the demo image.
@@ -295,14 +303,6 @@ show_masks(
     ],
     width=2.8,
 )
-
-# %% [markdown]
-# **Q12.** 🟡 Look at the similarity map and the IoU you got:
-#
-# - Which parts of the held-out image look most like the annotated vessels (purple), and which like the
-#   background (orange)?
-# - Pick another annotated image: does the held-out IoU move much?
-# - What does that say about relying on a single example?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -713,6 +713,13 @@ plt.show()
 # Want to see what the shortcut costs? The next cell tries it on the real scribbles.
 
 # %% [markdown]
+# **Q16.** 🔴 Compare your distance with the scribble head of 4.3:
+#
+# - How many true vessel pixels did your rule call background?
+# - Did recall, precision and IoU on the held-out images move, and in which direction?
+# - Is there a distance that helps without hurting?
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn: choose a distance -->
 # - Set `BG_BEYOND_PX` (try 20, 80, `None` = ignore every unlabelled pixel) and run the next cell.
 # - It turns the scribbles into targets with your distance, trains the same head on them (seconds), and
@@ -768,13 +775,6 @@ show_masks(
     ],
     width=3.8,
 )
-
-# %% [markdown]
-# **Q16.** 🔴 Compare your distance with the scribble head of 4.3:
-#
-# - How many true vessel pixels did your rule call background?
-# - Did recall, precision and IoU on the held-out images move, and in which direction?
-# - Is there a distance that helps without hurting?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>

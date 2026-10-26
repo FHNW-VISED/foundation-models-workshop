@@ -331,6 +331,15 @@ def path_chart(names: list[str]) -> None:
 path_chart(list(PATH_COLOURS))
 
 # %% [markdown]
+# **Q17.** 🟡 Compare the naive and the masked head:
+#
+# - Which hidden vessels does the masked head recover that the naive head missed? Think back to the third
+#   panel of 5.1: which pixels may it call vessel without any penalty?
+# - On the held-out image, what did each head pay for what it found? Compare the orange.
+# - Does that hold on another training image?
+# - What would the loss do if you also removed the background strokes?
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn: compare the heads on one image -->
 # - Run the next cell: the hidden vessels each head found on a training image, then the error maps of
 #   section 4 on the held-out demo image (violet found, orange false alarm, green missed). No new training.
@@ -365,15 +374,6 @@ show_masks(
     ],
     width=3.4,
 )
-
-# %% [markdown]
-# **Q17.** 🟡 Compare the naive and the masked head:
-#
-# - Which hidden vessels does the masked head recover that the naive head missed? Think back to the third
-#   panel of 5.1: which pixels may it call vessel without any penalty?
-# - On the held-out image, what did each head pay for what it found? Compare the orange.
-# - Does that hold on another training image?
-# - What would the loss do if you also removed the background strokes?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
