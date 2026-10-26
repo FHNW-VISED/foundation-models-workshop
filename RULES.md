@@ -1,6 +1,6 @@
 # RULES — every notebook
 
-Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-23.
+Copied from the second-brain ledger `wiki/work/notebooks/Notebook Rules.md` on 2026-10-26.
 Do not edit here; SPEC.md › Notebook-specific rules (L-xxx) override these for this notebook.
 Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = read for it.
 
@@ -76,3 +76,4 @@ Where one of them contradicts an L-rule in SPEC.md, it wins too, and the SPEC is
 | SN-003 | A section's objective is plain markdown right under the section heading, not a box. Overrides the objective half of the old N-044. | review |
 | SN-004 | Quoted reference material (the Karpathy *Recipe* quotes) uses the theory blue; it does not get a colour of its own. | review |
 | SN-005 | Learning objectives are written with Bloom's-taxonomy verbs, so each one states the level asked: describe, explain, apply, implement, justify. | review |
+| SN-006 | Screen every photo a student can see before the notebook is handed over: no nudity, swimwear or bare torsos. Search the dataset's captions or tags for such words where they exist, look at every match, and list the excluded ids with a reason in the data-building script, removed after sampling so the rest of the selection stays the same. A caption search does not see pixels, so anything she or a reviewer spots later is excluded the same way. | review |
