@@ -10,9 +10,7 @@
 # numbers, because section 2 runs the same three cells on the specialised task.
 
 # %% [markdown]
-# This helper cell defines how to turn a person's hint into a SAM prompt, `show_masks()`, the figure used for
-# every comparison in the notebook (prediction in violet, ground truth in green, prompts in teal), and the
-# small functions that score a mask only inside the scored area (the grey band is left out).
+# This cell defines the prompt, figure and scoring helpers used all through the notebook.
 
 # %%
 # @title Prompts and figure helpers { display-mode: "form" }
@@ -36,32 +34,105 @@ def box_prompt(item: dict) -> list[float]:
     return [float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())]
 
 
-def show_masks(panels: list[tuple[str, np.ndarray]], prompts: dict | None = None, width: float = 3.2):
-    """One row of RGB panels (title, image). `prompts` = {"point": [x, y], "box": [x0, y0, x1, y1]}."""
-    fig, axes = plt.subplots(1, len(panels), figsize=(width * len(panels), width))
-    axes = np.atleast_1d(axes)
-    for ax, (title, img) in zip(axes, panels, strict=True):
-        ax.imshow(img)
-        ax.set_title(title)
+def _key_handle(entry):
+    """One legend handle for a colour-key entry: "found", or (key, label), or (text, colour)."""
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    known = {
+        "found": ("found (prediction and truth)", THEME["works"]),
+        "invented": ("invented (prediction only)", THEME["fails"]),
+        "missed": ("missed (truth only)", THEME["truth"]),
+        "unscored": ("not scored (grey band)", "#E0E0E0"),
+        "mask": ("the model's mask", THEME["works"]),
+        "truth": ("ground truth", THEME["truth"]),
+    }
+    if isinstance(entry, str):
+        entry = (entry, None)
+    key, label = entry
+    teal = THEME["scribble"]
+    if key == "click":
+        return Line2D([], [], marker="*", ls="", ms=11, color=teal, mec="white", label=label or "click")
+    if key == "box":
+        return Patch(fc="none", ec=teal, lw=2, label=label or "box")
+    if key in known:
+        default, colour = known[key]
+        return Patch(fc=colour, ec="#888888", lw=0.5, label=label or default)
+    return Patch(fc=label, ec="#888888", lw=0.5, label=key)  # (text, colour)
+
+
+def add_key(fig, entries: list | None, note: str | None = None) -> None:
+    """Lay out `fig`, then add a colour key and an optional one-line note under it (it grows a little).
+
+    Entries: "found" | "invented" | "missed" | "unscored" | "mask" | "truth" | "click" | "box", or a pair
+    (key, label) to reword one, or (text, colour) for any other colour. Call it last, instead of
+    tight_layout()."""
+    fig.tight_layout()
+    handles = [_key_handle(e) for e in entries or []]
+    width, height = fig.get_size_inches()
+    cols = max(1, min(len(handles), int(width // 2.3)))
+    rows = -(-len(handles) // cols) if handles else 0
+    note_h, key_h = (0.3 if note else 0.0), 0.28 * rows
+    extra = note_h + key_h + (0.1 if handles or note else 0.0)
+    if not extra:
+        return
+    new_height = height + extra
+    for ax in fig.axes:  # keep every axes the same size in inches, and make room underneath
+        pos = ax.get_position(original=True)
+        y0, h = (pos.y0 * height + extra) / new_height, pos.height * height / new_height
+        ax.set_position([pos.x0, y0, pos.width, h])
+    fig.set_size_inches(width, new_height)
+    if note:
+        fig.text(0.5, 0.1 / new_height, note, ha="center", va="bottom", fontsize=8, style="italic")
+    if handles:
+        fig.legend(handles=handles, loc="lower center", ncol=cols, fontsize=8, frameon=False,
+                   bbox_to_anchor=(0.5, (0.05 + note_h) / new_height))
+
+
+def show_masks(
+    panels: list[tuple[str, np.ndarray]],
+    prompts: dict | list | None = None,
+    width: float = 3.2,
+    legend: list | None = None,
+    note: str | None = None,
+    ncols: int | None = None,
+):
+    """One row of RGB panels (title, image), or several rows of `ncols` panels each.
+
+    `prompts` = {"point": [x, y], "box": [x0, y0, x1, y1]} drawn on every panel, or a list with one such dict
+    (or None) per panel. `legend` = colour-key entries for add_key(); `note` = one italic line under it."""
+    ncols = ncols or len(panels)
+    nrows = -(-len(panels) // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(width * ncols, width * nrows))
+    axes = np.atleast_1d(axes).ravel()
+    for ax in axes[len(panels):]:
         ax.axis("off")
-    if prompts:
-        for ax in axes:
-            if prompts.get("point") is not None:
-                x, y = prompts["point"]
-                ax.plot(x, y, marker="*", markersize=14, color=THEME["scribble"], markeredgecolor="white")
-            if prompts.get("box") is not None:
-                x0, y0, x1, y1 = prompts["box"]
-                rect = mpl.patches.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=2)
-                rect.set_edgecolor(THEME["scribble"])
-                ax.add_patch(rect)
-    plt.tight_layout()
+    for ax, (title, img) in zip(axes, panels, strict=False):
+        ax.imshow(img)
+        ax.set_title(title, fontsize=8 if ncols > 3 else 9)
+        ax.axis("off")
+    per_panel = prompts if isinstance(prompts, list) else [prompts] * len(panels)
+    for ax, p in zip(axes, per_panel, strict=False):
+        if not p:
+            continue
+        if p.get("point") is not None:
+            x, y = p["point"]
+            ax.plot(x, y, marker="*", markersize=14, color=THEME["scribble"], markeredgecolor="white")
+        if p.get("box") is not None:
+            x0, y0, x1, y1 = p["box"]
+            rect = mpl.patches.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=2)
+            rect.set_edgecolor(THEME["scribble"])
+            ax.add_patch(rect)
+    add_key(fig, legend, note)
     plt.show()
 
 
 def pet_iou(pred: np.ndarray, item: dict) -> float:
     """IoU of a boolean mask with the pet, counted only inside the scored area (the grey band is left out)."""
     r = region(item)
-    return iou(pred & r, item["mask"] & r)
+    p, t = pred & r, item["mask"] & r
+    union = (p | t).sum()
+    return float((p & t).sum() / union) if union else 1.0  # same formula as iou() in 1.2, usable before it
 
 
 def truth_panel(item: dict) -> np.ndarray:
@@ -76,27 +147,6 @@ def error_panel(item: dict, pred: np.ndarray) -> np.ndarray:
     img = overlay(item["image"], pred & truth, THEME["works"], unscored=~r)
     img = overlay(img, pred & ~truth, THEME["fails"])
     return overlay(img, truth & ~pred, THEME["truth"])
-
-
-def show_sam_demo(items: list[dict], index: int) -> None:
-    """SAM with one click and with one box on items[index], next to the ground truth."""
-    if not isinstance(index, int) or not 0 <= index < len(items):
-        raise SystemExit(f"DEMO_INDEX must be a whole number from 0 to {len(items) - 1}.")
-    pet = items[index]
-    point, box = click_point(pet), box_prompt(pet)
-    t0 = time.monotonic()
-    by_point = sam.probability(pet["image"], points=[point], labels=[1]) >= 0.5
-    by_box = sam.probability(pet["image"], box=box) >= 0.5
-    print(f"{pet['name']}: two SAM calls in {time.monotonic() - t0:.1f} s on {DEVICE}")
-    works = THEME["works"]
-    show_masks(
-        [
-            ("SAM, one click", overlay(pet["image"], by_point, works)),
-            ("SAM, one box", overlay(pet["image"], by_box, works)),
-            ("ground truth (grey = not scored)", truth_panel(pet)),
-        ],
-        prompts={"point": point, "box": box},
-    )
 
 
 def features_for(dataset: dict, item: dict, long_side: int) -> torch.Tensor:
@@ -126,8 +176,7 @@ def pca_rgb(feat: torch.Tensor, shape: tuple[int, int]) -> np.ndarray:
 
 
 # %% [markdown]
-# This cell loads the held-out pets, the evaluation set every approach in this notebook is scored on (12 of
-# them on a CPU, to keep cells short), and fixes the resolution DINOv3 works at.
+# This cell loads the held-out pets that every approach in this notebook is scored on.
 
 # %%
 # @title Load the held-out pets { display-mode: "form" }
@@ -150,40 +199,30 @@ print(
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
-# The next cell gives SAM a single click on a pet, then a box around it. Before you run it: will one
-# click be enough for a clean mask of the whole animal, and what could go wrong (fur vs floor, the tail,
-# a second animal)? Say it to your neighbour or write it down.
-#
-# Then run the next cell and look at the three panels.
-#
-# **Q2.** 🟡 Compare the one-click mask and the box mask with the ground truth.
-#
-# - Where do they differ, if at all?
-# - Is the difference at the object's boundary, or is a whole part missing or added?
-# - Try another pet: move the `DEMO_INDEX` slider (0 to 11) and run the cell again.
+# The next cell lets you drive SAM yourself on the held-out pets. Before you start: will one click be enough
+# for a clean mask of the whole animal, and what could go wrong (fur against floor, the tail, a second
+# animal)? Say it to your neighbour or write it down.
 
 # %% [markdown]
-# This cell runs SAM twice on the held-out pet you pick, once with a single click and once with a box, and
-# shows both masks next to the ground truth, so you can see what a promptable model gives for free.
+# The cell below shows a held-out pet and takes a click, a box or a word, then draws SAM's mask with its IoU
+# against the ground truth (IoU = overlap ÷ union of the two masks: 1 is a perfect match, 0 no overlap; 1.2
+# explains it). The ◀ ▶ buttons change pet. 👁 Show ground truth colours the result: violet found, orange
+# invented, green missed, light grey not scored. Without Colab it shows one fixed click and one box instead.
+#
+# **Q2.** 🟢 Drive SAM on three or four pets.
+#
+# - Click on a pet, shift-click on the floor, then draw a box. What does each give you?
+# - Add a second click on a part SAM missed. What changes?
+# - Press 👁 Show ground truth. Does the mask differ from the truth at the outline, or is a whole part
+#   missing or added?
+# - Where does one click fail, and does a box fix it?
+# - Optional: type `dog` or `cat` and press "Ask SAM 3" (only if SAM 3 is in your cache).
+#
+# Look at the floor click: SAM still returns a clean-looking mask. A clean mask is not a correct one, so
+# always compare it with the ground truth (section 2 shows why).
 
 # %%
-# @title Q2 — SAM with one click and with one box on a held-out pet { display-mode: "form" }
-DEMO_INDEX = 0  # @param {type:"slider", min:0, max:11, step:1}
-show_sam_demo(pets_eval, DEMO_INDEX)
-
-# %% [markdown]
-# Now drive SAM yourself on the same held-out pets: the widget below takes a click, a box or a word and draws
-# the mask with its IoU against the ground truth (IoU = overlap ÷ union of the two masks: 1 is a perfect
-# match, 0 no overlap; 1.2 explains it). Without Colab it shows one fixed click and one box instead.
-#
-# **Q3.** 🟢 Click on a pet, then click on the floor, then draw a box around the pet.
-#
-# - What does each of the three give you?
-# - What changes when you add a second click on the part SAM missed?
-# - Type `dog` or `cat` in the text box and press "Ask SAM 3" (only if SAM 3 is in your cache).
-
-# %%
-# @title Q3 — Click, box or a word: drive SAM yourself { display-mode: "form" }
+# @title Q2 — Click, box or a word: drive SAM yourself { display-mode: "form" }
 sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, default_text="dog")
 
 # %% [markdown]
@@ -211,15 +250,10 @@ sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, defau
 # - On the pets, both masks are first cut to the scored area, so the grey "not sure" band counts for nothing.
 
 # %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 2 min) -->
-# Fill `my_iou`: two boolean arrays in, one float out.
-#
-# - Intersection: pixels where both are True.
-# - Union: pixels where at least one is True.
-# - Empty union: return 1.0 (two empty masks agree).
-#
-# The cell below checks your version on this 4 × 4 play example (1 = True) and continues with ours if you
-# skip it:
+# <!-- callout: your-turn | Your turn (optional, 1 min) -->
+# IoU = intersection ÷ union. We wrote the intersection. Fill `my_union`: how many pixels are True in at
+# least one of two boolean masks? The cell below checks your line on this 4 × 4 play example (1 = True) and
+# continues with ours if you skip it:
 #
 # ```
 # pred   truth
@@ -229,35 +263,45 @@ sam_playground(pets_eval, "Pets: click, box, or a word", text_prompt=True, defau
 # 0000   0000
 # ```
 #
-# Intersection 4, union 8, so the answer is 0.5.
+# The intersection is 4 and the union is 8, so the answer is 8 and the IoU is 0.5.
 
 # %%
 # @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_iou(pred: np.ndarray, truth: np.ndarray) -> float:
-    """Reference: |pred ∧ truth| / |pred ∨ truth|."""
-    inter, union = float((pred & truth).sum()), float((pred | truth).sum())
-    return inter / union if union else 1.0
+def _ref_union(pred: np.ndarray, truth: np.ndarray) -> int:
+    """Reference: the number of pixels where pred or truth is True."""
+    return int((pred | truth).sum())
 
 
 _play_pred = np.zeros((4, 4), bool)
 _play_pred[1:3, 1:4] = True  # 6 pixels
 _play_truth = np.zeros((4, 4), bool)
-_play_truth[0:3, 1:3] = True  # 6 pixels, 4 shared -> IoU = 4 / 8
+_play_truth[0:3, 1:3] = True  # 6 pixels, 4 shared -> union 8, IoU = 4 / 8
 
 # %%
 # ✍️ YOUR CODE
-def my_iou(pred: np.ndarray, truth: np.ndarray) -> float:
-    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty.
-    e.g. 0.62"""
+def my_union(pred: np.ndarray, truth: np.ndarray) -> int:
+    """Number of pixels that are True in pred, in truth, or in both.
+    e.g. 8"""
     ...
 
 
-iou = use(my_iou, reference=_ref_iou, check=lambda f: round(float(f(_play_pred, _play_truth)), 4), name="iou")
+union_pixels = use(
+    my_union, reference=_ref_union, check=lambda f: int(f(_play_pred, _play_truth)), name="iou"
+)
+
+
+def iou(pred: np.ndarray, truth: np.ndarray) -> float:
+    """Intersection over union of two boolean masks of the same shape; 1.0 when both are empty.
+    e.g. 0.5"""
+    inter, union = float((pred & truth).sum()), float(union_pixels(pred, truth))
+    return inter / union if union else 1.0
+
 
 # %% [markdown]
-# This cell scores SAM's one-click and one-box masks on every evaluation pet with the IoU you just
-# defined (inside the scored area) and keeps the mean as this task's zero-shot number, for section 2 to
-# compare.
+# %% [markdown]
+# This cell scores SAM on every held-out pet with the IoU above and keeps the mean as the zero-shot number
+# for section 2. The click is one pixel of a foreground scribble and the box is the tight box around the pet,
+# both taken from the ground truth: what a person would give SAM.
 
 # %%
 # @title Score SAM on every held-out pet { display-mode: "form" }
@@ -280,25 +324,12 @@ print(
 )
 
 # %% [markdown]
-# A mean hides the spread, so this cell shows the **worst, median and best** held-out pet by one-box IoU:
-# violet where mask and truth agree, orange for a false alarm (extra mask), green for what SAM missed, grey
-# for the band that is not scored.
-
-# %%
-# @title Worst, median and best pet by IoU { display-mode: "form" }
-order = np.argsort(zero_shot_all["box"])
-panels = []
-for label, pos in (("worst", order[0]), ("median", order[len(order) // 2]), ("best", order[-1])):
-    it = pets_eval[int(pos)]
-    pred = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
-    panels.append((f"{label} · IoU {zero_shot_all['box'][int(pos)]:.2f}", error_panel(it, pred)))
-show_masks(panels)
-
-# %% [markdown]
 # ### 1.3 What DINOv3 sees
 #
 # This cell keeps the **3 main directions (a PCA)** of each patch's 384 numbers and shows them as red, green
-# and blue, so the same colour means the model sees those patches as similar (both cat ears, say).
+# and blue, next to each photo. The same colour means the model sees those patches as similar (both cat
+# ears, say). What to look for: does the animal get colours that differ from the floor, and do its parts
+# (face, body) differ from each other? The blocks are the 16 px patches.
 
 # %%
 # @title Show the patch features as colours { display-mode: "form" }
@@ -308,10 +339,15 @@ for it in fig_items:
     feat = features_for(pets_task, it, pets_task["feat_side"])
     title = f"DINOv3 PCA · {feat.shape[2]}×{feat.shape[1]} patches"
     panels += [(it["name"], it["image"]), (title, pca_rgb(feat, it["image"].shape[:2]))]
-show_masks(panels, width=2.6)
+show_masks(
+    panels,
+    width=2.6,
+    note="Colours = the 3 main directions of the 384 numbers per patch (red, green, blue). They are not "
+    "classes: similar colour = patches the model finds similar.",
+)
 
 # %% [markdown]
-# **Q4.** 🟡 Look at the PCA images above.
+# **Q3.** 🟡 Look at the PCA images above.
 #
 # - Which pixels share a colour: the whole animal, parts of it (head, fur, legs), or the floor too?
 # - Does the colour follow the object's outline?
@@ -319,11 +355,10 @@ show_masks(panels, width=2.6)
 #
 # <details><summary>What to look for</summary>
 #
-# The colours are not classes: they are the 3 directions along which the features vary most in this image.
-# Typically the animal separates from the background in one direction and its parts (face vs body) in
-# another. The blocky edges show the 16 px grid: the features know <i>what</i> is where, at patch resolution,
-# not <i>exactly where</i> the boundary is. Whether that is enough depends on the size of what you want to
-# segment.
+# - The colours are not classes: they are the 3 directions along which the features vary most in this image.
+# - Typically the animal separates from the floor in one direction and its parts (face, body) in another.
+# - The blocky edges are the 16 px grid: the features know <i>what</i> is where, not <i>exactly where</i> the
+#   boundary is. Whether that is enough depends on how big the thing you segment is.
 #
 # </details>
 
@@ -339,6 +374,9 @@ show_masks(panels, width=2.6)
 # A sigmoid `σ` squeezes the score into a probability `p = σ(score)` between 0 and 1 (score 2.2 gives
 # p = 0.90, score 0 gives 0.5), so "score above 0" and "p above 0.5" say the same thing. The per-patch map is
 # then upsampled to the image.
+#
+# Training uses a **balanced loss**: pet pixels and background pixels each get half of the total weight, so
+# a small pet is not drowned out by the floor.
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -347,10 +385,7 @@ show_masks(panels, width=2.6)
 # number from 1.2? Write down a number before you run.
 
 # %% [markdown]
-# This helper cell defines the head used for every training step in the notebook (that 1 × 1 convolution on
-# standardised patch features, with a balanced loss, where each class gets half the total weight, that
-# ignores pixels labelled −1), `load_head()` for our precomputed checkpoints, and `fit_pet_head()`, which
-# trains the pet head or loads ours.
+# This cell defines the linear head that every later training step reuses.
 
 # %%
 # @title Linear head: train, predict, load a checkpoint { display-mode: "form" }
@@ -359,6 +394,7 @@ def train_head(
 ) -> tuple[dict, float]:
     """Linear head (384 -> 1) on standardised patch features. Labels per pixel: 1 fg, 0 bg, -1 ignored.
 
+    Pixels labelled -1 are skipped. `balanced=True`: each class gets half of the total loss weight.
     Returns the head's tensors (weight, bias, feat_mean, feat_std) and the training seconds.
     """
     torch.manual_seed(SEED)
@@ -439,9 +475,8 @@ def fit_pet_head(train_yourself: bool, n_pets: int, steps: int) -> tuple[list[di
 
 
 # %% [markdown]
-# This cell trains the head on the full masks of five fit pets (only sections 1 and 2 use full masks); the
-# grey "not sure" band is left out of its loss. Untick `TRAIN_PET_HEAD` and run it again to load our
-# checkpoint instead.
+# This cell trains the head on the full masks of five pets, leaving out the grey band. Untick
+# `TRAIN_PET_HEAD` to load our checkpoint instead.
 
 # %%
 # @title Train the linear head on five pets { display-mode: "form" }
@@ -454,7 +489,9 @@ if head_sec > 60:
 
 # %% [markdown]
 # This cell runs the head you just trained on one training pet and shows each step (patches, one probability
-# per patch, the upsampled map, the final mask), then works through one patch by hand.
+# per patch, the upsampled map, the final mask), then works through one patch by hand. The teal square marks
+# that patch; white to violet is the probability p of "pet" (white 0, violet 1). What to look for: the map in
+# panel 2 is coarse (one value per patch), and panels 3 and 4 only smooth and threshold it.
 
 # %%
 # @title The linear head step by step on one pet { display-mode: "form" }
@@ -478,32 +515,38 @@ print(f"w · f + b = {dot:.2f} + ({bias:.2f}) = {total:.2f} → p = σ({total:.2
 
 prob_cmap = mpl.colors.LinearSegmentedColormap.from_list("prob", ["#FFFFFF", THEME["works"]])
 H, W = hx["mask"].shape
-fig, axes = plt.subplots(1, 4, figsize=(11.6, 3))
+fig, axes = plt.subplots(1, 4, figsize=(11.6, 3.4))
 axes[0].imshow(hx["image"])
 axes[0].vlines(np.arange(0, W + 1, W / gw), 0, H, colors="white", linewidths=0.4)
 axes[0].hlines(np.arange(0, H + 1, H / gh), 0, W, colors="white", linewidths=0.4)
 cell_box = plt.Rectangle((px * W / gw, py * H / gh), W / gw, H / gh, fill=False, ec=THEME["scribble"], lw=2)
 axes[0].add_patch(cell_box)
-axes[0].set_title("1 · image cut into patches", fontsize=9)
+axes[0].set_title("1 · image cut into patches\n(white lines = the grid)", fontsize=9)
 axes[1].imshow(hprob.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1, interpolation="nearest")
 axes[1].add_patch(plt.Rectangle((px - 0.5, py - 0.5), 1, 1, fill=False, ec=THEME["scribble"], lw=2))
-axes[1].set_title("2 · one p per patch (white 0, violet 1)", fontsize=9)
+axes[1].set_title("2 · one p per patch\n(white 0, violet 1)", fontsize=9)
 axes[2].imshow(hup.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1)
-axes[2].set_title("3 · upsampled to the image", fontsize=9)
+axes[2].set_title("3 · upsampled\nto the image", fontsize=9)
 axes[3].imshow(overlay(hx["image"], predict_head(head_full5, hfeat, hx["mask"].shape), THEME["works"]))
-axes[3].set_title("4 · p > 0.5 → pet", fontsize=9)
+axes[3].set_title("4 · p > 0.5 → pet\n(violet = predicted pet)", fontsize=9)
 for ax in axes:
     ax.axis("off")
-plt.tight_layout()
+add_key(
+    fig,
+    [("box", "patch worked through in the printout"), ("16 px patch grid (panel 1)", "#FFFFFF"),
+     ("p near 1 = pet (panels 2-4)", THEME["works"]), ("p near 0 = background", "#F2F2F2")],
+    note="Panel 4 is the head's mask: violet = pixels with p above 0.5.",
+)
 plt.show()
 
 # %% [markdown]
-# This cell runs the linear head you trained in 1.4 (5 pets, full masks) on the held-out pets it never saw.
-# For each pet, IoU is the overlap of the head's mask and the ground truth divided by their union, with the
-# grey band left out. It then averages over the pets and shows the worst, median and best one.
+# This cell runs the head on the held-out pets it never saw and scores it with the same IoU. The figure shows
+# SAM from the box (row 1) and the head (row 2) on the same three pets: the worst, median and best by SAM's
+# IoU. The teal rectangle is the box given to SAM. What to look for: is the spread across pets as large for
+# the head as for SAM, and are the head's edges blockier (16 px patches)?
 
 # %%
-# @title Score the head on the held-out pets { display-mode: "form" }
+# @title Score the head, and SAM next to it { display-mode: "form" }
 t0 = time.monotonic()
 head_preds = [
     predict_head(head_full5, features_for(pets_task, it, pets_task["feat_side"]), it["mask"].shape)
@@ -523,15 +566,23 @@ print(f"Score: per-pet IoU with the ground truth (grey band not scored), average
 print(f"  linear head       mean IoU {RESULTS['pets_head_iou']:.3f}")
 print(f"  SAM, one click    mean IoU {RESULTS['pets_zero_shot_point_iou']:.3f}  (the 1.2 masks)")
 print(f"  SAM, one box      mean IoU {RESULTS['pets_zero_shot_box_iou']:.3f}  (the 1.2 masks)")
-panels, works = [], THEME["works"]
-order = np.argsort(head_ious)
-for label, pos in (("worst", order[0]), ("median", order[n_eval // 2]), ("best", order[-1])):
+pet_order = np.argsort(zero_shot_all["box"])  # the same three pets in both rows
+picked = [("worst", pet_order[0]), ("median", pet_order[n_eval // 2]), ("best", pet_order[-1])]
+sam_row, head_row, boxes = [], [], []
+for label, pos in picked:
     it = pets_eval[int(pos)]
-    panels += [
-        (f"head, {label} · IoU {head_ious[int(pos)]:.2f}", overlay(it["image"], head_preds[int(pos)], works)),
-        ("ground truth", truth_panel(it)),
-    ]
-show_masks(panels, width=2.6)
+    by_box = sam.probability(it["image"], box=box_prompt(it)) >= 0.5
+    sam_iou, head_iou = zero_shot_all["box"][int(pos)], head_ious[int(pos)]
+    sam_row.append((f"{label} pet · SAM from the box\nIoU {sam_iou:.2f}", error_panel(it, by_box)))
+    head_row.append((f"same pet · linear head\nIoU {head_iou:.2f}", error_panel(it, head_preds[int(pos)])))
+    boxes.append({"box": box_prompt(it)})
+show_masks(
+    sam_row + head_row,
+    prompts=boxes + [None] * len(head_row),
+    ncols=3,
+    legend=["found", "invented", "missed", "unscored", ("box", "box given to SAM")],
+    note="Pets chosen by SAM's box IoU (worst, median, best); the head is shown on the same three.",
+)
 
 # %% [markdown]
 # <!-- callout: across | Across approaches -->
@@ -544,50 +595,19 @@ show_masks(panels, width=2.6)
 # specialised task.
 
 # %% [markdown]
-# **Q5.** 🟡 Compare the two numbers you got with the prediction you wrote down.
+# **Q4.** 🟡 Compare the two numbers you got with the prediction you wrote down.
 #
 # - Which approach would you pick for 10 000 pet photos, and which for 10 photos?
 # - What does each one ask of a person?
 #
 # <details><summary>One possible answer</summary>
 #
-# For 10 photos, a click each is nothing, and SAM's masks come with sharp boundaries. For 10 000, a person
-# cannot click on each one, while the head, once trained on a few masks, runs with no hint at all. Its
-# boundaries follow the 16 px patch grid, so it loses a little IoU at the edges, which matters more as the
-# objects get smaller. Hardware or seed may change the numbers; the trade-off stays.
+# - 10 photos: a click each is nothing, and SAM's masks have sharp boundaries.
+# - 10 000 photos: nobody clicks them all, while the head, trained once on a few masks, needs no hint. Its
+#   edges follow the 16 px grid, so it loses a little IoU, more as objects get smaller.
+# - Hardware or seed may change the numbers; the trade-off stays.
 #
 # </details>
-
-# %% [markdown]
-# <!-- callout: question | 👥 Optional, 3 min -->
-# Pick different `DEMO_INDEX` values (Q2), so you and your neighbour see different pictures, and compare.
-#
-# - Did one click fail on either of yours?
-# - If so, was the click on an ambiguous spot (fur against a similar floor, a collar, a second animal)?
-
-# %% [markdown]
-# This cell clicks on the floor instead of the pet and shows what SAM returns.
-
-# %%
-# @title Click on the floor, not the pet { display-mode: "form" }
-it = pets_eval[0]
-floor_ys, floor_xs = np.nonzero(region(it) & ~it["mask"])  # a floor pixel, not one in the grey band
-k = int(np.random.default_rng([SEED, len(floor_ys)]).integers(len(floor_ys)))
-floor_pt = [float(floor_xs[k]), float(floor_ys[k])]
-by_floor = sam.probability(it["image"], points=[floor_pt], labels=[1]) >= 0.5
-floor_title = f"SAM, click on the floor · IoU {pet_iou(by_floor, it):.2f}"
-show_masks(
-    [
-        (floor_title, overlay(it["image"], by_floor, THEME["works"])),
-        ("ground truth", truth_panel(it)),
-    ],
-    prompts={"point": floor_pt},
-)
-
-# %% [markdown]
-# <!-- callout: pitfall | Pitfall: a clean mask is not a correct one -->
-# SAM returned a confident-looking mask for a click on the floor, so always compare a mask with the ground
-# truth (section 2 shows why).
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway -->

@@ -21,7 +21,7 @@ They leave with a reusable experimental framework and guiding principles that tr
 ## 2. Audience and level
 AMLD audience: practitioners and researchers with practical ML experience; no computer-vision
 background needed (proposal, "Intermediate level"). 40–200 people in one room, first come first served.
-Default path 🟡, with 🔴 extensions.
+Default path 🟡; only one 🔴 part is left (the PU one-liner in 5.3).
 **Freedom (N-028): medium** (G-14, W-5):
 - Participants **write their own code and do manual work** (scribbling).
 - Every such task is **strongly suggested but never mandatory**: a default answer exists via `use()` (N-029), while the value comes from doing it themselves (W-5).
@@ -78,28 +78,35 @@ These appear verbatim in the title banner.
 | Smoke run | `NB_SMOKE=1`, CPU, budget 1,200 s; local test images only, no Drive |
 
 ## 6. Sections
-Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = participant minutes.
-👥 = pairs compare results for ~5 min (W-11). ✍️ = participant code via `use()`. 🖍️ = draw on the canvas.
+Two blocks of about 85 and 90 minutes around the **30-min coffee break**, which sits **just before 5.3** (W-1, W-9; moved
+by S0 and again on 2026-10-26). Time = participant minutes, summing to ~175. 👥 = pairs compare results for ~4–5 min (W-11), in
+sections 2, 6, 8 and 9. ✍️ = participant code via `use()`. 🖍️ = draw on the canvas.
 
 | # | File | Title | Objective (one line) | Level | Time | Status |
 |---|---|---|---|---|---|---|
-| 0 | sections/00_setup.py | Setup & the question | Load the cached models and data; see the question and outcomes | 🟢 | 5 | done |
-| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 15 | done |
-| 2 | sections/02_falls_short.py | Where it falls short | Run the same tools on the specialised task and probe SAM with escalating prompts | 🟡 | 20 | done |
-| 3 | sections/03_hidden_labels.py | Hide the labels: the naive baseline | Train a head with "missing = background" and watch it fail differently | 🟡 | 20 | done |
-| 4 | sections/04_ladder.py | The adaptation ladder | Zero-shot → one-shot → scribbles: see how predictions change at each rung | 🟡 | 25 | done |
-| 5 | sections/05_learn_from_less.py | Path 1 · Learn from less | Treat missing labels as unknown; write the masked / PU loss | 🟡🔴 | 20 | done |
-| 6 | sections/06_recover_supervision.py | Path 2 · Recover supervision | Turn SAM pseudo-labels and Grad-CAM maps into training signal | 🟡🔴 | 20 | done |
-| 7 | sections/07_use_fm_directly.py | Path 3 · Skip specialist training | Prompt the foundation model directly with scribble points and boxes | 🟡 | 10 | done |
-| 8 | sections/08_compare.py | Compare everything | Fill the comparison table, predicting the winner first | 🟡 | 15 | done |
-| 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 20 | done |
-| 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | done |
+| 0 | sections/00_setup.py | Setup & the question | Load the cached models and data; see the question and outcomes | 🟢 | 7 | done |
+| 1 | sections/01_out_of_the_box.py | Out of the box: pets | See a foundation model segment pets almost perfectly, zero-shot | 🟡 | 18 | done |
+| 2 | sections/02_falls_short.py | Where it falls short | Run the same tools on the specialised task, probe SAM with escalating prompts, and name the signs that it is not good enough | 🟡 | 24 | done |
+| 3 | sections/03_hidden_labels.py | Hide the labels: the naive baseline | Train a head with "missing = background" and watch it fail differently | 🟡 | 12 | done |
+| 4 | sections/04_ladder.py | The adaptation ladder | Zero-shot → scribbles: see how predictions change at each rung (one-shot in a go-deeper box) | 🟡 | 12 | done |
+| 5 | sections/05_learn_from_less.py | Path 1 · Learn from less | Treat missing labels as unknown (masked loss), then tell the loss how many vessels hide among them (PU loss) | 🟡🔴 | 22 | done |
+| 6 | sections/06_recover_supervision.py | Path 2 · Recover supervision | Turn SAM pseudo-labels and Grad-CAM maps into training signal, and know when to distrust them | 🟡 | 18 | done |
+| 7 | sections/07_use_fm_directly.py | Path 3 · Skip specialist training | Prompt the foundation model directly with scribble points and boxes | 🟡 | 12 | done |
+| 8 | sections/08_compare.py | Compare everything | Fill the comparison table, predicting the winner first | 🟡 | 16 | done |
+| 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 25 | done |
+| 10 | sections/10_principles.py | Guiding principles & the framework | Turn the results into rules and six questions you can reuse | 🟢 | 9 | done |
 
-**Block 1** = sections 0–3 and section 4 up to the scribble rung (4.3), "when it works and when it doesn't". The coffee break
-sits **just before 4.3** (S0, Simone 2026-10-26; was: end of 03). It carries a no-code question to think about over coffee
-(Q17: "what could you tell the training about a pixel nobody labelled?", with a hint for after the break); block 2 opens by
-collecting answers, then 4.3 starts with "Welcome back" and the annotator's new instruction.
-**Block 2** = 4.3 (scribbles) to section 10, "ways out".
+**Block 1** (about 85 min) = sections 0–4 and 5.1–5.2, "when it works, when it doesn't, and the first way to read missing labels".
+Section 5 is split by the break: 5.1–5.2 (the masked loss) take about 12 min, 5.3 (the PU loss) about 10.
+The coffee break sits **just before 5.3** (Simone 2026-10-26; before that it was before 4.3, and before that at the end of 03).
+It carries a no-code question to think about over coffee (Q10: "the masked head over-marks; the annotator says they painted about
+half of the vessels; how could that one number help the training?", with a hint for after the break); block 2 opens by collecting
+answers, then 5.3 starts with "Welcome back" and the PU loss.
+**Block 2** (about 90 min) = 5.3 (the PU loss) to section 10, "the rest of the ways out, the comparison, and your own images".
+
+Questions are numbered **Q1–Q23** straight through the notebook (Q1 in 00; Q2–Q4 in 01; Q5–Q7 in 02; Q8 in 03; Q9 in 04; Q10–Q13 in 05;
+Q14–Q16 in 06; Q17–Q18 in 07; Q19–Q20 in 08; Q21–Q22 in 09; Q23 in 10). Two former questions are facilitator discussions in
+`FACILITATION.md` and not in the notebook: Q11's "cracks in concrete" checklist (section 2) and the invented pilot (section 6).
 
 ### Section contents
 - **00 Setup & the question**
@@ -107,77 +114,83 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
   - Setup cell: IN_COLAB, SMOKE, DEVICE (cuda / cpu with a plain message), SEED, `RESULTS = {}`, `use()` (N-029), `SPECIALISED` config, the Theme style.
   - Loading models (timm DINOv3 ViT-S/16, SAM per §5) and data from the Drive cache, or a local cache in SMOKE.
   - The DINOv3 licence notice.
-  - One sentence per cell on what and why (N-031).
+  - One sentence per cell on what and why (N-031). Q1 🟢 is a written prediction on the two tasks.
 - **01 Out of the box: pets**
   - SAM with 1 point and with a box on pets (it shines).
   - DINOv3 patch features shown as a 3-colour PCA image.
   - A linear head trained on 5 pets with full masks (seconds), with IoU on held-out pets, and a step-by-step figure of the head
-    (patches, one probability per patch, upsampled map, mask) with one patch worked by hand (moved here from section 3).
-  - ✍️ optional `my_iou`. 👥 optional.
-  - **Interactive SAM** (`sam_playground`, defined in 00): click, shift-click for background, drag a box, or type a word
-    for SAM 3 if cached; IoU and "marked" update live. Also in sections 2, 7.4 and 9 (Simone 2026-10-26: "way more
+    (patches, one probability per patch, upsampled map, mask) with one patch worked by hand.
+  - ✍️ optional one-line `my_union` warm-up in 1.2: the intersection is given and the learner writes the union; reference collapsed, `use()` fallback unchanged. No 👥 in this section.
+  - **Interactive SAM** (`sam_playground`, defined in 00, Q2): click, shift-click for background, drag a box, or type a word
+    for SAM 3 if cached; IoU and "marked" update live; 👁 Show ground truth colours found / invented / missed / not scored. Also in sections 2, 7.4 and 9 (Simone 2026-10-26: "way more
     interactive"). Headless it shows one fixed click and one box.
 - **02 Where it falls short**
-  - The same three tools on the specialised task, plus a failure gallery.
-  - **SAM probed with escalating prompts** (1 → 5 → 20 points; box) (W-4 research); one figure shows the four prompts next to SAM's masks.
-  - Resolution effect: features at 512 vs 1024 for thin structures (the attention arithmetic is a go-deeper box).
-  - clDice is collapsed reference code with an interactive visual (three cases: too wide, capillaries missed, blob). No
-    ✍️ here: the workshop is not about vessel segmentation (Simone 2026-10-26, reverses the earlier "keep `my_cldice`").
-  - The playground: "try to get SAM to mark only the vessels".
-  - 🔴 optional: the DINOv3 PCA on retina images, the whole-fundus view (the "thick trunk" simulation was cut 2026-10-26).
+  - The same three tools on the specialised task, plus a failure gallery (Q7, 👥 "whose image fails worst?").
+  - **SAM probed with escalating prompts** (1 → 5 → 20 points; box) (W-4 research); one figure shows the four prompts next to SAM's masks (Q6).
+  - Resolution effect: features at 512 vs 1024 for thin structures, in two numbers, next to a pets-vs-vessels chart.
+  - clDice appears **only here (2.2) and in the section-8 table**: collapsed reference code with an interactive visual (`CASE`: too wide, capillaries missed, blob). Elsewhere titles and printouts show IoU · recall · marked. No
+    ✍️ here: the workshop is not about vessel segmentation (Simone 2026-10-26, reverses the earlier decision to keep a clDice exercise).
+  - The playground: "try to get SAM to mark only the vessels" (Q5).
+  - The signs that a model is not good enough (the "everything" line, resolution, IoU vs clDice) are closed by a **facilitator discussion** (the "cracks in concrete" checklist, ex-Q11), not a notebook question.
+  - Cut 2026-10-26: the DINOv3 PCA on retina images, the whole-fundus view and the "thick trunk" simulation.
   - Predict before you run (N-004).
-  - 👥 "whose image fails worst?" (a show-of-hands moment, in FACILITATION).
 - **03 Hide the labels: the naive baseline**
   - Generate incomplete supervision (§4).
   - Train the head with **missing = background**, evaluate on the hidden ground truth, and show where it fails ("it learns that vessels are background").
-  - No ✍️ here: `hidden_recall` is reference code. 🔴 optional: the balanced-loss head ("is it the labels, or the loss?").
+  - No ✍️ here: `hidden_recall` is reference code. The 🔴 balanced-loss head was cut 2026-10-26.
   - "Hidden" = vessels in the full ground truth that the label file left unpainted; defined with a picture in 3.1–3.2.
   - The naive baseline is explained as numbered steps, the guess comes before the "why" (N-004).
-  - A slider (`HIDE_PERCENT`) rebuilds the label file with more or fewer hidden segments and retrains the naive head.
-  - Leads straight into section 4's first rungs; the break comes later, before 4.3 (S0).
+  - A slider (`HIDE_PERCENT`, Q8) rebuilds the label file with more or fewer hidden segments and retrains the naive head.
+  - Leads straight into section 4; the break comes later, before 5.3.
 - **04 The adaptation ladder** (W-3)
-  - Rungs: zero-shot (02) → **one-shot**: one annotated image, as a nearest-feature prototype (🔴 optional: the same map used as SAM prompts) → **scribbles** (auto-scribbles, partial cross-entropy that ignores unlabelled pixels: the MIT DINOv2-scribble idea applied to DINOv3).
+  - Main path: zero-shot (02) → **scribbles** (auto-scribbles, partial cross-entropy that ignores unlabelled pixels: the MIT DINOv2-scribble idea applied to DINOv3). Q9 reads the side-by-side table and error maps.
+  - **One-shot** (one annotated image, as a nearest-feature prototype) sits in a collapsed 🔍 go-deeper box at the end, with a plain prompt (no question number) and an `ONE_SHOT_IMAGE` field; it still runs, so `RESULTS["ladder"]` holds `zero_shot`, `one_shot`, `scribbles`.
   - Show **how the predictions differ**, not "quality rises" (Simone: quality need not improve).
-  - ✍️ optional `my_scribble_targets`: choose which unlabelled pixels to ignore.
-  - The coffee break and its question sit before 4.3 (see §6 above).
-  - 🔴 optional: the difference maps between rungs, and "choose a distance" (the "surely background" shortcut, with `BG_BEYOND_PX`).
+  - No ✍️ here: a dropdown `UNLABELLED_TARGET` (-1 ignored, 0 background) on the scribble-head cell replaces the old target-building exercise; 0 brings section 3's failure back.
+  - Cut 2026-10-26: prototype → SAM clicks, the difference maps between rungs, the "surely background" distance (`BG_BEYOND_PX`) and its question.
 - **05 Path 1 · Learn from less**
-  - Treat missing as **unknown**: a masked loss, then 🔴 a PU-inspired loss.
-  - ✍️ `masked_loss(logits, labels, ignore_mask) -> torch.Tensor` via `use()`, so participants write the loss (W-5).
+  - Treat missing as **unknown**: a masked loss (5.1–5.2, block 1), then, after the break, the **PU loss on the main path** (5.3, block 2; no longer an extension).
+  - ✍️ optional one-line `known_pixels(ignore_mask)` (masked loss; the balanced loss is given, returning all-ones is the naive loss) via `use()`, so participants write the part that matters (W-5).
+  - 5.3: one plain paragraph, a three-step theory box, the helper collapsed, one knob `LABELLED_SHARE` (0.2–1, default 0.5), and the figure below.
+  - 🔴 challenge: one-line `pu_background` (`L_b = (all_as_bg − prior · painted_as_bg) / (1 − prior)`), reference collapsed, `use()` fallback unchanged.
   - Compare with section 03's naive baseline.
-  - The three recipes side by side on one image: what each loss hears (row 1) and the mistake it produces (row 2).
+  - One 2 × 3 figure after PU: columns naive, masked, PU; row 1 the hidden vessels each head found on a training image, row 2 its error map on the demo image; plus a recall / precision chart (Q11–Q12). Q13 asks for a real annotation habit that breaks the random-hiding assumption.
+  - The break question Q10 sits between 5.2 and 5.3.
 - **06 Path 2 · Recover supervision**
   - **SAM pseudo-labels** from scribble points, used as training targets for the head.
-  - **Grad-CAM** from a small classifier on image-level or patch-level labels, thresholded into a pseudo-mask *or* used as a SAM prompt.
-  - ✍️ optional `my_pseudo_targets`. The pseudo-label threshold and the unsure band are Colab sliders (`PSEUDO_THRESHOLD`, `UNSURE_BAND`).
-  - The Grad-CAM sketch and its step-by-step sit in a go-deeper box; 🔴 optional: Grad-CAM peaks as SAM clicks.
+  - **Grad-CAM** from a small classifier on patch-level labels, thresholded into a pseudo-mask (lean: no step-by-step box, no peaks-as-clicks).
+  - No ✍️ here: `pseudo_targets` is collapsed reference code. The pseudo-label threshold and the unsure band are Colab sliders (`PSEUDO_THRESHOLD`, `UNSURE_BAND`, Q15, with an optional 👥).
+  - The **blind-spot simulation** stays, with a legend and a "what to look for" line.
+  - The invented pilot (ex-Q28) is a **facilitator discussion** in `FACILITATION.md`, not a notebook question.
   - **[OPEN]** If the specialised task is retina, Grad-CAM needs an image-level task. Default: classify patches as "contains vessel / not", and say plainly that this is an awkward fit. The bake-off reports whether Grad-CAM is meaningful.
 - **07 Path 3 · Skip specialist training**
-  - SAM prompted directly with points from the scribbles (one computed row; the number-of-clicks variation is 🔴), plus one small box and a centre click per stroke. No training.
-  - The box size and the centre click are a slider (`BOX_PAD_TRY`) and a checkbox (`WITH_CLICK_TRY`). The thickened strokes (no model) are the baseline to beat.
-  - 🔴 SAM 3 text prompts if available: a dropdown with free text, plus the playground on retina and pets images.
+  - SAM prompted directly with points from the scribbles (one computed row, no click-count slider), plus one small box and a centre click per stroke. No training.
+  - The box size and the centre click are a slider (`BOX_PAD_TRY`) and a checkbox (`WITH_CLICK_TRY`, Q17). The thickened strokes (no model) are the baseline to beat.
+  - 7.4 SAM 3 text prompts if available (Q18): a playground with free text on retina images, needing SAM 3 access and otherwise skippable; an optional go-deeper cell scores one phrase on all images (`SAM3_TEXT` dropdown with free text).
 - **08 Compare everything**
-  - First, a ✏️ "your prediction: which approach wins, which is steadiest?" cell with two dropdowns (`MY_WINNER`, `MY_STEADIEST`; W-11).
+  - First, a ✏️ "your prediction: which approach wins, which is steadiest?" cell with two dropdowns (`MY_WINNER`, `MY_STEADIEST`; W-11; Q19).
   - Then the **comparison table** (W-15), one row per approach:
     - accuracy = IoU / Dice (+ clDice for vessels) on the hidden ground truth;
     - annotation effort = labelled pixels + strokes → estimated minutes, with the minutes-per-stroke assumption stated;
     - reliability = spread over 3 seeds or images;
     - speed / compute = seconds of training + inference;
     - scalability = discussion only.
-  - A small plot, then a violin plot of the per-image IoU.
-  - 👥 defend a row for a given situation.
+  - A small plot, then a violin plot of the per-image IoU and the winner's worst, typical and best image.
+  - 👥 defend a row for a given situation (Q20).
 - **09 Your own images**
   - Upload 1–3 images. Draw scribbles on a **canvas inside Colab** (HTML canvas + `google.colab.output`), with an **upload-a-PNG fallback** (W-6).
-  - Run the ladder on them: zero-shot SAM, the scribble head, SAM from scribble points.
+  - Run the ladder on them: zero-shot SAM, the scribble head, SAM from scribble points (Q21); an optional playground first.
+  - No ✍️ here: the `disagreement` map (9.4, Q22) is collapsed reference code; sliders (`N_OWN_CLICKS`, `OWN_BOX_PAD`) and the canvas are the hands-on part.
   - In SMOKE / without Colab, use a bundled example image and generated scribbles.
   - ⚠️ Never use Gradio's public share link (privacy).
   - 👥 compare own-image results.
   - Sections 2, 4 and 7 end with a one-line pointer to this section; the own-image cells that W-10 first put there were cut (2026-10-26), so section 9 is the only place for participants' own photos. Never mandatory.
   - The setup email asks each participant to bring one image (S8).
-- **10 Guiding principles & wrap-up**
+- **10 Guiding principles & the framework**
   - 4–6 principles derived from *this run's* table (e.g. "thin structures defeat patch features: check the resolution first").
-  - Outcomes restated ("At the end you can"); "six questions for any task" and "where to go next" are go-deeper boxes; licences and credits.
-  - A closing cell for their own problem (`MY_PROBLEM`, `MY_PRINCIPLE`, `MY_FIRST_STEP`); no separate whole-workshop takeaway.
+  - **The six questions for any task** are a main-path card (10.2), not a go-deeper box: the reusable experimental framework the proposal promises. Each question carries a number you can measure.
+  - Outcomes restated ("At the end you can"); "where to go next" is a go-deeper box; licences and credits.
+  - A closing cell for their own problem (`MY_PROBLEM`, `MY_PRINCIPLE`, `MY_FIRST_STEP`, Q23); no separate whole-workshop takeaway.
 
 ### Separate deliverable: `setup_check.py` → `setup_check.ipynb`
 - Mounts Google Drive and downloads the DINOv3 timm weights, SAM weights, data subsets, precomputed features and checkpoints into `MyDrive/fm-workshop-cache/`.
@@ -192,7 +205,7 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
   - training "too slow" → load our checkpoint;
   - canvas not rendering → upload fallback;
   - over-trusting SAM's confident masks.
-- Extensions (🔴): PU loss, SAM 3 text prompts, the U-Net-from-scratch baseline, a Frangi vesselness filter (if retina): "a 1998 filter vs a 2025 foundation model".
+- Extensions (🔴): the PU one-line challenge `pu_background` (the PU loss itself is on the main path since 2026-10-26), the U-Net-from-scratch baseline, a Frangi vesselness filter (if retina): "a 1998 filter vs a 2025 foundation model". SAM 3 text prompts (7.4) are not an extension but are skippable when access is missing.
 
 ## 7. Out of scope / limitations
 - No full fine-tuning of the foundation models (heads only; a light decoder at most).
@@ -225,6 +238,8 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
 
 **L-006 — CPU path:** every training cell checks the elapsed time and offers the precomputed checkpoint. Under SMOKE, tiny steps on CPU.
 
+**L-007 — Figures carry their legend (N-059):** every figure draws a key for every colour and marker it uses, inside the figure; an error map always names found / invented / missed / not scored (violet / orange / green / light grey). Model masks are violet, ground truth green, annotations teal; orange means "invented" in images and nowhere else. Shared helpers: `add_key` and `show_masks(..., legend=, note=)` in 01, `show_clicks` in 02, `show_keyed` in 03. Each figure is preceded by one sentence saying what it shows and one line on what to look for.
+
 ## 9. Acceptance
 - `just check` passes, including `tests/test_content.py` (the night agent never edits it).
 - **Results contract:**
@@ -238,7 +253,7 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
   - each `use()` falls back cleanly when the participant cell is untouched;
   - the canvas section runs headless with the bundled example.
 - Every step completes on CPU in SMOKE (W-13). Simone runs it fully on a Colab T4 by hand.
-- `FACILITATION.md` covers both blocks, with timings, 👥 moments, show-of-hands moments, and "if short on time" cuts (N-033, W-14).
+- `FACILITATION.md` covers both blocks and the break before 5.3, with timings, 👥 moments, show-of-hands moments, "if short on time" cuts, and the two facilitator discussions (the cracks checklist and the invented pilot) (N-033, W-14).
 - The 19-Nov AMLD agenda draft can be read off §6 (W-14).
 
 ## 10. Open questions
