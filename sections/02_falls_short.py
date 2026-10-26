@@ -135,13 +135,13 @@ def show_clicks(panels: list[tuple[str, np.ndarray, list | None]], width: float 
 
 # %%
 # @title Load the held-out retina images { display-mode: "form" }
-SPECIALISED["feat_side"] = 256 if SMOKE else SPECIALISED["feature_long_side"]
-SPECIALISED["eval"] = SPECIALISED["held"] if (SMOKE or DEVICE == "cuda") else SPECIALISED["held"][:12]
-SPEC_EVAL = [load_item(SPECIALISED, it) for it in SPECIALISED["eval"]]
-fg_share = float(np.mean([it["mask"][region(it)].mean() for it in SPEC_EVAL]))
+specialised["feat_side"] = 256 if SMOKE else specialised["feature_long_side"]
+specialised["eval"] = specialised["held"] if (SMOKE or DEVICE == "cuda") else specialised["held"][:12]
+spec_eval = [load_item(specialised, it) for it in specialised["eval"]]
+fg_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
 print(
-    f"evaluation set: {len(SPEC_EVAL)} held-out images · {SPECIALISED['task']} · the foreground covers "
-    f"{fg_share:.0%} of the evaluation region · DINOv3 features at {SPECIALISED['feat_side']} px long side"
+    f"evaluation set: {len(spec_eval)} held-out images · {specialised['task']} · the foreground covers "
+    f"{fg_share:.0%} of the evaluation region · DINOv3 features at {specialised['feat_side']} px long side"
 )
 
 # %% [markdown]
@@ -150,9 +150,9 @@ print(
 
 # %%
 # @title Meet the retina images: vessels next to the DINOv3 patch grid { display-mode: "form" }
-peek = SPEC_EVAL[0]
+peek = spec_eval[0]
 ph, pw = peek["mask"].shape
-patch_px = 16 * max(ph, pw) / SPECIALISED["feat_side"]  # one DINOv3 patch, in image pixels
+patch_px = 16 * max(ph, pw) / specialised["feat_side"]  # one DINOv3 patch, in image pixels
 centre_line = skeleton(peek["mask"] & region(peek))
 vessel_px = float(peek["mask"].sum() / max(centre_line.sum(), 1))  # area ÷ centre-line length = mean width
 win = int(min(8 * patch_px, ph, pw))  # the zoom window: about 8 × 8 patches
@@ -202,9 +202,9 @@ print(
 # @title Helper: SAM with one click and one box on a retina image { display-mode: "form" }
 def pick_demo(index: int) -> dict:
     """The held-out retina image with this index; a plain message when the index does not exist."""
-    if not isinstance(index, int) or not 0 <= index < len(SPEC_EVAL):
-        raise SystemExit(f"IMAGE must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
-    return SPEC_EVAL[index]
+    if not isinstance(index, int) or not 0 <= index < len(spec_eval):
+        raise SystemExit(f"IMAGE must be a whole number from 0 to {len(spec_eval) - 1}.")
+    return spec_eval[index]
 
 
 def click_and_box(item: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -264,7 +264,7 @@ sam_point, sam_box = click_and_box(demo)
 
 # %%
 # @title Q7 — Try it: make SAM mark only the vessels { display-mode: "form" }
-sam_playground(SPEC_EVAL, "Retina: try to get only the vessels")
+sam_playground(spec_eval, "Retina: try to get only the vessels")
 
 # %% [markdown]
 # ### 2.2 A second number for thin structures: clDice
@@ -471,7 +471,7 @@ ladder_cover = {name: [] for name in LADDER}
 ladder_demo = {}  # the demo image's masks and clicks, for the figure below
 sam_box_masks = []  # every image's box mask, for the gallery in 2.6
 everything = []
-for it in tqdm(SPEC_EVAL, desc="SAM prompt ladder"):
+for it in tqdm(spec_eval, desc="SAM prompt ladder"):
     r = region(it)
     for name, n in LADDER.items():
         pts = scribble_points(it, n) if n else None
@@ -497,7 +497,7 @@ RESULTS["specialised_zero_shot_box_iou"] = ladder_mean["box"]["iou"]
 RESULTS["specialised_everything_iou"] = everything_mean["iou"]
 RESULTS["specialised_zero_shot_seconds"] = spec_sec
 
-print(f"SAM prompt ladder on {len(SPEC_EVAL)} held-out images · {spec_sec} s on {DEVICE}")
+print(f"SAM prompt ladder on {len(spec_eval)} held-out images · {spec_sec} s on {DEVICE}")
 print(f"{'setting':<12}{'IoU':>7}{'clDice':>8}{'marked':>8}")
 for name, v in ladder_mean.items():
     print(f"{name:<12}{v['iou']:>7.3f}{v['cldice']:>8.3f}{np.mean(ladder_cover[name]):>8.0%}")
@@ -562,10 +562,10 @@ show_clicks(
 
 # %%
 # @title DINOv3 PCA colours on three retina images { display-mode: "form" }
-fig_items = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:3]]
+fig_items = [load_item(specialised, it) for it in specialised["fit"][:3]]
 panels = []
 for it in fig_items:
-    feat = features_for(SPECIALISED, it, SPECIALISED["feat_side"])
+    feat = features_for(specialised, it, specialised["feat_side"])
     title = f"DINOv3 PCA · {feat.shape[2]}×{feat.shape[1]} patches"
     panels += [(it["name"], it["image"]), (title, pca_rgb(feat, it["image"].shape[:2]))]
 show_masks(panels, width=2.6)
@@ -607,9 +607,9 @@ show_masks(panels, width=2.6)
 
 # %%
 # @title Helper: train one head per resolution, or load ours { display-mode: "form" }
-N_TRAIN_SPEC, HEAD_STEPS = 5, 30 if SMOKE else 200
-SIDES = SPECIALISED["feature_long_sides"]  # [512, 1024]: the two resolutions we compare
-SIDES = [side // 4 for side in SIDES] if SMOKE else SIDES  # smoke thumbnails are 256 px
+N_TRAIN_SPEC = 5
+sides = specialised["feature_long_sides"]  # [512, 1024]: the two resolutions we compare
+sides = [side // 4 for side in sides] if SMOKE else sides  # smoke thumbnails are 256 px
 
 
 def fit_spec_heads(train_yourself: bool) -> tuple[list[dict], dict]:
@@ -618,22 +618,22 @@ def fit_spec_heads(train_yourself: bool) -> tuple[list[dict], dict]:
     The border is labelled -1, so the loss skips it. Returns the fit images and {long side: (head, seconds)}.
     """
     if not isinstance(train_yourself, bool):
-        raise SystemExit("TRAIN_YOURSELF must be True or False.")
-    items = [load_item(SPECIALISED, it) for it in SPECIALISED["fit"][:N_TRAIN_SPEC]]
+        raise SystemExit("TRAIN_SPEC_HEADS must be True or False.")
+    items = [load_item(specialised, it) for it in specialised["fit"][:N_TRAIN_SPEC]]
     heads = {}
-    for side in SIDES:
+    for side in sides:
         if train_yourself:
-            feats = [features_for(SPECIALISED, it, side) for it in items]
+            feats = [features_for(specialised, it, side) for it in items]
             labels = [np.where(region(it), it["mask"], -1).astype(np.int8) for it in items]
             heads[side] = train_head(feats, labels, HEAD_STEPS)
             src = f"trained here on {len(items)} images, {HEAD_STEPS} steps"
         else:
-            tensors, entry = load_head(SPECIALISED, "full", side)
+            tensors, entry = load_head(specialised, "full", side)
             heads[side] = (tensors, entry["train_sec"])
             src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
         print(f"linear head @ {side} px · {src} · {heads[side][1]:.1f} s on {DEVICE}")
     if sum(sec for _, sec in heads.values()) > 60:
-        print("ℹ️ Slow session? Untick TRAIN_YOURSELF above to load our checkpoints next time.")
+        print("ℹ️ Slow session? Untick TRAIN_SPEC_HEADS above to load our checkpoints next time.")
     return items, heads
 
 
@@ -646,13 +646,13 @@ def fit_spec_heads(train_yourself: bool) -> tuple[list[dict], dict]:
 
 # %% [markdown]
 # This cell trains one head per resolution on the five fit images and prints the seconds it took; if it is
-# slow, untick `TRAIN_YOURSELF` and run it again to load our checkpoints (trained the same way on all fit
+# slow, untick `TRAIN_SPEC_HEADS` and run it again to load our checkpoints (trained the same way on all fit
 # images).
 
 # %%
 # @title Train the two heads here (or load ours) { display-mode: "form" }
-TRAIN_YOURSELF = True  # @param {type:"boolean"}
-spec_train, spec_heads = fit_spec_heads(TRAIN_YOURSELF)
+TRAIN_SPEC_HEADS = True  # @param {type:"boolean"}
+spec_train, spec_heads = fit_spec_heads(TRAIN_SPEC_HEADS)
 
 # %% [markdown]
 # This cell scores both heads on the evaluation images with IoU and clDice and zooms into the centre of the
@@ -664,11 +664,11 @@ t0 = time.monotonic()
 head_preds, res_scores = {}, {}
 for side, (tensors, _) in spec_heads.items():
     head_preds[side] = [
-        predict_head(tensors, features_for(SPECIALISED, it, side), it["mask"].shape)
-        for it in tqdm(SPEC_EVAL, desc=f"head @ {side} px")
+        predict_head(tensors, features_for(specialised, it, side), it["mask"].shape)
+        for it in tqdm(spec_eval, desc=f"head @ {side} px")
     ]
-    res_scores[side] = mean_scores([score(p, it) for p, it in zip(head_preds[side], SPEC_EVAL, strict=True)])
-lo, hi = min(SIDES), max(SIDES)
+    res_scores[side] = mean_scores([score(p, it) for p, it in zip(head_preds[side], spec_eval, strict=True)])
+lo, hi = min(sides), max(sides)
 RESULTS["specialised_head_iou"] = res_scores[hi]["iou"]
 RESULTS["specialised_head"] = {
     "iou": res_scores[hi]["iou"],
@@ -683,7 +683,7 @@ for side, v in res_scores.items():
     print(f"linear head @ {side:>4} px · mean IoU {v['iou']:.3f} · clDice {v['cldice']:.3f}")
 print(f"SAM one box · mean IoU {ladder_mean['box']['iou']:.3f} · clDice {ladder_mean['box']['cldice']:.3f}")
 
-k = next(i for i, it in enumerate(SPEC_EVAL) if it is demo)
+k = next(i for i, it in enumerate(spec_eval) if it is demo)
 h, w = demo["mask"].shape
 zoom = (slice(h // 4, 3 * h // 4), slice(w // 4, 3 * w // 4))  # the central quarter
 show_masks(
@@ -692,7 +692,7 @@ show_masks(
             pred_title(f"linear head on DINOv3\nfeatures @ {s} px (centre zoom)", head_preds[s][k], demo),
             overlay(demo["image"], head_preds[s][k], THEME["fails"])[zoom],
         )
-        for s in SIDES
+        for s in sides
     ]
     + [("ground truth (centre zoom)", overlay(demo["image"], demo["mask"], THEME["truth"])[zoom])],
     width=3.0,
@@ -719,10 +719,14 @@ print(f"{'everything is foreground':<32}{'':>10}{RESULTS['specialised_everything
 x = np.arange(len(rows))
 fig, ax = plt.subplots(figsize=(6.4, 3.2))
 ax.bar(
-    x - 0.2, [v[0] for v in rows.values()], 0.4, color=THEME["works"], label=f"{PETS['name']} (easy task)"
+    x - 0.2,
+    [v[0] for v in rows.values()],
+    0.4,
+    color=THEME["works"],
+    label=f"{pets_task['name']} (easy task)",
 )
 ax.bar(x + 0.2, [v[1] for v in rows.values()], 0.4, color=THEME["fails"],
-       label=f"{SPECIALISED['name']} (specialised task)")
+       label=f"{specialised['name']} (specialised task)")
 ax.axhline(RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--",
            label='vessels, "everything is foreground"')
 ax.set_xticks(x, list(rows), fontsize=8)
@@ -761,7 +765,7 @@ plt.show()
 # @title Helper: the failure gallery, worst images first { display-mode: "form" }
 def gallery_row(label: str, k: int, scores: list[dict]) -> None:
     """One row for evaluation image k: the photo, SAM with a box, the head, and the ground truth."""
-    it, sam_s, head_s = SPEC_EVAL[k], ladder_scores["box"][k], scores[k]
+    it, sam_s, head_s = spec_eval[k], ladder_scores["box"][k], scores[k]
     show_masks(
         [
             (f"{label}{it['name']}", it["image"]),
@@ -784,9 +788,9 @@ def gallery_row(label: str, k: int, scores: list[dict]) -> None:
 
 def show_gallery(start: int) -> tuple[list[dict], np.ndarray]:
     """Draw the three images from rank `start` (0 = worst). Returns every head score and the ranking."""
-    if not isinstance(start, int) or not 0 <= start < len(SPEC_EVAL):
-        raise SystemExit(f"GALLERY_START must be a whole number from 0 to {len(SPEC_EVAL) - 1}.")
-    scores = [score(p, it) for p, it in zip(head_preds[hi], SPEC_EVAL, strict=True)]
+    if not isinstance(start, int) or not 0 <= start < len(spec_eval):
+        raise SystemExit(f"GALLERY_START must be a whole number from 0 to {len(spec_eval) - 1}.")
+    scores = [score(p, it) for p, it in zip(head_preds[hi], spec_eval, strict=True)]
     ranking = np.argsort([s["iou"] for s in scores])
     for k in ranking[start : start + 3]:
         gallery_row("", int(k), scores)
@@ -869,8 +873,8 @@ for label, k in (("typical (median)", order[len(order) // 2]), ("best", order[-1
 # %%
 # @title The failure gallery on the whole fundus { display-mode: "form" }
 # the whole fundus of the demo image, shrunk so its long side is 1024 px (smoke: 256 px)
-meta = next(m for m in SPECIALISED["eval"] if m["name"] == demo["name"])
-root = SPECIALISED["dir"]
+meta = next(m for m in specialised["eval"] if m["name"] == demo["name"])
+root = specialised["dir"]
 full = {
     "image": np.array(Image.open(root / meta["full"]["image"]).convert("RGB")),
     "mask": read_png(root / meta["full"]["mask"]) > 127,

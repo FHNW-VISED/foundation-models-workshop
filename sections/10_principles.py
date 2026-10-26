@@ -19,8 +19,8 @@
 
 # %%
 # @title The story in one picture { display-mode: "form" }
-TABLE = {r["approach"]: r for r in RESULTS["comparison_table"]}  # section 8's rows, by short name
-EVERYTHING = RESULTS["specialised_everything_iou"]
+table = {r["approach"]: r for r in RESULTS["comparison_table"]}  # section 8's rows, by short name
+everything_iou = RESULTS["specialised_everything_iou"]
 PATHS = {  # the rows of section 8, grouped the way the notebook introduced them
     "ladder (section 4)": ("one_shot", "one_shot_sam", "scribbles"),
     "path 1 (section 5)": ("naive", "masked", "pu"),
@@ -29,19 +29,19 @@ PATHS = {  # the rows of section 8, grouped the way the notebook introduced them
 }
 story = [("pets · one box (section 1)", RESULTS["pets_zero_shot_iou"], THEME["works"])]
 story.append(
-    (f"{SPECIALISED['name']} · one box (section 2)", TABLE["zero_shot"]["iou"], APPROACH_COLOURS["zero_shot"])
+    (f"{specialised['name']} · one box (section 2)", table["zero_shot"]["iou"], approach_colours["zero_shot"])
 )
 for path, keys in PATHS.items():
-    best = max(keys, key=lambda k: TABLE[k]["iou"])
-    story.append((f"best of {path}: {best}", TABLE[best]["iou"], APPROACH_COLOURS[best]))
-story.append(("complete masks (section 2)", TABLE["full_masks"]["iou"], APPROACH_COLOURS["full_masks"]))
+    best = max(keys, key=lambda k: table[k]["iou"])
+    story.append((f"best of {path}: {best}", table[best]["iou"], approach_colours[best]))
+story.append(("complete masks (section 2)", table["full_masks"]["iou"], approach_colours["full_masks"]))
 
 fig, ax = plt.subplots(figsize=(8, 3.4))
 labels, values, colours = zip(*story[::-1], strict=True)
 ax.barh(labels, values, color=colours)
 for y, v in enumerate(values):
     ax.text(v + 0.01, y, f"{v:.2f}", va="center", fontsize=8, color="#311B92")
-ax.axvline(EVERYTHING, color=THEME["background"], ls="--", label='IoU of "everything" (specialised task)')
+ax.axvline(everything_iou, color=THEME["background"], ls="--", label='IoU of "everything" (specialised task)')
 ax.set_xlim(0, 1.08)
 ax.set_xlabel("mean IoU on the held-out images")
 ax.set_title("Where it worked, where it fell short, how far each path got back")
@@ -66,10 +66,10 @@ def p_check_first() -> str:
     pets, spec = RESULTS["pets_zero_shot_iou"], RESULTS["specialised_zero_shot_iou"]
     rule = "Test the foundation model on your own task first, and read its score against marking everything."
     fact = (
-        f"One box scored IoU {pets:.2f} on pets and {spec:.2f} on {SPECIALISED['name']}, where a mask over "
-        f"the whole image scores {EVERYTHING:.2f}."
+        f"One box scored IoU {pets:.2f} on pets and {spec:.2f} on {specialised['name']}, where a mask over "
+        f"the whole image scores {everything_iou:.2f}."
     )
-    if spec < EVERYTHING + 0.1:
+    if spec < everything_iou + 0.1:
         return f"{rule} {fact} Out of the box it was close to doing nothing useful here."
     return f"{rule} {fact} It did part of the job out of the box; adapt only if the rest matters."
 
@@ -78,7 +78,7 @@ def p_resolution() -> str:
     """Section 2: the patch is 16 px; does a larger input help?"""
     res = sorted((int(k.split()[0]), v) for k, v in RESULTS["resolution_effect"].items())
     (lo, a), (hi, b) = res[0], res[-1]
-    if SPECIALISED.get("thin_structures"):
+    if specialised.get("thin_structures"):
         rule = "Thin structures defeat patch features: check the resolution first."
     else:
         rule = "Check the resolution first: a patch feature describes a 16 px block, not a pixel."
@@ -102,7 +102,7 @@ def p_missing_is_unknown() -> str:
     )
     if masked <= naive:
         return f"{rule} {fact} Here ignoring the gaps did not recover more; check what the strokes cover."
-    pn, pm = TABLE["naive"]["precision"], TABLE["masked"]["precision"]
+    pn, pm = table["naive"]["precision"], table["masked"]["precision"]
     if pm < pn:
         return f"{rule} {fact} The price was precision ({pn:.2f} → {pm:.2f}): fewer misses, more alarms."
     return f"{rule} {fact} And it kept its precision ({pn:.2f} → {pm:.2f})."
@@ -111,13 +111,13 @@ def p_missing_is_unknown() -> str:
 def p_cheapest_baseline() -> str:
     """Section 7: compare SAM with the hints alone."""
     alone = RESULTS["sam_direct_strokes_alone"]
-    sam_rows = [k for k in ("zero_shot", "one_shot_sam", "sam_clicks", "sam_boxes") if k in TABLE]
-    best = max(sam_rows, key=lambda k: TABLE[k]["iou"])
-    gain = TABLE[best]["iou"] - alone["iou"]
+    sam_rows = [k for k in ("zero_shot", "one_shot_sam", "sam_clicks", "sam_boxes") if k in table]
+    best = max(sam_rows, key=lambda k: table[k]["iou"])
+    gain = table[best]["iou"] - alone["iou"]
     rule = "Compare the foundation model with the cheapest baseline built from the same hints."
     fact = (
         f"The strokes thickened by {alone['thicken_px']} px, no model at all, scored IoU {alone['iou']:.2f}; "
-        f"the best SAM recipe, {best}, scored {TABLE[best]['iou']:.2f}."
+        f"the best SAM recipe, {best}, scored {table[best]['iou']:.2f}."
     )
     if gain <= 0:
         return f"{rule} {fact} The model added nothing the strokes did not already say."
@@ -146,7 +146,7 @@ def p_one_number() -> str:
 
 def p_minutes_before_hours() -> str:
     """Section 8: annotation effort, once and per new image."""
-    full = TABLE["full_masks"]
+    full = table["full_masks"]
     cheap_rows = [r for r in RESULTS["comparison_table"] if r["effort_min"] < full["effort_min"] / 10]
     cheap = max(cheap_rows or RESULTS["comparison_table"], key=lambda r: r["iou"])
     per_image = max(RESULTS["comparison_table"], key=lambda r: r["effort_min_per_new_image"])
@@ -167,7 +167,7 @@ def p_minutes_before_hours() -> str:
     return f"{rule} {fact} {verdict} {scale}"
 
 
-PRINCIPLES = [
+principles = [
     p_check_first(),
     p_resolution(),
     p_missing_is_unknown(),
@@ -175,15 +175,15 @@ PRINCIPLES = [
     p_one_number(),
     p_minutes_before_hours(),
 ]
-RESULTS["principles"] = PRINCIPLES
-headline = f"Principles from this session ({SPECIALISED['name']}, {len(SPEC_EVAL)} held-out images, {DEVICE})"
+RESULTS["principles"] = principles
+headline = f"Principles from this session ({specialised['name']}, {len(spec_eval)} held-out images, {DEVICE})"
 try:
     from html import escape
 
     from IPython.display import HTML, display
 
     cards = ""
-    for n, text in enumerate(PRINCIPLES, start=1):
+    for n, text in enumerate(principles, start=1):
         rule, _, evidence = text.partition(". ")  # the rule is the first sentence, the rest is the evidence
         cards += (
             f'<div style="flex:1 1 300px;background:#EDE7F6;border-left:6px solid {THEME["works"]};'
@@ -199,7 +199,7 @@ try:
     )
 except ImportError:  # no IPython: plain text
     print(headline + ":\n")
-    for n, text in enumerate(PRINCIPLES, start=1):
+    for n, text in enumerate(principles, start=1):
         print(textwrap.fill(text, width=100, initial_indent=f"{n}. ", subsequent_indent="   "), end="\n\n")
 
 # %% [markdown]
@@ -210,14 +210,14 @@ except ImportError:  # no IPython: plain text
 # @title show_my_plan: print your problem, your first step and the principle { display-mode: "form" }
 def show_my_plan(problem: str, principle: int, first_step: str) -> None:
     """Print the problem and the first step, and the principle (1 to 6) they rest on. Checks nothing."""
-    if not isinstance(principle, int) or not 0 <= principle <= len(PRINCIPLES):
-        raise SystemExit(f"MY_PRINCIPLE must be a whole number from 0 to {len(PRINCIPLES)}.")
+    if not isinstance(principle, int) or not 0 <= principle <= len(principles):
+        raise SystemExit(f"MY_PRINCIPLE must be a whole number from 0 to {len(principles)}.")
     if not (isinstance(problem, str) and isinstance(first_step, str)):
         raise SystemExit('MY_PROBLEM and MY_FIRST_STEP must be text in quotes, e.g. "my problem".')
     if problem or first_step:
         print(f"problem: {problem or '(not written)'}\nfirst step: {first_step or '(not written)'}")
         if principle:
-            print(textwrap.fill(PRINCIPLES[principle - 1], width=100, initial_indent="because: "))
+            print(textwrap.fill(principles[principle - 1], width=100, initial_indent="because: "))
     else:
         print("nothing written; fine. Keep the question for the train home: what would you measure first?")
 
@@ -310,15 +310,15 @@ show_my_plan(MY_PROBLEM, MY_PRINCIPLE, MY_FIRST_STEP)
 
 # %%
 # @title Credits: models and datasets of this session { display-mode: "form" }
-cfg = SPECIALISED
+cfg = specialised
 print(f"DINOv3 ViT-S/16 · {DINO_SOURCE} · {DINO_LICENCE}")
 print(f"SAM 2.1 hiera-small · {SAM_ID} · {SAM_LICENCE}")
-print(f"{PETS['name']} · {PETS['licence']}")
+print(f"{pets_task['name']} · {pets_task['licence']}")
 print(f"{cfg['name']} · {cfg['licence']} ({cfg['licence_url']})")
 print(textwrap.fill(cfg["citation"], width=100, initial_indent="  ", subsequent_indent="  "))
 RESULTS["credits"] = {
     "models": {DINO_SOURCE: DINO_LICENCE, SAM_ID: SAM_LICENCE},
-    "datasets": {PETS["name"]: PETS["licence"], SPECIALISED["name"]: SPECIALISED["licence"]},
+    "datasets": {pets_task["name"]: pets_task["licence"], specialised["name"]: specialised["licence"]},
 }
 
 # %% [markdown]

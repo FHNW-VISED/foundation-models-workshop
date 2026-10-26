@@ -208,13 +208,13 @@ def use(fn, reference, check=None, name: str | None = None):
 
 if not SPECIALISED_JSON.is_file():
     raise SystemExit(f"{SPECIALISED_JSON} is missing. Run setup_check.ipynb first, then run this cell again.")
-SPECIALISED: dict = json.loads(SPECIALISED_JSON.read_text())  # the specialised task; never hard-coded
-SPECIALISED["dir"] = DATA_DIR / "specialised"
-PETS: dict = {"key": "pets", "name": "Oxford-IIIT Pet", "task": "pet vs background"}
-PETS |= {"licence": "CC BY-SA 4.0", "dir": DATA_DIR / "pets"}
+specialised: dict = json.loads(SPECIALISED_JSON.read_text())  # the specialised task; never hard-coded
+specialised["dir"] = DATA_DIR / "specialised"
+pets_task: dict = {"key": "pets", "name": "Oxford-IIIT Pet", "task": "pet vs background"}
+pets_task |= {"licence": "CC BY-SA 4.0", "dir": DATA_DIR / "pets"}
 
 print(f"Colab: {IN_COLAB} · smoke mode: {SMOKE} · device: {DEVICE} · seed: {SEED}")
-print(f"cache: {CACHE_DIR} · specialised task: {SPECIALISED['name']} ({SPECIALISED['task']})")
+print(f"cache: {CACHE_DIR} · specialised task: {specialised['name']} ({specialised['task']})")
 
 # %% [markdown]
 # <!-- callout: theory | Theory: how use() works -->
@@ -341,7 +341,7 @@ def load_index(dataset: dict) -> dict:
 
 # %%
 # @title Load both datasets and show two examples of each { display-mode: "form" }
-for ds in (PETS, SPECIALISED):
+for ds in (pets_task, specialised):
     idx = load_index(ds)
     print(
         f"{ds['name']}: {len(ds['items'])} images ({len(ds['fit'])} fit, {len(ds['held'])} held-out) · "
@@ -351,12 +351,12 @@ PRECOMPUTED_HEADS = json.loads((PRECOMPUTED / "heads" / "index.json").read_text(
 print(f"precomputed: {len(PRECOMPUTED_HEADS)} head checkpoints in {PRECOMPUTED}")
 
 fig, axes = plt.subplots(2, 4, figsize=(12, 6.4))
-for k, ds in enumerate((PETS, SPECIALISED)):
+for k, ds in enumerate((pets_task, specialised)):
     for j, item in enumerate(ds["fit"][:2]):
         it = load_item(ds, item)
         axes[k, 2 * j].imshow(it["image"])
         axes[k, 2 * j].set_title(f"{ds['name']}: {it['name']}")
-        not_scored = ~region(it) if ds is PETS else None  # the pets' "not sure" band
+        not_scored = ~region(it) if ds is pets_task else None  # the pets' "not sure" band
         axes[k, 2 * j + 1].imshow(overlay(it["image"], it["mask"], unscored=not_scored))
         axes[k, 2 * j + 1].set_title(f"ground truth · {it['mask'].mean():.0%} of the pixels")
 for ax in axes.ravel():
@@ -499,6 +499,7 @@ from IPython.display import HTML, JSON, display
 
 PLAY_PX = 560  # long side of the playground image on screen
 SAM3_ID = "facebook/sam3"
+HEAD_STEPS = 30 if SMOKE else 200  # training steps for every linear head in the notebook
 _SAM3: dict = {}  # SAM 3 is loaded on the first text request and kept here
 
 
@@ -730,7 +731,8 @@ drag = box.</div></div>
 # - "Google Drive is not mounted" or "... is missing" → run the setup cell again and click Allow; if the
 #   folder is still missing, run `setup_check.ipynb` first.
 # - "No GPU in this session" → Runtime → Change runtime type → T4 GPU, then run the setup cell again.
-# - A cell is slow on a CPU → normal; training cells have `TRAIN_YOURSELF = False` to load our checkpoint.
+# - A cell is slow on a CPU → normal; each training cell has its own `TRAIN_…` box: untick it to load our
+#   checkpoint.
 # - A cell with a `...` stub → fill it or skip it; `use()` picks yours or ours and the notebook goes on.
 
 # %% [markdown]
@@ -742,7 +744,7 @@ drag = box.</div></div>
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway -->
-# - When a cell needs data → `PETS` and `SPECIALISED` are loaded from the cache, with ground truth for
+# - When a cell needs data → `pets_task` and `specialised` are loaded from the cache, with ground truth for
 #   evaluation only.
 # - When a cell needs a model → `dino` and `sam` are already loaded, nothing is downloaded.
 # - When you skip or fail a `...` stub → `use()` continues with our version, nothing breaks.

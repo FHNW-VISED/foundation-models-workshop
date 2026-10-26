@@ -41,11 +41,11 @@
 # @title Path 3 helpers: colours, strokes, SAM on many prompts, recipes, try-it runs { display-mode: "form" }
 from matplotlib.patches import Rectangle
 
-APPROACH_COLOURS |= {
+approach_colours |= {
     "sam_clicks": "#546E7A",
     "sam_boxes": "#880E4F",
 }
-APPROACH_NAMES |= {
+approach_names |= {
     "sam_clicks": "direct: SAM from stroke clicks",
     "sam_boxes": "direct: SAM, one box + click per stroke",
 }
@@ -140,7 +140,7 @@ def try_clicks(n_clicks: int) -> None:
     of 20. Stores the numbers in RESULTS["sam_direct_clicks_try"]."""
     if not isinstance(n_clicks, int) or n_clicks < 1:
         raise SystemExit("N_CLICKS_TRY must be a whole number of at least 1.")
-    preds, _ = direct_clicks(SPEC_EVAL, n_clicks)
+    preds, _ = direct_clicks(spec_eval, n_clicks)
     RESULTS["sam_direct_clicks_try"] = rung_report(preds) | {"n_clicks": n_clicks}
     print_path2(
         {
@@ -157,7 +157,7 @@ def try_boxes(box_pad: int, with_click: bool) -> None:
     if not isinstance(box_pad, int) or box_pad < 0 or not isinstance(with_click, bool):
         raise SystemExit("BOX_PAD_TRY must be a whole number ≥ 0 and WITH_CLICK_TRY True or False.")
     pad = max(box_pad // 4, 0) if SMOKE else box_pad  # smoke thumbnails are 4× smaller
-    preds, _ = direct_boxes(SPEC_EVAL, pad, with_click)
+    preds, _ = direct_boxes(spec_eval, pad, with_click)
     RESULTS["sam_direct_boxes_try"] = rung_report(preds) | {"pad": box_pad, "with_click": with_click}
     print_path2(
         {
@@ -184,11 +184,11 @@ def try_boxes(box_pad: int, with_click: bool) -> None:
 N_DIRECT_CLICKS = 20  # clicks per kind (vessel / background) and image, taken from the strokes
 t0 = time.monotonic()
 path3_preds = {"zero_shot": ladder_preds["zero_shot"], "scribbles": ladder_preds["scribbles"]}
-path3_preds["sam_clicks"], click_prompts = direct_clicks(SPEC_EVAL, N_DIRECT_CLICKS)
+path3_preds["sam_clicks"], click_prompts = direct_clicks(spec_eval, N_DIRECT_CLICKS)
 clicks_sec = round(time.monotonic() - t0, 1)
 path3_report = {k: rung_report(v) for k, v in path3_preds.items()}
 print(
-    f"SAM from {N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} stroke clicks on {len(SPEC_EVAL)} images · "
+    f"SAM from {N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} stroke clicks on {len(spec_eval)} images · "
     f"{clicks_sec} s on {DEVICE}"
 )
 print_path2({"sam_clicks": path3_report["sam_clicks"]})
@@ -275,10 +275,10 @@ def stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
 BOX_PAD = 1 if SMOKE else 4  # px around each stroke (smoke thumbnails are 4× smaller)
 THICKEN = 1 if SMOKE else 3  # px: the "no model" reference, the vessel strokes thickened
 t0 = time.monotonic()
-path3_preds["sam_boxes"], box_prompts = direct_boxes(SPEC_EVAL, BOX_PAD, with_click=True)
+path3_preds["sam_boxes"], box_prompts = direct_boxes(spec_eval, BOX_PAD, with_click=True)
 boxes_sec = round(time.monotonic() - t0, 1)
 path3_report["sam_boxes"] = rung_report(path3_preds["sam_boxes"])
-strokes_alone = [ndi.binary_dilation(it["scribbles"] == 1, iterations=THICKEN) for it in SPEC_EVAL]
+strokes_alone = [ndi.binary_dilation(it["scribbles"] == 1, iterations=THICKEN) for it in spec_eval]
 strokes_report = rung_report(strokes_alone)
 n_boxes = [len(b) for b, _ in box_prompts]
 print(
@@ -306,7 +306,7 @@ show_boxes(
 
 # %%
 # @title Box recipe: worst, typical and best evaluation image { display-mode: "form" }
-box_iou = [score(p, it)["iou"] for p, it in zip(path3_preds["sam_boxes"], SPEC_EVAL, strict=True)]
+box_iou = [score(p, it)["iou"] for p, it in zip(path3_preds["sam_boxes"], spec_eval, strict=True)]
 rank_box = np.argsort(box_iou)
 mid_box = rank_box[len(rank_box) // 2]
 box_picks = [("worst", rank_box[0]), ("typical (median)", mid_box), ("best", rank_box[-1])]
@@ -314,7 +314,7 @@ show_masks(
     [
         (
             f"{label} · IoU {box_iou[k]:.2f}",
-            error_map(SPEC_EVAL[k]["image"], path3_preds["sam_boxes"][k], SPEC_EVAL[k]),
+            error_map(spec_eval[k]["image"], path3_preds["sam_boxes"][k], spec_eval[k]),
         )
         for label, k in box_picks
     ],
@@ -362,7 +362,7 @@ try_boxes(BOX_PAD_TRY, WITH_CLICK_TRY)
 # @title Path 3 side by side: table, annotation cost, bars and error maps { display-mode: "form" }
 path3_preds["sam_pseudo"] = path2_preds["sam_pseudo"]
 path3_report["sam_pseudo"] = path2_report["sam_pseudo"]
-eval_meta = SPECIALISED["eval"]
+eval_meta = specialised["eval"]
 strokes_per_image = {
     "sam_clicks": float(np.mean([m.get("n_fg_strokes", 0) + m.get("n_bg_strokes", 0) for m in eval_meta])),
     "sam_boxes": float(np.mean([m.get("n_fg_strokes", 0) for m in eval_meta])),  # vessel strokes only
@@ -371,12 +371,12 @@ effort = {k: effort_minutes(n_strokes=round(v * len(eval_meta))) for k, v in str
 sec = {"sam_clicks": clicks_sec, "sam_boxes": boxes_sec}
 result_key = {"sam_clicks": "sam_direct_clicks", "sam_boxes": "sam_direct_boxes"}
 for k in ("sam_clicks", "sam_boxes"):
-    per_image = [score(p, it)["iou"] for p, it in zip(path3_preds[k], SPEC_EVAL, strict=True)]
+    per_image = [score(p, it)["iou"] for p, it in zip(path3_preds[k], spec_eval, strict=True)]
     RESULTS[result_key[k]] = path3_report[k] | {
         "iou_std": float(np.std(per_image)),
         "train_sec": 0.0,
         "infer_sec": sec[k],
-        "n_images": len(SPEC_EVAL),
+        "n_images": len(spec_eval),
         "strokes_per_image": strokes_per_image[k],
         "effort_min_per_image": round(effort_minutes(n_strokes=1) * strokes_per_image[k], 2),
         "effort_min": round(effort[k], 2),
@@ -400,8 +400,8 @@ print(
 )
 for k in ("sam_clicks", "sam_boxes"):
     print(
-        f"annotation · {APPROACH_NAMES[k]}: ≈ {RESULTS[result_key[k]]['effort_min_per_image']:.1f} min on "
-        f"every image you segment ({effort[k]:.0f} min for these {len(SPEC_EVAL)})"
+        f"annotation · {approach_names[k]}: ≈ {RESULTS[result_key[k]]['effort_min_per_image']:.1f} min on "
+        f"every image you segment ({effort[k]:.0f} min for these {len(spec_eval)})"
     )
 metrics = ["iou", "cldice", "recall", "precision"]
 x, width = np.arange(len(metrics)), 0.8 / len(order)
@@ -412,8 +412,8 @@ for n, k in enumerate(order):
         x + shift,
         [path3_report[k][m] for m in metrics],
         width,
-        color=APPROACH_COLOURS[k],
-        label=APPROACH_NAMES[k],
+        color=approach_colours[k],
+        label=approach_names[k],
     )
 ax.axhline(
     RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--", label='IoU of "everything"'
@@ -427,7 +427,7 @@ plt.show()
 show_masks(
     [
         (
-            f"{APPROACH_NAMES[k].split(':')[-1].strip()} · "
+            f"{approach_names[k].split(':')[-1].strip()} · "
             f"IoU {score(path3_preds[k][k_demo], demo)['iou']:.2f}",
             error_map(demo["image"], path3_preds[k][k_demo], demo),
         )
@@ -464,7 +464,7 @@ show_masks(
 # %%
 # @title Q31 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache) { display-mode: "form" }
 SAM3_TEXT = "blood vessel"  # @param ["blood vessel", "vessel", "red line", "optic disc"] {allow-input: true}
-SAM3_ID, SAM3_LICENCE = "facebook/sam3", "SAM License (Meta)"
+SAM3_LICENCE = "SAM License (Meta)"
 if not isinstance(SAM3_TEXT, str) or not SAM3_TEXT.strip():
     raise SystemExit('SAM3_TEXT must be a short phrase in quotes, e.g. "blood vessel".')
 RESULTS["sam3_text_iou"] = None
@@ -481,7 +481,7 @@ else:
 if sam3 is not None:
     try:
         t0, sam3_preds = time.monotonic(), []
-        for it in tqdm(SPEC_EVAL, desc="SAM 3, one phrase", leave=False):
+        for it in tqdm(spec_eval, desc="SAM 3, one phrase", leave=False):
             inputs = sam3_proc(images=it["image"], text=SAM3_TEXT.strip(), return_tensors="pt").to(DEVICE)
             inputs["pixel_values"] = inputs["pixel_values"].to(sam3_dtype)
             with torch.no_grad():
@@ -538,7 +538,7 @@ if sam3 is not None:
 # %%
 # @title Q32 — 🔴 Ask SAM 3 with a word, or click { display-mode: "form" }
 sam_playground(
-    SPEC_EVAL + PETS_EVAL[:3],
+    spec_eval + pets_eval[:3],
     "Ask SAM 3 with a word, or click",
     text_prompt=True,
     default_text="blood vessel",

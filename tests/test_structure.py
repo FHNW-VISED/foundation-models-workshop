@@ -23,3 +23,36 @@ def test_forward_question_reference_is_found():
     assert forward_question_refs("**Q9.** 🟢 Run it; Q9 asks for the count.", next_q=9) == []
     assert forward_question_refs("Worked answer (Q24): which check finds which kind", next_q=25) == []
     assert forward_question_refs("QA and Q-learning are not questions.", next_q=1) == []
+
+
+def test_settings_rule_n058(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import lint_notebook
+
+    def section(name: str, *cells: str) -> Path:
+        path = tmp_path / name
+        path.write_text("".join(f"# %%\n{c}\n\n" for c in cells))
+        return path
+
+    files = [
+        section(
+            "01_a.py",
+            "THRESHOLD = 8\nRESULTS = {}\nRESULTS['n'] = 1\n"
+            "if THRESHOLD > 4:\n    MODE = 'a'\nelse:\n    MODE = 'b'",
+            "TABLE = load_table(THRESHOLD)",
+            "CONFIG = {'a': 1}\nCONFIG['b'] = 2",
+            "# ✏️ YOUR TURN\nCLASS_TO_SHOW = 'dog'",
+            "FLAG = True  # @param {type:'boolean'}\nSTEPS = 30",
+        ),
+        section("02_b.py", "THRESHOLD = 9", "print(CLASS_TO_SHOW, STEPS)"),
+    ]
+    lint_notebook.problems.clear()
+    lint_notebook.check_settings(files)
+    found = "\n".join(lint_notebook.problems)
+    assert "TABLE is computed (reads load_table)" in found
+    assert "CONFIG is changed in place" in found
+    assert "THRESHOLD is set again" in found
+    assert "CLASS_TO_SHOW is the learner's ✏️ setting in sections/01_a.py" in found
+    for fine in ("RESULTS", "MODE", "STEPS", "FLAG"):
+        assert f" {fine} " not in found, found
+    assert len(lint_notebook.problems) == 4, found
