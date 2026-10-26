@@ -8,6 +8,7 @@ Usage:
     uv run python scripts/prepare_data.py             # download (idempotent) + workshop cache + smoke
     uv run python scripts/prepare_data.py --download  # only fetch the raw archives into data/cache/
     uv run python scripts/prepare_data.py --smoke     # only rebuild data/smoke/ (committed, <= 2 MB)
+    uv run python scripts/prepare_data.py --only-pets # rebuild pets only, specialised stays byte-identical
 
 Layout (one folder per dataset, identical for the workshop cache and the smoke fixtures):
 
@@ -15,7 +16,7 @@ Layout (one folder per dataset, identical for the workshop cache and the smoke f
         index.json         dataset facts, encoding, one entry per image (name, split, file paths, stats)
         images/NAME.jpg    RGB image at the working size
         masks/NAME.png     full ground truth (0/255)         -> EVALUATION ONLY (SPEC L-005)
-        fov/NAME.png       evaluation region (retina only)
+        fov/NAME.png       evaluation region (retina: inside the FOV; pets: all but the not-sure band)
         scribbles/NAME.png auto-scribbles: 0 = unlabelled, 1 = foreground stroke, 2 = background stroke
         visible/NAME.png   "missing labels": the ground truth with ~50 % of the foreground hidden (0/255)
         full/, full_masks/, full_fov/   (specialised, crop mode only) the whole image downsampled
@@ -66,7 +67,7 @@ PETS = {
     "feature_long_side": 512,
     "feature_long_sides": [512],
     "thin_structures": False,
-    "eval_region": "all",
+    "eval_region": "trimap: everything except the not-sure band (class 3) around the outline",
     "scribble_generator": {
         "type": "skeleton_segments",
         "fg_keep_fraction": 0.3,
@@ -188,8 +189,19 @@ def load_pets(n: int | None = None) -> list[Sample]:
         img, tri = ds[i]
         img = np.array(img.convert("RGB"))
         tri = np.array(tri)
-        mask = (tri == 1) | (tri == 3)  # 1 = pet, 2 = background, 3 = border -> pet
-        samples.append(Sample(Path(ds._images[i]).stem, resize(img, long, False), resize(mask, long, True)))
+        # Trimap: 1 = pet, 2 = background, 3 = "not sure" band (~10-20 px along the outline).
+        # Pet = class 1 only. The not-sure band is neither pet nor background: it is left out of the
+        # evaluation region (stored as the item's fov PNG, exactly like the retina FOV).
+        mask = tri == 1
+        scored = tri != 3
+        samples.append(
+            Sample(
+                Path(ds._images[i]).stem,
+                resize(img, long, False),
+                resize(mask, long, True),
+                resize(scored, long, True),
+            )
+        )
     return assign_splits(samples, PETS["split"])
 
 
@@ -438,7 +450,7 @@ def write_dataset(samples: list[Sample], cfg: dict, out: Path, scale: float = 1.
             "scribbles": "PNG, 0 = unlabelled, 1 = foreground stroke, 2 = background stroke",
             "visible": "PNG, 255 = labelled foreground; the rest of the true foreground is hidden "
             "(missing labels)",
-            "fov": "PNG, 255 = inside the evaluation region",
+            "fov": "PNG, 255 = inside the evaluation region (pets: 0 = the trimap's not-sure band)",
         },
         "n_fit": sum(s.split == "fit" for s in samples),
         "n_held": sum(s.split == "held" for s in samples),
@@ -490,15 +502,17 @@ def summarise(index: dict, out: Path) -> None:
 
 
 # ----------------------------------------------------------------------------- main
-def build_workshop(spec: dict, pets: list[Sample], special: list[Sample]) -> None:
+def build_workshop(spec: dict, pets: list[Sample], special: list[Sample] | None) -> None:
     print("Workshop subsets")
     summarise(write_dataset(pets, PETS, WORKSHOP / "pets"), WORKSHOP / "pets")
-    summarise(write_dataset(special, spec, WORKSHOP / "specialised"), WORKSHOP / "specialised")
+    if special is not None:
+        summarise(write_dataset(special, spec, WORKSHOP / "specialised"), WORKSHOP / "specialised")
 
 
-def build_smoke(spec: dict, pets: list[Sample], special: list[Sample]) -> None:
+def build_smoke(spec: dict, pets: list[Sample], special: list[Sample] | None) -> None:
     print(f"Smoke fixtures ({SMOKE_PER_DATASET} + {SMOKE_PER_DATASET} images at <= {SMOKE_LONG_SIDE} px)")
-    for cfg, samples, sub in ((PETS, pets, "pets"), (spec, special, "specialised")):
+    todo = [(PETS, pets, "pets")] + ([(spec, special, "specialised")] if special is not None else [])
+    for cfg, samples, sub in todo:
         small = [shrink(s, SMOKE_LONG_SIDE) for s in smoke_pick(samples)]
         scale = SMOKE_LONG_SIDE / max(max(s.mask.shape) for s in samples)
         summarise(write_dataset(small, cfg, SMOKE_DIR / sub, scale=scale), SMOKE_DIR / sub)
@@ -512,6 +526,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--download", action="store_true", help="only download/extract the raw data")
     ap.add_argument("--smoke", action="store_true", help="only rebuild data/smoke/")
+    ap.add_argument("--only-pets", action="store_true", help="rebuild pets only; leave specialised untouched")
     args = ap.parse_args(argv)
     spec = load_specialised()
     fetch(spec)
@@ -519,7 +534,7 @@ def main(argv=None) -> int:
         return 0
     t0 = time.time()
     pets = load_pets()
-    special = load_specialised_samples(spec)
+    special = None if args.only_pets else load_specialised_samples(spec)
     if not args.smoke:
         build_workshop(spec, pets, special)
     build_smoke(spec, pets, special)

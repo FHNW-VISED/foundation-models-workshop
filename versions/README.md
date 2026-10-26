@@ -13,3 +13,4 @@ Never edit a version folder.
 | v04 | 2026-10-26 | cuts 2026-10-26 (round 1 + 2 decisions) | c990866 |
 | v05 | 2026-10-26 | reorders: Q12, Q16, Q17 before their cells (N-052) | 2893a93 |
 | v06 | 2026-10-26 | SPEC: made with Susanne Suter (SN rules incl. SN-006); RULES.md synced with the current ledger | 91a315d |
+| v07 | 2026-10-26 | Simone review 2026-10-26: interactive SAM, pets band, clDice visual, shorter cells | b6b44ad |

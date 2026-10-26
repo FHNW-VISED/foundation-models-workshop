@@ -83,6 +83,67 @@ def stroke_points(item: dict, value: int, n: int) -> list[list[float]]:
 #   in training.
 
 # %% [markdown]
+# This helper cell defines `sam_pseudo_labels`: it asks SAM for a probability map on each training image (or
+# loads our maps), prints how sure SAM is and draws one image.
+
+# %%
+# @title SAM pseudo-label helper: probability maps from the stroke clicks { display-mode: "form" }
+def sam_pseudo_labels(run_sam: bool, n_clicks: int):
+    """SAM's probability map for each training image from `n_clicks` + `n_clicks` clicks on the strokes
+    (or our precomputed maps). Prints the numbers and draws one image. Returns the maps, the clicks, the
+    seconds, SAM's quality at the 0.5 cut and the share of the fundus it marks."""
+    if not isinstance(run_sam, bool):
+        raise SystemExit("RUN_SAM must be True or False.")
+    t0 = time.monotonic()
+    probs, clicks_used = [], []  # per training image: SAM's probability map, (vessel, background) clicks
+    if run_sam:
+        for it in tqdm(scrib_train, desc="SAM on the training images"):
+            pos, neg = stroke_points(it, 1, n_clicks), stroke_points(it, 2, n_clicks)
+            labels = [1] * len(pos) + [0] * len(neg)
+            probs.append(sam.probability(it["image"], points=pos + neg, labels=labels))
+            clicks_used.append((pos, neg))
+        src = f"SAM 2.1 run here, {n_clicks} + {n_clicks} clicks per image"
+    else:
+        ours = PRECOMPUTED / "pseudo_labels" / "specialised"
+        if not (ours / "prompts.json").is_file():
+            raise SystemExit(f"{ours} is missing. Run setup_check.ipynb first, or set RUN_SAM = True.")
+        prompts = json.loads((ours / "prompts.json").read_text())["prompts"]
+        for it in scrib_train:
+            probs.append(read_png(ours / f"{it['name']}.png") / 255)
+            p = prompts[it["name"]]
+            pairs = list(zip(p["points_xy"], p["labels"], strict=True))
+            clicks_used.append(tuple([xy for xy, lab in pairs if lab == k] for k in (1, 0)))
+        src = "our precomputed maps (same recipe, clicks drawn at random from the strokes)"
+    sec = round(time.monotonic() - t0, 1)
+
+    # diagnosis only: SAM's guesses at the usual 0.5 cut, scored against the hidden truth (never for training)
+    quality = mean_scores([score(p >= 0.5, it) for p, it in zip(probs, scrib_train, strict=True)])
+    marked = float(np.mean([(p >= 0.5)[region(it)].mean() for p, it in zip(probs, scrib_train, strict=True)]))
+    # how sure SAM is, inside the fundus (no truth needed): the spread of its probabilities
+    spread = np.quantile(
+        np.concatenate([p[region(it)] for p, it in zip(probs, scrib_train, strict=True)]), [0.05, 0.5, 0.95]
+    )
+    print(
+        f"SAM pseudo-labels on {len(scrib_train)} training images · {src} · {sec} s on {DEVICE}\n"
+        f"SAM's probability inside the fundus · 5 % of the pixels below {spread[0]:.2f} · median "
+        f"{spread[1]:.2f} · 95 % below {spread[2]:.2f}\n"
+        f"diagnosis (truth used to score only): at 0.5 they mark {marked:.0%} of the fundus · IoU "
+        f"{quality['iou']:.3f} · clDice {quality['cldice']:.3f}"
+    )
+    ex, (pos, neg) = scrib_train[0], clicks_used[0]
+    show_clicks(
+        [
+            (f"{ex['name']} · vessel clicks", ex["image"], pos),
+            ("background clicks", ex["image"], neg),
+            ("SAM probability: purple 1, white 0.5, orange 0", prob_rgb(probs[0]), None),
+            ("pseudo-label at 0.5 vs truth", error_map(ex["image"], probs[0] >= 0.5, ex), None),
+        ],
+        width=2.8,
+    )
+    return probs, clicks_used, sec, quality, marked
+
+
+# %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # Section 2 showed what SAM does with clicks on a vessel tree. Now it gets forty clicks per image, half of
 # them saying "not here". Will its mask follow the vessels, or cover a region around them? Write one guess.
@@ -104,65 +165,14 @@ def stroke_points(item: dict, value: int, n: int) -> list[list[float]]:
 # with clicks drawn at random).
 
 # %%
-RUN_SAM = True  # False -> load our precomputed SAM maps for the training images
-N_PSEUDO_CLICKS = 20  # clicks per kind (vessel / background) and image, taken from the strokes
-if not isinstance(RUN_SAM, bool):
-    raise SystemExit("RUN_SAM must be True or False.")
-
-t0 = time.monotonic()
-pseudo_probs, pseudo_clicks = [], []  # per training image: SAM's probability map, (vessel, background) clicks
-if RUN_SAM:
-    for it in scrib_train:
-        pos, neg = stroke_points(it, 1, N_PSEUDO_CLICKS), stroke_points(it, 2, N_PSEUDO_CLICKS)
-        prob = sam.probability(it["image"], points=pos + neg, labels=[1] * len(pos) + [0] * len(neg))
-        pseudo_probs.append(prob)
-        pseudo_clicks.append((pos, neg))
-    src = f"SAM 2.1 run here, {N_PSEUDO_CLICKS} + {N_PSEUDO_CLICKS} clicks per image"
-else:
-    ours = PRECOMPUTED / "pseudo_labels" / "specialised"
-    if not (ours / "prompts.json").is_file():
-        raise SystemExit(f"{ours} is missing. Run setup_check.ipynb first, or set RUN_SAM = True.")
-    prompts = json.loads((ours / "prompts.json").read_text())["prompts"]
-    for it in scrib_train:
-        pseudo_probs.append(read_png(ours / f"{it['name']}.png") / 255)
-        p = prompts[it["name"]]
-        clicks = [
-            [xy for xy, lab in zip(p["points_xy"], p["labels"], strict=True) if lab == k] for k in (1, 0)
-        ]
-        pseudo_clicks.append(tuple(clicks))
-    src = "our precomputed maps (same recipe, clicks drawn at random from the strokes)"
-pseudo_sec = round(time.monotonic() - t0, 1)
-
-# diagnosis only: SAM's guesses at the usual 0.5 cut, scored against the hidden truth (never for training)
-sam_quality = mean_scores([score(p >= 0.5, it) for p, it in zip(pseudo_probs, scrib_train, strict=True)])
-sam_marked = float(
-    np.mean([(p >= 0.5)[region(it)].mean() for p, it in zip(pseudo_probs, scrib_train, strict=True)])
-)
-# how sure SAM is, inside the fundus (no truth needed): the spread of its probabilities
-spread = np.quantile(
-    np.concatenate([p[region(it)] for p, it in zip(pseudo_probs, scrib_train, strict=True)]),
-    [0.05, 0.5, 0.95],
-)
-print(
-    f"SAM pseudo-labels on {len(scrib_train)} training images · {src} · {pseudo_sec} s on {DEVICE}\n"
-    f"SAM's probability inside the fundus · 5 % of the pixels below {spread[0]:.2f} · median "
-    f"{spread[1]:.2f} · 95 % below {spread[2]:.2f}\n"
-    f"diagnosis (truth used to score only): at 0.5 they mark {sam_marked:.0%} of the fundus · IoU "
-    f"{sam_quality['iou']:.3f} · clDice {sam_quality['cldice']:.3f}"
-)
-ex, (pos, neg) = scrib_train[0], pseudo_clicks[0]
-show_clicks(
-    [
-        (f"{ex['name']} · vessel clicks", ex["image"], pos),
-        ("background clicks", ex["image"], neg),
-        ("SAM probability: purple 1, white 0.5, orange 0", prob_rgb(pseudo_probs[0]), None),
-        ("pseudo-label at 0.5 vs truth", error_map(ex["image"], pseudo_probs[0] >= 0.5, ex), None),
-    ],
-    width=2.8,
-)
+# @title Run SAM on the stroke clicks to get pseudo-labels (False = load our maps) { display-mode: "form" }
+RUN_SAM = True  # @param {type:"boolean"}
+N_PSEUDO_CLICKS = 20  # @param {type:"integer"}
+pseudo_probs, pseudo_clicks, pseudo_sec, sam_quality, sam_marked = sam_pseudo_labels(RUN_SAM, N_PSEUDO_CLICKS)
+ex = scrib_train[0]
 
 # %% [markdown]
-# **Q20.** 🟡 Look at the error map and the probability panel. Where does SAM's guess go wrong: around
+# **Q24.** 🟡 Look at the error map and the probability panel. Where does SAM's guess go wrong: around
 # the thick vessels, along the thin ones, in the background between the strokes? Is SAM sure of itself (deep
 # purple, deep orange) or unsure (pale)? What does that mean for a cut at exactly 0.5?
 #
@@ -220,7 +230,7 @@ plt.show()
 # This helper cell holds our solution of the next exercise. Open it only if you are stuck.
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
+# @title Reference solution and play example (open only if stuck) { display-mode: "form" }
 def _ref_pseudo_targets(
     prob: np.ndarray, scribbles: np.ndarray, region: np.ndarray, threshold: float = 0.5, band: float = 0.0
 ) -> np.ndarray:
@@ -232,6 +242,25 @@ def _ref_pseudo_targets(
     targets[scribbles == 2] = 0
     targets[~np.asarray(region, bool)] = -1
     return targets
+
+
+_play_prob = np.array([[0.95, 0.62, 0.45, 0.10], [0.55, 0.30, 0.71, 0.05], [0.20, 0.90, 0.40, 0.80]])
+_play_scrib = np.zeros((3, 4), np.uint8)
+_play_scrib[1, 1] = 1  # a vessel stroke where SAM says "not vessel"
+_play_scrib[2, 1] = 2  # a background stroke where SAM says "vessel"
+_play_region = np.ones((3, 4), bool)
+_play_region[:, 3] = False  # the last column is outside the evaluation region
+
+
+def _check_pseudo_targets(f):
+    """What `use` compares: the targets of the play map without and with an unsure band."""
+    return [np.asarray(f(_play_prob, _play_scrib, _play_region, 0.5, b)).astype(int) for b in (0.0, 0.2)]
+
+
+def show_pseudo_play(fn) -> None:
+    """Print the targets `fn` makes on the 3 x 4 play map (threshold 0.5, band 0.2)."""
+    print("play example · targets with threshold 0.5 and band 0.2 (−1 = ignored):")
+    print(fn(_play_prob, _play_scrib, _play_region, 0.5, 0.2))
 
 
 # %% [markdown]
@@ -260,22 +289,38 @@ def my_pseudo_targets(
     ...
 
 
-_play_prob = np.array([[0.95, 0.62, 0.45, 0.10], [0.55, 0.30, 0.71, 0.05], [0.20, 0.90, 0.40, 0.80]])
-_play_scrib = np.zeros((3, 4), np.uint8)
-_play_scrib[1, 1] = 1  # a vessel stroke where SAM says "not vessel"
-_play_scrib[2, 1] = 2  # a background stroke where SAM says "vessel"
-_play_region = np.ones((3, 4), bool)
-_play_region[:, 3] = False  # the last column is outside the evaluation region
 pseudo_targets = use(
-    my_pseudo_targets,
-    reference=_ref_pseudo_targets,
-    check=lambda f: [
-        np.asarray(f(_play_prob, _play_scrib, _play_region, 0.5, b)).astype(int) for b in (0.0, 0.2)
-    ],
-    name="pseudo_targets",
+    my_pseudo_targets, reference=_ref_pseudo_targets, check=_check_pseudo_targets, name="pseudo_targets"
 )
-print("play example · targets with threshold 0.5 and band 0.2 (−1 = ignored):")
-print(pseudo_targets(_play_prob, _play_scrib, _play_region, 0.5, 0.2))
+show_pseudo_play(pseudo_targets)
+
+# %% [markdown]
+# This helper cell defines `train_sam_head`: it turns SAM's maps into targets at the usual cut and trains the
+# section-2 head on them, or loads our checkpoint.
+
+# %%
+# @title SAM-head helper: pseudo-label targets, then train or load { display-mode: "form" }
+def train_sam_head(train_yourself: bool):
+    """The head trained on SAM's pseudo-labels at threshold 0.5, no band. Returns the head's tensors, the
+    training seconds and the targets."""
+    if not isinstance(train_yourself, bool):
+        raise SystemExit("TRAIN_YOURSELF must be True or False.")
+    # the supervision of this path: the strokes, and SAM's guesses from clicks on the strokes (L-005)
+    targets = [
+        pseudo_targets(p, it["scribbles"], region(it), 0.5, 0.0)
+        for p, it in zip(pseudo_probs, scrib_train, strict=True)
+    ]
+    if train_yourself:
+        head, sec = train_head(scrib_feats, targets, HEAD_STEPS)
+        src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, SAM pseudo-labels at 0.5"
+    else:
+        head, entry = load_head(SPECIALISED, "pseudo", side)
+        sec = entry["train_sec"]
+        src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
+    print(f"SAM pseudo-label head @ {side} px · {src} · {sec:.1f} s on {DEVICE}")
+    if sec > 60:
+        print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+    return head, sec, targets
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -288,25 +333,9 @@ print(pseudo_targets(_play_prob, _play_scrib, _play_region, 0.5, 0.2))
 # head on them (`TRAIN_YOURSELF = False` loads our "pseudo" checkpoint instead, trained the same way).
 
 # %%
-TRAIN_YOURSELF = True  # False -> load our precomputed "pseudo" head instead of training
-if not isinstance(TRAIN_YOURSELF, bool):
-    raise SystemExit("TRAIN_YOURSELF must be True or False.")
-
-# the supervision of this path: the strokes, and SAM's guesses from clicks on the strokes (L-005)
-sam_targets = [
-    pseudo_targets(p, it["scribbles"], region(it), 0.5, 0.0)
-    for p, it in zip(pseudo_probs, scrib_train, strict=True)
-]
-if TRAIN_YOURSELF:
-    sam_head, sam_sec = train_head(scrib_feats, sam_targets, HEAD_STEPS)
-    src = f"trained here on {len(scrib_train)} images, {HEAD_STEPS} steps, SAM pseudo-labels at 0.5"
-else:
-    sam_head, entry = load_head(SPECIALISED, "pseudo", side)
-    sam_sec = entry["train_sec"]
-    src = f"our checkpoint {entry['file']} ({len(entry['train_names'])} images)"
-print(f"SAM pseudo-label head @ {side} px · {src} · {sam_sec:.1f} s on {DEVICE}")
-if sam_sec > 60:
-    print("ℹ️ Slow session? Set TRAIN_YOURSELF = False above to load our checkpoint next time.")
+# @title Train the SAM pseudo-label head (False = load our checkpoint) { display-mode: "form" }
+TRAIN_YOURSELF = True  # @param {type:"boolean"}
+sam_head, sam_sec, sam_targets = train_sam_head(TRAIN_YOURSELF)
 
 # %% [markdown]
 # This cell scores the new head on the held-out images with the numbers of section 4 and prints it under the
@@ -352,36 +381,11 @@ def print_path2(reports: dict) -> None:
 print_path2(path2_report)
 
 # %% [markdown]
-# <!-- callout: question | Question -->
-# Run the next cell, then move the cut.
-#
-# **Q21.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
-# `PSEUDO_THRESHOLD` and give the doubtful pixels an `UNSURE_BAND` to ignore, picking values from the spread
-# printed in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
-# at the held-out line once: does it move the same way? Is there a setting that beats 0.5 on your run?
-#
-# - `PSEUDO_THRESHOLD`: try 0.55, 0.6, 0.7 (or the median printed in 6.1).
-# - `UNSURE_BAND`: try 0.03; pixels within 0.03 of the threshold are ignored.
-#
-# Both are sliders in the next cell: move one, then run it again.
-
-# %% [markdown]
-# This cell trains the same head on targets made with your setting and prints it under the head at 0.5, with
-# three diagnosis columns from the hidden truth on the training images: **ignored** (the share of the fundus
-# set to −1), **vessel → bg** (the share of true vessel pixels that got label 0) and **bg → vessel** (the
-# share of true background pixels that got label 1).
+# This helper cell defines `tune_pseudo_labels`: it makes targets with your cut and band, trains the head on
+# them and prints the diagnosis columns and the held-out line.
 
 # %%
-# Q21 — tune the pseudo-label threshold and the unsure band
-PSEUDO_THRESHOLD = 0.5  # @param {type:"slider", min:0.45, max:0.75, step:0.025}
-UNSURE_BAND = 0.0  # @param {type:"slider", min:0, max:0.1, step:0.01}
-ok = all(isinstance(v, (int, float)) for v in (PSEUDO_THRESHOLD, UNSURE_BAND))
-if not ok or UNSURE_BAND < 0 or PSEUDO_THRESHOLD - UNSURE_BAND <= 0 or PSEUDO_THRESHOLD + UNSURE_BAND > 1:
-    raise SystemExit(
-        "PSEUDO_THRESHOLD must lie between 0 and 1, and UNSURE_BAND ≥ 0 must keep both edges inside."
-    )
-
-
+# @title Pseudo-label tuning helper: targets, head, diagnosis columns { display-mode: "form" }
 def target_errors(targets: list[np.ndarray]) -> dict:
     """Diagnosis only (uses the hidden truth): share of the fundus ignored, of the true vessel pixels called
     background, and of the true background pixels called vessel, over the training images."""
@@ -402,22 +406,58 @@ def target_errors(targets: list[np.ndarray]) -> dict:
     }
 
 
-tuned_targets = [
-    pseudo_targets(p, it["scribbles"], region(it), PSEUDO_THRESHOLD, UNSURE_BAND)
-    for p, it in zip(pseudo_probs, scrib_train, strict=True)
-]
-tuned_head, tuned_sec = train_head(scrib_feats, tuned_targets, HEAD_STEPS)
-tuned_preds = [
-    predict_head(tuned_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
-]
-tuned_report = rung_report(tuned_preds)
-RESULTS["sam_pseudo_tuned"] = tuned_report | {"threshold": PSEUDO_THRESHOLD, "band": UNSURE_BAND}
-print(f"{'targets on the training images':<46}{'ignored':>8}{'vessel → bg':>13}{'bg → vessel':>13}")
-for name, t in {"threshold 0.5, no band": sam_targets, "your setting": tuned_targets}.items():
-    e = target_errors(t)
-    print(f"{name:<46}{e['ignored']:>8.0%}{e['vessel_as_bg']:>13.0%}{e['bg_as_vessel']:>13.0%}")
-print(f"\nyour head: threshold {PSEUDO_THRESHOLD}, band {UNSURE_BAND} · trained in {tuned_sec:.1f} s")
-print_path2({"threshold 0.5, no band": path2_report["sam_pseudo"], "your setting": tuned_report})
+def tune_pseudo_labels(threshold: float, band: float) -> None:
+    """Targets from SAM's maps with this cut and unsure band, a head trained on them, and its numbers
+    printed under the head at 0.5."""
+    ok = all(isinstance(v, (int, float)) for v in (threshold, band))
+    if not ok or band < 0 or threshold - band <= 0 or threshold + band > 1:
+        raise SystemExit(
+            "PSEUDO_THRESHOLD must lie between 0 and 1, and UNSURE_BAND ≥ 0 must keep both edges inside."
+        )
+    side = SPECIALISED["feat_side"]
+    tuned_targets = [
+        pseudo_targets(p, it["scribbles"], region(it), threshold, band)
+        for p, it in zip(pseudo_probs, scrib_train, strict=True)
+    ]
+    tuned_head, tuned_sec = train_head(scrib_feats, tuned_targets, HEAD_STEPS)
+    tuned_preds = [
+        predict_head(tuned_head, features_for(SPECIALISED, it, side), it["mask"].shape) for it in SPEC_EVAL
+    ]
+    tuned_report = rung_report(tuned_preds)
+    RESULTS["sam_pseudo_tuned"] = tuned_report | {"threshold": threshold, "band": band}
+    print(f"{'targets on the training images':<46}{'ignored':>8}{'vessel → bg':>13}{'bg → vessel':>13}")
+    for name, t in {"threshold 0.5, no band": sam_targets, "your setting": tuned_targets}.items():
+        e = target_errors(t)
+        print(f"{name:<46}{e['ignored']:>8.0%}{e['vessel_as_bg']:>13.0%}{e['bg_as_vessel']:>13.0%}")
+    print(f"\nyour head: threshold {threshold}, band {band} · trained in {tuned_sec:.1f} s")
+    print_path2({"threshold 0.5, no band": path2_report["sam_pseudo"], "your setting": tuned_report})
+
+
+# %% [markdown]
+# <!-- callout: question | Question -->
+# Run the next cell, then move the cut.
+#
+# **Q25.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
+# `PSEUDO_THRESHOLD` and give the doubtful pixels an `UNSURE_BAND` to ignore, picking values from the spread
+# printed in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
+# at the held-out line once: does it move the same way? Is there a setting that beats 0.5 on your run?
+#
+# - `PSEUDO_THRESHOLD`: try 0.55, 0.6, 0.7 (or the median printed in 6.1).
+# - `UNSURE_BAND`: try 0.03; pixels within 0.03 of the threshold are ignored.
+#
+# Both are sliders in the next cell: move one, then run it again.
+
+# %% [markdown]
+# This cell trains the same head on targets made with your setting and prints it under the head at 0.5, with
+# three diagnosis columns from the hidden truth on the training images: **ignored** (the share of the fundus
+# set to −1), **vessel → bg** (the share of true vessel pixels that got label 0) and **bg → vessel** (the
+# share of true background pixels that got label 1).
+
+# %%
+# @title Q25 — tune the pseudo-label threshold and the unsure band { display-mode: "form" }
+PSEUDO_THRESHOLD = 0.5  # @param {type:"slider", min:0.45, max:0.75, step:0.025}
+UNSURE_BAND = 0.0  # @param {type:"slider", min:0, max:0.1, step:0.01}
+tune_pseudo_labels(PSEUDO_THRESHOLD, UNSURE_BAND)
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pair moment (optional, 4 min) -->
@@ -718,7 +758,7 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q22.** 🟡 Compare the two pseudo-labels of the same training image. What shape does the Grad-CAM
+# **Q26.** 🟡 Compare the two pseudo-labels of the same training image. What shape does the Grad-CAM
 # evidence have, and where does it sit? Which of the two would you rather correct by hand, and why?
 #
 # <details><summary>What to look for</summary>
@@ -803,52 +843,61 @@ show_masks(
 )
 
 # %% [markdown]
+# This helper cell defines `cam_sam_prompt`: it picks SAM clicks on each training image's heat map, asks SAM
+# for a mask and scores the three kinds of pseudo-label on the training images (diagnosis only).
+
+# %%
+# @title Grad-CAM-as-prompt helper: heat map to SAM clicks to masks { display-mode: "form" }
+def cam_sam_prompt(n_clicks: int) -> None:
+    """Hottest `n_clicks` patches of each heat map = vessel clicks, coldest = background clicks; SAM turns
+    them into masks. Prints the three pseudo-labels' quality and draws one image."""
+    if not float(n_clicks).is_integer() or n_clicks < 1:
+        raise SystemExit("N_CAM_CLICKS must be a whole number of at least 1.")
+    n_clicks = int(n_clicks)
+    masks, clicks_used = [], []
+    for it, f in tqdm(list(zip(scrib_train, std_feats, strict=True)), desc="Grad-CAM, then SAM"):
+        s = torch.from_numpy(cam_map(clf, f)).to(DEVICE)
+        keep = patch_share(region(it), tuple(s.shape))
+        pos = top_points(s, keep, n_clicks, it["mask"].shape, largest=True)
+        neg = top_points(s, keep, n_clicks, it["mask"].shape, largest=False)
+        prob = sam.probability(it["image"], points=pos + neg, labels=[1] * len(pos) + [0] * len(neg))
+        masks.append(prob >= 0.5)
+        clicks_used.append(pos)
+    quality = mean_scores([score(m, it) for m, it in zip(masks, scrib_train, strict=True)])
+    RESULTS["gradcam_sam_prompt_iou_fit"] = quality["iou"]
+    print("pseudo-labels on the training images (diagnosis only: scored against the hidden truth)")
+    for name, q in {
+        "SAM from stroke clicks (6.1, at 0.5)": sam_quality,
+        f"Grad-CAM cut at {CAM_THRESHOLD}": cam_quality,
+        f"SAM from {n_clicks} + {n_clicks} Grad-CAM clicks": quality,
+    }.items():
+        print(f"{name:<44} IoU {q['iou']:.3f} · clDice {q['cldice']:.3f}")
+    show_clicks(
+        [
+            ("Grad-CAM clicks: vessel", ex["image"], clicks_used[0]),
+            ("SAM from Grad-CAM clicks vs truth", error_map(ex["image"], masks[0], ex), clicks_used[0]),
+        ],
+        width=3.4,
+    )
+
+
+# %% [markdown]
 # <!-- callout: question | Question (optional) -->
 # Run the next cell to use the heat map as a SAM prompt instead of a mask.
 #
-# **Q23.** 🔴 Instead of cutting the heat map, let it pick SAM clicks: the hottest patches as "vessel", the
+# **Q27.** 🔴 Instead of cutting the heat map, let it pick SAM clicks: the hottest patches as "vessel", the
 # coldest as "not vessel" (the trick of section 4.2, with Grad-CAM in place of the prototype). Do SAM's
 # masks from these clicks look more like the SAM pseudo-labels of 6.1 or like the Grad-CAM blobs?
-#
-# ```python
-# N_CAM_CLICKS = 5   # try 2, 10
-# ```
+# `N_CAM_CLICKS` (clicks of each kind per image) is a slider in the next cell: try 2 and 10.
 
 # %% [markdown]
 # This cell picks SAM clicks on each training image's heat map, asks SAM for a mask and scores the three kinds
 # of pseudo-label on the training images (diagnosis only, no training).
 
 # %%
-# Q23 — Grad-CAM as a SAM prompt: hottest patches = vessel clicks, coldest = background clicks
-N_CAM_CLICKS = 5  # try 2, 10
-if not isinstance(N_CAM_CLICKS, int) or N_CAM_CLICKS < 1:
-    raise SystemExit("N_CAM_CLICKS must be a whole number of at least 1.")
-cam_sam_masks, cam_clicks = [], []
-for it, f in zip(scrib_train, std_feats, strict=True):
-    s = torch.from_numpy(cam_map(clf, f)).to(DEVICE)
-    keep = patch_share(region(it), tuple(s.shape))
-    pos = top_points(s, keep, N_CAM_CLICKS, it["mask"].shape, largest=True)
-    neg = top_points(s, keep, N_CAM_CLICKS, it["mask"].shape, largest=False)
-    cam_sam_masks.append(
-        sam.probability(it["image"], points=pos + neg, labels=[1] * len(pos) + [0] * len(neg)) >= 0.5
-    )
-    cam_clicks.append(pos)
-cam_sam_quality = mean_scores([score(m, it) for m, it in zip(cam_sam_masks, scrib_train, strict=True)])
-RESULTS["gradcam_sam_prompt_iou_fit"] = cam_sam_quality["iou"]
-print("pseudo-labels on the training images (diagnosis only: scored against the hidden truth)")
-for name, q in {
-    "SAM from stroke clicks (6.1, at 0.5)": sam_quality,
-    f"Grad-CAM cut at {CAM_THRESHOLD}": cam_quality,
-    f"SAM from {N_CAM_CLICKS} + {N_CAM_CLICKS} Grad-CAM clicks": cam_sam_quality,
-}.items():
-    print(f"{name:<44} IoU {q['iou']:.3f} · clDice {q['cldice']:.3f}")
-show_clicks(
-    [
-        ("Grad-CAM clicks: vessel", ex["image"], cam_clicks[0]),
-        ("SAM from Grad-CAM clicks vs truth", error_map(ex["image"], cam_sam_masks[0], ex), cam_clicks[0]),
-    ],
-    width=3.4,
-)
+# @title Q27 — Grad-CAM as a SAM prompt: hottest patches = vessel clicks { display-mode: "form" }
+N_CAM_CLICKS = 5  # @param {type:"slider", min:1, max:10, step:1}
+cam_sam_prompt(N_CAM_CLICKS)
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -909,7 +958,7 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q24.** 🟡 All three heads cost the same strokes. You can add one more afternoon (about 4 hours) of work.
+# **Q28.** 🟡 All three heads cost the same strokes. You can add one more afternoon (about 4 hours) of work.
 # Suppose a pilot (invented numbers) says:
 #
 # - **A, more strokes:** a second round on the same five images would lift the scribble head's held-out IoU

@@ -6,14 +6,14 @@
  "citation": "Parkhi OM, Vedaldi A, Zisserman A, Jawahar CV. Cats and Dogs. CVPR 2012.",
  "seed": 42,
  "thin_structures": false,
- "eval_region": "all",
+ "eval_region": "trimap: everything except the not-sure band (class 3) around the outline",
  "metric_extras": [],
  "feature_long_side": 512,
  "encoding": {
   "masks": "PNG, 255 = foreground. Ground truth: evaluation only (SPEC L-005).",
   "scribbles": "PNG, 0 = unlabelled, 1 = foreground stroke, 2 = background stroke",
   "visible": "PNG, 255 = labelled foreground; the rest of the true foreground is hidden (missing labels)",
-  "fov": "PNG, 255 = inside the evaluation region"
+  "fov": "PNG, 255 = inside the evaluation region (pets: 0 = the trimap's not-sure band, not scored)"
  },
  "n_fit": 2,
  "n_held": 2,
@@ -29,11 +29,12 @@
    "mask": "masks/english_cocker_spaniel_103.png",
    "scribbles": "scribbles/english_cocker_spaniel_103.png",
    "visible": "visible/english_cocker_spaniel_103.png",
-   "fg_fraction": 0.3442,
+   "fg_fraction": 0.2371,
    "n_fg_strokes": 4,
    "n_bg_strokes": 3,
-   "scribbled_fraction": 0.00535,
-   "hidden_fg_fraction": 0.454
+   "scribbled_fraction": 0.00483,
+   "hidden_fg_fraction": 0.348,
+   "fov": "fov/english_cocker_spaniel_103.png"
   },
   {
    "name": "chihuahua_17",
@@ -46,11 +47,12 @@
    "mask": "masks/chihuahua_17.png",
    "scribbles": "scribbles/chihuahua_17.png",
    "visible": "visible/chihuahua_17.png",
-   "fg_fraction": 0.1174,
-   "n_fg_strokes": 1,
-   "n_bg_strokes": 3,
-   "scribbled_fraction": 0.00477,
-   "hidden_fg_fraction": 0.714
+   "fg_fraction": 0.0599,
+   "n_fg_strokes": 3,
+   "n_bg_strokes": 5,
+   "scribbled_fraction": 0.00841,
+   "hidden_fg_fraction": 0.972,
+   "fov": "fov/chihuahua_17.png"
   },
   {
    "name": "boxer_173",
@@ -63,11 +65,12 @@
    "mask": "masks/boxer_173.png",
    "scribbles": "scribbles/boxer_173.png",
    "visible": "visible/boxer_173.png",
-   "fg_fraction": 0.0629,
+   "fg_fraction": 0.0297,
    "n_fg_strokes": 3,
    "n_bg_strokes": 4,
-   "scribbled_fraction": 0.00669,
-   "hidden_fg_fraction": 0.031
+   "scribbled_fraction": 0.00612,
+   "hidden_fg_fraction": 0.338,
+   "fov": "fov/boxer_173.png"
   },
   {
    "name": "Siamese_182",
@@ -80,11 +83,12 @@
    "mask": "masks/Siamese_182.png",
    "scribbles": "scribbles/Siamese_182.png",
    "visible": "visible/Siamese_182.png",
-   "fg_fraction": 0.1946,
+   "fg_fraction": 0.102,
    "n_fg_strokes": 3,
    "n_bg_strokes": 5,
-   "scribbled_fraction": 0.00607,
-   "hidden_fg_fraction": 0.422
+   "scribbled_fraction": 0.00668,
+   "hidden_fg_fraction": 0.344,
+   "fov": "fov/Siamese_182.png"
   }
  ]
 }

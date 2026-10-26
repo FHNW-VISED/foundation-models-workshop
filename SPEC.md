@@ -40,7 +40,9 @@ These appear verbatim in the title banner.
 ## 4. Use case and data
 
 ### Simple task: Oxford-IIIT Pet (W-2)
-- Pet vs background from the trimap.
+- Pet vs background from the trimap: pet = class 1. The trimap's "not sure" band (class 3, ~11 % of an image) is
+  excluded from scoring and from the heads' loss, and drawn grey (Simone's review 2026-10-26: counting it as pet made the
+  ground truth spill onto the rug). It is the workshop's idea in miniature: an annotator's "unknown" is not "background".
 - Licence **CC BY-SA 4.0**: we may host a resized subset with attribution and share-alike. ~100 images in the workshop, 4 in SMOKE.
 
 ### Specialised task: **[OPEN — chosen by the bake-off, issue #1]**
@@ -95,7 +97,7 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 
 **Block 1** = sections 0–3 and section 4 up to the scribble rung (4.3), "when it works and when it doesn't". The coffee break
 sits **just before 4.3** (S0, Simone 2026-10-26; was: end of 03). It carries a no-code question to think about over coffee
-(Q14: "what could you tell the training about a pixel nobody labelled?", with a hint for after the break); block 2 opens by
+(Q17: "what could you tell the training about a pixel nobody labelled?", with a hint for after the break); block 2 opens by
 collecting answers, then 4.3 starts with "Welcome back" and the annotator's new instruction.
 **Block 2** = 4.3 (scribbles) to section 10, "ways out".
 
@@ -112,18 +114,26 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
   - A linear head trained on 5 pets with full masks (seconds), with IoU on held-out pets, and a step-by-step figure of the head
     (patches, one probability per patch, upsampled map, mask) with one patch worked by hand (moved here from section 3).
   - ✍️ optional `my_iou`. 👥 optional.
+  - **Interactive SAM** (`sam_playground`, defined in 00): click, shift-click for background, drag a box, or type a word
+    for SAM 3 if cached; IoU and "marked" update live. Also in sections 2, 7.4 and 9 (Simone 2026-10-26: "way more
+    interactive"). Headless it shows one fixed click and one box.
 - **02 Where it falls short**
   - The same three tools on the specialised task, plus a failure gallery.
   - **SAM probed with escalating prompts** (1 → 5 → 20 points; box) (W-4 research); one figure shows the four prompts next to SAM's masks.
   - Resolution effect: features at 512 vs 1024 for thin structures (the attention arithmetic is a go-deeper box).
-  - ✍️ optional `my_cldice`.
-  - 🔴 optional: the DINOv3 PCA on retina images, the "thick trunk only" simulation, the whole-fundus view.
+  - clDice is collapsed reference code with an interactive visual (three cases: too wide, capillaries missed, blob). No
+    ✍️ here: the workshop is not about vessel segmentation (Simone 2026-10-26, reverses the earlier "keep `my_cldice`").
+  - The playground: "try to get SAM to mark only the vessels".
+  - 🔴 optional: the DINOv3 PCA on retina images, the whole-fundus view (the "thick trunk" simulation was cut 2026-10-26).
   - Predict before you run (N-004).
   - 👥 "whose image fails worst?" (a show-of-hands moment, in FACILITATION).
 - **03 Hide the labels: the naive baseline**
   - Generate incomplete supervision (§4).
   - Train the head with **missing = background**, evaluate on the hidden ground truth, and show where it fails ("it learns that vessels are background").
   - No ✍️ here: `hidden_recall` is reference code. 🔴 optional: the balanced-loss head ("is it the labels, or the loss?").
+  - "Hidden" = vessels in the full ground truth that the label file left unpainted; defined with a picture in 3.1–3.2.
+  - The naive baseline is explained as numbered steps, the guess comes before the "why" (N-004).
+  - A slider (`HIDE_PERCENT`) rebuilds the label file with more or fewer hidden segments and retrains the naive head.
   - Leads straight into section 4's first rungs; the break comes later, before 4.3 (S0).
 - **04 The adaptation ladder** (W-3)
   - Rungs: zero-shot (02) → **one-shot**: one annotated image, as a nearest-feature prototype (🔴 optional: the same map used as SAM prompts) → **scribbles** (auto-scribbles, partial cross-entropy that ignores unlabelled pixels: the MIT DINOv2-scribble idea applied to DINOv3).
@@ -135,6 +145,7 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
   - Treat missing as **unknown**: a masked loss, then 🔴 a PU-inspired loss.
   - ✍️ `masked_loss(logits, labels, ignore_mask) -> torch.Tensor` via `use()`, so participants write the loss (W-5).
   - Compare with section 03's naive baseline.
+  - The three recipes side by side on one image: what each loss hears (row 1) and the mistake it produces (row 2).
 - **06 Path 2 · Recover supervision**
   - **SAM pseudo-labels** from scribble points, used as training targets for the head.
   - **Grad-CAM** from a small classifier on image-level or patch-level labels, thresholded into a pseudo-mask *or* used as a SAM prompt.
@@ -144,7 +155,7 @@ collecting answers, then 4.3 starts with "Welcome back" and the annotator's new 
 - **07 Path 3 · Skip specialist training**
   - SAM prompted directly with points from the scribbles (one computed row; the number-of-clicks variation is 🔴), plus one small box and a centre click per stroke. No training.
   - The box size and the centre click are a slider (`BOX_PAD_TRY`) and a checkbox (`WITH_CLICK_TRY`). The thickened strokes (no model) are the baseline to beat.
-  - 🔴 SAM 3 text prompts if available.
+  - 🔴 SAM 3 text prompts if available: a dropdown with free text, plus the playground on retina and pets images.
 - **08 Compare everything**
   - First, a ✏️ "your prediction: which approach wins, which is steadiest?" cell with two dropdowns (`MY_WINNER`, `MY_STEADIEST`; W-11).
   - Then the **comparison table** (W-15), one row per approach:

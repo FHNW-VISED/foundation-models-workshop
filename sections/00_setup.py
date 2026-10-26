@@ -43,7 +43,8 @@
 # ## 0. Setup & the question
 #
 # This cell detects Colab and the GPU, fixes the seed, creates the `RESULTS` dictionary every section writes
-# into, and defines `use()`, so your own code never blocks the notebook. Run it once.
+# into, loads the `tqdm` progress bars used by the long steps, and defines `use()`, so your own code never
+# blocks the notebook. Run it once.
 
 # %%
 # @title Setup (run me first) { display-mode: "form" }
@@ -54,9 +55,11 @@ import os
 import random
 import sys
 import time
+import weakref
 from pathlib import Path
 
 import numpy as np
+from tqdm.auto import tqdm  # noqa: F401 - progress bars for the long loops of later sections
 
 IN_COLAB = "google.colab" in sys.modules
 SMOKE = os.environ.get("NB_SMOKE") == "1"  # automated test: tiny data, CPU, seconds. Never set this by hand.
@@ -228,7 +231,8 @@ print(f"cache: {CACHE_DIR} · specialised task: {SPECIALISED['name']} ({SPECIALI
 # ### The theme
 #
 # This cell sets the colours used in every figure: violet means "it works", orange "it fails, we adapt",
-# green is the hidden ground truth and teal marks scribbles, the same in every plot.
+# green is the hidden ground truth and teal marks scribbles, the same in every plot. Masks are drawn on a
+# grey copy of the photo, so every colour you see belongs to a mask and none to the photo.
 
 # %%
 # @title Theme and image helpers { display-mode: "form" }
@@ -260,11 +264,40 @@ def hex_rgb(colour: str) -> np.ndarray:
     return np.array([int(colour[i : i + 2], 16) for i in (1, 3, 5)]) / 255
 
 
-def overlay(image: np.ndarray, mask: np.ndarray, colour: str = THEME["truth"], alpha: float = 0.55):
-    """Blend a binary mask in one theme colour over an RGB uint8 image; returns an RGB uint8 image."""
+_OVERLAID = weakref.WeakValueDictionary()  # images overlay() made, so stacking a second mask never re-greys
+
+
+def overlay(
+    image: np.ndarray,
+    mask: np.ndarray,
+    colour: str = THEME["truth"],
+    alpha: float = 0.75,
+    unscored: np.ndarray | None = None,
+    dim: bool | None = None,
+):
+    """Draw a binary mask in one theme colour on a grey, dimmed copy of an RGB uint8 image.
+
+    The photo is turned grey (0.35 to 0.85 brightness) so an orange or green mask stays visible on a red
+    retina or a brown dog. `unscored` pixels (not evaluated) are painted light grey. Stacking a second mask
+    on the result of a first call keeps the first mask's colour (`dim` is then False unless you set it).
+    """
+    if dim is None:
+        dim = _OVERLAID.get(id(image)) is not image
     out = image.astype(float) / 255
+    if dim:
+        grey = out @ np.array([0.299, 0.587, 0.114])
+        out = np.repeat((0.35 + 0.5 * grey)[..., None], 3, axis=2)
+    if unscored is not None:
+        out[unscored] = 0.3 * out[unscored] + 0.7 * 0.88
     out[mask] = (1 - alpha) * out[mask] + alpha * hex_rgb(colour)
-    return (out * 255).astype(np.uint8)
+    result = (out * 255).astype(np.uint8)
+    _OVERLAID[id(result)] = result
+    return result
+
+
+def region(item: dict) -> np.ndarray:
+    """Where we score: the field of view if the dataset has one, else the whole image."""
+    return item["fov"] if item.get("fov") is not None else np.ones_like(item["mask"])
 
 
 def read_png(path: Path) -> np.ndarray:
@@ -303,6 +336,8 @@ def load_index(dataset: dict) -> dict:
 #
 # This cell reads the two datasets (pets, and the specialised task) and shows two images of each with the
 # ground truth in green and its share of the pixels in the title; the ground truth is for evaluation only.
+# Light grey marks pixels nobody scores: on the pets, the "not sure" band that the annotators drew around the
+# outline of each animal.
 
 # %%
 # @title Load both datasets and show two examples of each { display-mode: "form" }
@@ -321,7 +356,8 @@ for k, ds in enumerate((PETS, SPECIALISED)):
         it = load_item(ds, item)
         axes[k, 2 * j].imshow(it["image"])
         axes[k, 2 * j].set_title(f"{ds['name']}: {it['name']}")
-        axes[k, 2 * j + 1].imshow(overlay(it["image"], it["mask"]))
+        not_scored = ~region(it) if ds is PETS else None  # the pets' "not sure" band
+        axes[k, 2 * j + 1].imshow(overlay(it["image"], it["mask"], unscored=not_scored))
         axes[k, 2 * j + 1].set_title(f"ground truth · {it['mask'].mean():.0%} of the pixels")
 for ax in axes.ravel():
     ax.axis("off")
@@ -447,6 +483,247 @@ class Sam:
 dino = Dino()
 sam = Sam()
 RESULTS["models"] = {"dino": DINO_SOURCE, "sam": SAM_ID, "device": DEVICE}
+
+# %% [markdown]
+# This cell defines the interactive SAM tool used in sections 1, 2 and 7: click a dot, drag a box, or (in
+# section 7) type a word, and SAM answers with a mask you can compare with the ground truth. Run it once.
+
+# %%
+# @title Interactive SAM: click, box, or a word { display-mode: "form" }
+import base64
+import io
+import uuid
+from string import Template
+
+from IPython.display import HTML, JSON, display
+
+PLAY_PX = 560  # long side of the playground image on screen
+SAM3_ID = "facebook/sam3"
+_SAM3: dict = {}  # SAM 3 is loaded on the first text request and kept here
+
+
+def load_sam3() -> dict:
+    """SAM 3 from your cache (never the internet): {"model", "proc", "dtype"}, or {"error": a plain line}."""
+    if _SAM3:
+        return _SAM3
+    try:
+        from transformers import Sam3Model, Sam3Processor
+
+        dtype = torch.float16 if DEVICE == "cuda" else torch.float32  # fp16 on a T4, never bf16
+        src = str(model_folder(SAM3_ID) or SAM3_ID)
+        proc = Sam3Processor.from_pretrained(src, local_files_only=True)
+        model = Sam3Model.from_pretrained(src, local_files_only=True, dtype=dtype).eval().to(DEVICE)
+        _SAM3.update(model=model, proc=proc, dtype=dtype)
+    except Exception as err:  # noqa: BLE001 - not cached, no access, an older transformers: all mean "no SAM 3"
+        _SAM3["error"] = (
+            f"SAM 3 is not in your cache ({type(err).__name__}). To use it, request access on "
+            f"huggingface.co/{SAM3_ID}, then run setup_check.ipynb with your HF token."
+        )
+    return _SAM3
+
+
+def sam3_masks(image: np.ndarray, text: str, threshold: float = 0.3) -> np.ndarray:
+    """Every instance SAM 3 finds for a short noun phrase: bool array [n, H, W] (n may be 0)."""
+    s3 = load_sam3()
+    if "error" in s3:
+        raise RuntimeError(s3["error"])
+    inputs = s3["proc"](images=image, text=text.strip(), return_tensors="pt").to(DEVICE)
+    inputs["pixel_values"] = inputs["pixel_values"].to(s3["dtype"])
+    with torch.no_grad():
+        out = s3["model"](**inputs)
+    found = s3["proc"].post_process_instance_segmentation(
+        out, threshold=threshold, mask_threshold=0.5, target_sizes=[image.shape[:2]]
+    )[0]
+    return found["masks"].bool().cpu().numpy()
+
+
+def sam_playground(items: list[dict], title: str, text_prompt: bool = False, default_text: str = "") -> None:
+    """Click, box or word prompts on `items` (dicts from load_item); SAM 2.1 answers, with IoU vs the truth.
+
+    Left click = object dot, shift-click = background dot, drag = box. With `text_prompt=True` a text box asks
+    SAM 3 (if it is in your cache). Outside Colab and in the smoke run it shows one fixed click and one fixed
+    box on the first image instead, so nothing blocks. All the code lives in this function on purpose.
+    """
+    page = Template("""
+<div style="font-family:sans-serif"><b>$title</b><br>
+<div id="st$uid" style="position:relative;margin:4px 0">
+<img id="im$uid" style="position:absolute;left:0;top:0">
+<img id="mk$uid" style="position:absolute;left:0;top:0;display:none;pointer-events:none">
+<canvas id="cv$uid" style="position:absolute;left:0;top:0;cursor:crosshair;touch-action:none"></canvas></div>
+<div id="ctl$uid"><button id="pv$uid">◀</button> <button id="nx$uid">▶</button>
+<button id="pen$uid">➕ object dot</button> <button id="clr$uid">clear</button> $ask
+<span id="nm$uid"></span></div>
+<div id="msg$uid" style="margin-top:4px;min-height:1.4em">Click = object dot · shift-click = background dot ·
+drag = box.</div></div>
+<script>
+(function () {
+  var D = $data, uid = "$uid", k = 0, pts = [], box = null, bg = false, seq = 0, start = null, cur = null;
+  function el(s) { return document.getElementById(s + uid); }
+  var im = el("im"), mk = el("mk"), cv = el("cv"), ctx = cv.getContext("2d"), msg = el("msg");
+  function size(node, w, h) { node.style.width = w + "px"; node.style.height = h + "px"; }
+  function xy(e) {
+    var r = cv.getBoundingClientRect();
+    return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height];
+  }
+  function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height); ctx.lineWidth = 2;
+    pts.forEach(function (p) {
+      ctx.beginPath(); ctx.arc(p[0], p[1], 6, 0, 6.3);
+      ctx.fillStyle = p[2] ? "#fff" : "#000"; ctx.strokeStyle = p[2] ? "$fg" : "#fff";
+      ctx.fill(); ctx.stroke();
+    });
+    var b = start ? [start[0], start[1], cur[0], cur[1]] : box;
+    if (b) {
+      ctx.setLineDash([6, 4]); ctx.strokeStyle = "#fff"; ctx.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+      ctx.strokeStyle = "$fg"; ctx.lineDashOffset = 5; ctx.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+      ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    }
+  }
+  function reset() {
+    var d = D[k]; pts = []; box = null; seq++;
+    im.src = "data:image/jpeg;base64," + d.b64; im.style.filter = ""; mk.style.display = "none";
+    cv.width = d.w; cv.height = d.h; size(im, d.w, d.h); size(mk, d.w, d.h); size(cv, d.w, d.h);
+    size(el("st"), d.w, d.h); el("nm").textContent = d.name + " (" + (k + 1) + "/" + D.length + ")";
+    msg.textContent = "Click = object dot · shift-click = background dot · drag = box."; draw();
+  }
+  function run(text) {
+    if (!(window.google && google.colab && google.colab.kernel)) {
+      msg.textContent = "Needs a live Colab session."; return;
+    }
+    var mine = ++seq; msg.textContent = "SAM is thinking...";
+    google.colab.kernel.invokeFunction("fm_workshop.sam_play_" + uid, [k, pts, box, text || ""], {})
+      .then(function (r) {
+        if (mine !== seq) return;
+        var o = r.data["application/json"]; msg.textContent = o.line;
+        if (o.png) {
+          mk.src = o.png; mk.style.display = "block"; im.style.filter = "grayscale(1) brightness(.75)";
+        }
+        else { mk.style.display = "none"; im.style.filter = ""; }
+      })
+      .catch(function (err) { msg.textContent = "Error: " + err; });
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    start = cur = xy(e); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", function (e) { if (start) { cur = xy(e); draw(); } });
+  cv.addEventListener("pointerup", function (e) {
+    if (!start) return;
+    var s = start, c = xy(e); start = null;
+    if (Math.hypot(c[0] - s[0], c[1] - s[1]) < 8) pts.push([s[0], s[1], (e.shiftKey || bg) ? 0 : 1]);
+    else box = [Math.min(s[0], c[0]), Math.min(s[1], c[1]), Math.max(s[0], c[0]), Math.max(s[1], c[1])];
+    draw(); run("");
+  });
+  el("pv").onclick = function () { k = (k + D.length - 1) % D.length; reset(); };
+  el("nx").onclick = function () { k = (k + 1) % D.length; reset(); };
+  el("pen").onclick = function () {
+    bg = !bg; this.textContent = bg ? "➖ background dot" : "➕ object dot";
+  };
+  el("clr").onclick = reset;
+  if (el("ask")) el("ask").onclick = function () {
+    var t = el("txt").value.trim();
+    if (t) run(t); else msg.textContent = "Type a word first, for example the object you want.";
+  };
+  reset();
+})();
+</script>
+""")
+
+    def score(item: dict, pred: np.ndarray) -> str:
+        """'IoU vs ground truth 0.83 · marked 12 %' inside the scored region."""
+        r = region(item)
+        line = f"marked {(pred & r).sum() / max(1, r.sum()):.0%}"
+        if item.get("mask") is not None:
+            union = ((pred | item["mask"]) & r).sum()
+            line = f"IoU vs ground truth {((pred & item['mask']) & r).sum() / max(1, union):.2f} · " + line
+        return line
+
+    def predict(item: dict, pts: list, box: list | None, text: str, scale: float) -> np.ndarray:
+        """The binary mask SAM 3 (a word) or SAM 2.1 (dots and box, in image pixels) gives."""
+        if text.strip():
+            found = sam3_masks(item["image"], text)
+            return found.any(0) if len(found) else np.zeros(item["image"].shape[:2], bool)
+        prob = sam.probability(
+            item["image"],
+            points=[[x * scale, y * scale] for x, y, _ in pts] or None,
+            labels=[int(label) for _, _, label in pts] or None,
+            box=[v * scale for v in box] if box else None,
+        )
+        return prob > 0.5
+
+    if not IN_COLAB or SMOKE:  # no browser to talk to: one fixed click and one fixed box, as a figure
+        item = items[0]
+        ys, xs = np.nonzero(item["mask"]) if item.get("mask") is not None else (np.array([]), np.array([]))
+        if len(xs):
+            near = np.argmin((xs - xs.mean()) ** 2 + (ys - ys.mean()) ** 2)
+            click = [float(xs[near]), float(ys[near])]
+            box = [float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())]
+        else:
+            h, w = item["image"].shape[:2]
+            click, box = [w / 2, h / 2], [w / 4, h / 4, 3 * w / 4, 3 * h / 4]
+        panels = [
+            ("click", sam.probability(item["image"], points=[click], labels=[1]) > 0.5),
+            ("box", sam.probability(item["image"], box=box) > 0.5),
+        ]
+        fig, axes = plt.subplots(1, 3, figsize=(10, 3.4))
+        axes[0].imshow(item["image"])
+        axes[0].plot(*click, "o", color="white", mec=THEME["works"])
+        wh = (box[2] - box[0], box[3] - box[1])
+        axes[0].add_patch(plt.Rectangle(box[:2], *wh, fill=False, ec="white", ls="--"))
+        axes[0].set_title(f"{title}: {item['name']}")
+        for ax, (how, pred) in zip(axes[1:], panels, strict=True):
+            ax.imshow(overlay(item["image"], pred, THEME["works"]))
+            ax.set_title(f"SAM, one {how} · {score(item, pred)}", fontsize=8)
+        for ax in axes:
+            ax.axis("off")
+        plt.tight_layout()
+        plt.show()
+        word = ", or ask SAM 3 with a word" if text_prompt else ""
+        print(f"In Colab this is a live canvas: click, shift-click, drag a box{word}.")
+        return
+
+    uid = uuid.uuid4().hex[:8]
+    shown = []  # per image: the JPEG the canvas shows and its on-screen size
+    for item in items:
+        h, w = item["image"].shape[:2]
+        s = PLAY_PX / max(h, w)
+        size = (round(w * s), round(h * s))
+        buf = io.BytesIO()
+        Image.fromarray(item["image"]).resize(size).save(buf, format="JPEG", quality=85)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        shown.append({"name": item["name"], "w": size[0], "h": size[1], "b64": b64})
+    colour = np.round(hex_rgb(THEME["works"]) * 255).astype(np.uint8)
+
+    def answer(k, pts, box, text) -> JSON:
+        """Called by the canvas: run SAM for image k and send back a transparent mask PNG plus one line."""
+        item, d = items[int(k)], shown[int(k)]
+        if not text.strip() and not pts and box is None:
+            return JSON({"png": "", "line": "Click, shift-click or drag first."})
+        try:
+            pred = predict(item, pts, box, text, item["image"].shape[1] / d["w"])
+        except Exception as err:  # noqa: BLE001 - the widget shows one plain line, never a traceback
+            line = f"SAM could not run: {type(err).__name__}: {err}"
+            line = str(err) if isinstance(err, RuntimeError) else line
+            return JSON({"png": "", "line": line})
+        soft = Image.fromarray(pred.astype(np.uint8) * 255).resize((d["w"], d["h"]), Image.BILINEAR)
+        alpha = np.asarray(soft)
+        rgba = np.dstack([np.broadcast_to(colour, (d["h"], d["w"], 3)), (alpha * 0.7).astype(np.uint8)])
+        buf = io.BytesIO()
+        Image.fromarray(rgba).save(buf, format="PNG")
+        png = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        who = "SAM 3" if text.strip() else "SAM 2.1"
+        line = f"{who} · {score(item, pred)}" if pred.any() else f"{who} found nothing."
+        return JSON({"png": png, "line": line})
+
+    from google.colab import output
+
+    output.register_callback(f"fm_workshop.sam_play_{uid}", answer)
+    ask = (
+        f'<input id="txt{uid}" value="{default_text}" size="18"> <button id="ask{uid}">Ask SAM 3</button>'
+        if text_prompt
+        else ""
+    )
+    data = json.dumps(shown).replace("</", "<\\/")
+    display(HTML(page.substitute(title=title, uid=uid, data=data, ask=ask, fg=THEME["works"])))
 
 # %% [markdown]
 # <!-- callout: note | If something goes wrong -->

@@ -16,7 +16,10 @@ index.json          dataset facts + one entry per image: name, split (fit | held
                     n_fg_strokes, n_bg_strokes, scribbled_fraction, hidden_fg_fraction, size_hw
 images/NAME.jpg     RGB image
 masks/NAME.png      full ground truth, 255 = foreground      -> evaluation only (SPEC L-005)
-fov/NAME.png        evaluation region, 255 = inside           (retina only)
+fov/NAME.png        evaluation region, 255 = inside. Retina: inside the camera's field of view.
+                    Pets: everything except the trimap's "not sure" band (Oxford class 3, ~10-20 px
+                    along the outline), which is 0 here = not scored. masks/ is class 1 only (the pet),
+                    so band pixels are neither pet nor background. Scribbles keep out of the band.
 scribbles/NAME.png  0 = unlabelled, 1 = foreground stroke, 2 = background stroke
 visible/NAME.png    "missing labels": 255 = labelled foreground; the hidden half of the true
                     foreground is 0 here (hidden = mask & ~visible)
@@ -39,3 +42,6 @@ manifest.json                          path, bytes, sha256 of every file
 A head is applied as `conv1x1((feat - feat_mean) / feat_std)`, logits upsampled bilinearly to the
 image, foreground = logit > 0. Regimes: `full`, `full5` (pets: 5 images), `scribbles`, `hidden_bg`
 (naive baseline, plain BCE), `hidden_bg_balanced`, `masked` (hidden pixels ignored), `pseudo`.
+Pets heads also ignore the not-sure band in the loss (label -1 outside `fov`), and their held-out
+metrics are computed inside `fov`. Rebuild pets only: `prepare_data.py --only-pets`, then
+`precompute.py --only-pets` (and again with `--smoke`); specialised files stay byte-identical.
