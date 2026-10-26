@@ -1,5 +1,7 @@
 # SPEC — When Foundation Models Fall Short: From Off-the-Shelf AI to Problem-Specific Adaptation
 
+**With:** Susanne Suter
+
 The single source of truth for **what** this notebook is. `AGENTS.md` says how to work,
 `RULES.md` says what every notebook must respect, and this file says what *this* one must do.
 Written 2026-10-19 from Simone's grilling (W-1…W-17 on the vault page

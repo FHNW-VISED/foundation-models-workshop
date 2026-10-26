@@ -12,3 +12,4 @@ Never edit a version folder.
 | v03 | 2026-10-26 | rules sync N-050–N-052 + lint checks (PR #22) | d391250 |
 | v04 | 2026-10-26 | cuts 2026-10-26 (round 1 + 2 decisions) | c990866 |
 | v05 | 2026-10-26 | reorders: Q12, Q16, Q17 before their cells (N-052) | 2893a93 |
+| v06 | 2026-10-26 | SPEC: made with Susanne Suter (SN rules incl. SN-006); RULES.md synced with the current ledger | 91a315d |
