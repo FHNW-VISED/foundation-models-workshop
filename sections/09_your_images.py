@@ -433,7 +433,7 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 # - Then run the next cell (seconds on a T4, much slower on CPU): it shows each image with the three masks
 #   in the approach colours of sections 4 and 7, and the IoU on the example.
 #
-# **Q33.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
+# **Q30.** 🟡 Which rung gave the mask you would keep, image by image, and did it match your prediction?
 # Where a rung failed, was it:
 #
 # - SAM's idea of an object (the box or the clicks grabbed the wrong thing, or too much)?
@@ -441,7 +441,7 @@ def stroke_agreement(pred: np.ndarray, item: dict) -> tuple[float, float]:
 # - your strokes (a part of the thing you never touched)?
 
 # %%
-# Q33 — the ladder on your images: zero-shot SAM, your scribble head, SAM from your strokes
+# Q30 — the ladder on your images: zero-shot SAM, your scribble head, SAM from your strokes
 N_OWN_CLICKS = 10  # clicks per kind (thing / background) and image, spread along your strokes
 OWN_BOX_PAD = 0.05  # zero-shot box: your thing strokes' bounding box, grown by this share of the long side
 OWN_FEAT_SIDE = 256 if SMOKE else 512  # DINOv3 resolution for the head (long side, pixels)
@@ -587,7 +587,7 @@ for it, d in zip(LADDER_OWN, own_disagree, strict=True):
 show_masks(panels, width=2.8)
 
 # %% [markdown]
-# **Q34.** 🟡 Where is the orange?
+# **Q31.** 🟡 Where is the orange?
 #
 # - Along the boundary of the thing?
 # - On whole parts of it?
@@ -609,7 +609,7 @@ show_masks(panels, width=2.8)
 # </details>
 
 # %% [markdown]
-# **Q35.** 🔴 Test your answer to Q34.
+# **Q32.** 🔴 Test your answer to Q31.
 #
 # 1. Draw your two extra strokes per image on the canvas of 9.2. Draw over the old ones; they stay until
 #    you press clear. On the example, a saved canvas replaces the generated strokes, so draw a full set.

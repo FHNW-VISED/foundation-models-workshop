@@ -70,7 +70,7 @@ These appear verbatim in the title banner.
 | Grad-CAM | `grad-cam` (pytorch-grad-cam, MIT); the only `%pip install` |
 | Licence checks | Re-check the DINOv3/SAM 3 terms ~4 weeks before each event (Meta can change them) |
 | Precomputed | DINOv3 patch features for every workshop image, plus a checkpoint for every training step ("not done in 3 min? load ours") (W-7), downloaded by the setup check |
-| Setup check | A separate small notebook `setup_check.ipynb`, shared a week before (W-12, N-030). It downloads models, data and caches into the participant's Google Drive and prints ✅. The main notebook loads from that cache |
+| Setup check | A separate small notebook `setup_check.ipynb`, shared a week before (W-12, N-030), with an email that also asks each participant to **bring one image of their own** for section 9 (S8, Simone 2026-10-26). It downloads models, data and caches into the participant's Google Drive and prints ✅. The main notebook loads from that cache |
 | Smoke run | `NB_SMOKE=1`, CPU, budget 1,200 s; local test images only, no Drive |
 
 ## 6. Sections
@@ -91,8 +91,11 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 | 9 | sections/09_your_images.py | Your own images | Scribble on your own images and run the ladder | 🟡 | 20 | done |
 | 10 | sections/10_principles.py | Guiding principles & wrap-up | Turn the results into rules you can reuse | 🟢 | 5 | done |
 
-**Block 1** = sections 0–3 (+ the start of 4), "when it works and when it doesn't", ending on the cliffhanger before coffee.
-**Block 2** = sections 4–10, "ways out".
+**Block 1** = sections 0–3 and section 4 up to the scribble rung (4.3), "when it works and when it doesn't". The coffee break
+sits **just before 4.3** (S0, Simone 2026-10-26; was: end of 03). It carries a no-code question to think about over coffee
+(Q14: "what could you tell the training about a pixel nobody labelled?", with a hint for after the break); block 2 opens by
+collecting answers, then 4.3 starts with "Welcome back" and the annotator's new instruction.
+**Block 2** = 4.3 (scribbles) to section 10, "ways out".
 
 ### Section contents
 - **00 Setup & the question**
@@ -104,22 +107,28 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 - **01 Out of the box: pets**
   - SAM with 1 point and with a box on pets (it shines).
   - DINOv3 patch features shown as a 3-colour PCA image.
-  - A linear head trained on 5 pets with full masks (seconds), with IoU on held-out pets.
-  - 👥 optional.
+  - A linear head trained on 5 pets with full masks (seconds), with IoU on held-out pets, and a step-by-step figure of the head
+    (patches, one probability per patch, upsampled map, mask) with one patch worked by hand (moved here from section 3).
+  - ✍️ optional `my_iou`. 👥 optional.
 - **02 Where it falls short**
   - The same three tools on the specialised task, plus a failure gallery.
-  - **SAM probed with escalating prompts** (1 → 5 → 20 points; box) (W-4 research).
-  - Resolution effect: features at 518 vs 1024 for thin structures.
+  - **SAM probed with escalating prompts** (1 → 5 → 20 points; box) (W-4 research); one figure shows the four prompts next to SAM's masks.
+  - Resolution effect: features at 512 vs 1024 for thin structures (the attention arithmetic is a go-deeper box).
+  - ✍️ optional `my_cldice`.
+  - 🔴 optional: the DINOv3 PCA on retina images, the "thick trunk only" simulation, the whole-fundus view.
   - Predict before you run (N-004).
   - 👥 "whose image fails worst?" (a show-of-hands moment, in FACILITATION).
 - **03 Hide the labels: the naive baseline**
   - Generate incomplete supervision (§4).
   - Train the head with **missing = background**, evaluate on the hidden ground truth, and show where it fails ("it learns that vessels are background").
-  - The cliffhanger into the break.
+  - No ✍️ here: `hidden_recall` is reference code. 🔴 optional: the balanced-loss head ("is it the labels, or the loss?").
+  - Leads straight into section 4's first rungs; the break comes later, before 4.3 (S0).
 - **04 The adaptation ladder** (W-3)
-  - Rungs: zero-shot (02) → **one-shot**: one annotated image, either as a nearest-feature prototype or as SAM prompts from it → **scribbles** (auto-scribbles, partial cross-entropy that ignores unlabelled pixels: the MIT DINOv2-scribble idea applied to DINOv3).
+  - Rungs: zero-shot (02) → **one-shot**: one annotated image, as a nearest-feature prototype (🔴 optional: the same map used as SAM prompts) → **scribbles** (auto-scribbles, partial cross-entropy that ignores unlabelled pixels: the MIT DINOv2-scribble idea applied to DINOv3).
   - Show **how the predictions differ**, not "quality rises" (Simone: quality need not improve).
-  - ✍️ optional: choose which unlabelled pixels to ignore.
+  - ✍️ optional `my_scribble_targets`: choose which unlabelled pixels to ignore.
+  - The coffee break and its question sit before 4.3 (see §6 above).
+  - 🔴 optional: the difference maps between rungs, and "choose a distance" (the "surely background" shortcut, with `BG_BEYOND_PX`).
 - **05 Path 1 · Learn from less**
   - Treat missing as **unknown**: a masked loss, then 🔴 a PU-inspired loss.
   - ✍️ `masked_loss(logits, labels, ignore_mask) -> torch.Tensor` via `use()`, so participants write the loss (W-5).
@@ -127,31 +136,35 @@ Two **90-minute blocks around the 30-min coffee break** (W-1, W-9). Time = parti
 - **06 Path 2 · Recover supervision**
   - **SAM pseudo-labels** from scribble points, used as training targets for the head.
   - **Grad-CAM** from a small classifier on image-level or patch-level labels, thresholded into a pseudo-mask *or* used as a SAM prompt.
-  - ✍️ tune the pseudo-label threshold.
+  - ✍️ optional `my_pseudo_targets`. The pseudo-label threshold and the unsure band are Colab sliders (`PSEUDO_THRESHOLD`, `UNSURE_BAND`).
+  - The Grad-CAM sketch and its step-by-step sit in a go-deeper box; 🔴 optional: Grad-CAM peaks as SAM clicks.
   - **[OPEN]** If the specialised task is retina, Grad-CAM needs an image-level task. Default: classify patches as "contains vessel / not", and say plainly that this is an awkward fit. The bake-off reports whether Grad-CAM is meaningful.
 - **07 Path 3 · Skip specialist training**
-  - SAM prompted directly with points from the scribbles, plus boxes. No training.
+  - SAM prompted directly with points from the scribbles (one computed row; the number-of-clicks variation is 🔴), plus one small box and a centre click per stroke. No training.
+  - The box size and the centre click are a slider (`BOX_PAD_TRY`) and a checkbox (`WITH_CLICK_TRY`). The thickened strokes (no model) are the baseline to beat.
   - 🔴 SAM 3 text prompts if available.
 - **08 Compare everything**
-  - First, a ✏️ "your prediction: which approach wins?" cell (W-11).
+  - First, a ✏️ "your prediction: which approach wins, which is steadiest?" cell with two dropdowns (`MY_WINNER`, `MY_STEADIEST`; W-11).
   - Then the **comparison table** (W-15), one row per approach:
     - accuracy = IoU / Dice (+ clDice for vessels) on the hidden ground truth;
     - annotation effort = labelled pixels + strokes → estimated minutes, with the minutes-per-stroke assumption stated;
     - reliability = spread over 3 seeds or images;
     - speed / compute = seconds of training + inference;
     - scalability = discussion only.
-  - A small plot.
-  - 👥 compare tables with your neighbour.
+  - A small plot, then a violin plot of the per-image IoU.
+  - 👥 defend a row for a given situation.
 - **09 Your own images**
   - Upload 1–3 images. Draw scribbles on a **canvas inside Colab** (HTML canvas + `google.colab.output`), with an **upload-a-PNG fallback** (W-6).
   - Run the ladder on them: zero-shot SAM, the scribble head, SAM from scribble points.
   - In SMOKE / without Colab, use a bundled example image and generated scribbles.
   - ⚠️ Never use Gradio's public share link (privacy).
   - 👥 compare own-image results.
-  - Short "try it on your images" invitations also appear at the end of sections 2, 4 and 7 (W-10). Never mandatory.
+  - Sections 2, 4 and 7 end with a one-line pointer to this section; the own-image cells that W-10 first put there were cut (2026-10-26), so section 9 is the only place for participants' own photos. Never mandatory.
+  - The setup email asks each participant to bring one image (S8).
 - **10 Guiding principles & wrap-up**
   - 4–6 principles derived from *this run's* table (e.g. "thin structures defeat patch features: check the resolution first").
-  - Outcomes restated; where to go next; licences and credits.
+  - Outcomes restated ("At the end you can"); "six questions for any task" and "where to go next" are go-deeper boxes; licences and credits.
+  - A closing cell for their own problem (`MY_PROBLEM`, `MY_PRINCIPLE`, `MY_FIRST_STEP`); no separate whole-workshop takeaway.
 
 ### Separate deliverable: `setup_check.py` → `setup_check.ipynb`
 - Mounts Google Drive and downloads the DINOv3 timm weights, SAM weights, data subsets, precomputed features and checkpoints into `MyDrive/fm-workshop-cache/`.
