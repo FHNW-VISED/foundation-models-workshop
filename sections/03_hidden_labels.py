@@ -117,23 +117,6 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q10.** 🟡 Look at the third panel on its own. The line above says what share of the vessel pixels is
-# hidden. If a colleague handed you that label file, could you tell that this much is missing? What would you
-# need to know to tell?
-#
-# <details><summary>What to look for</summary>
-#
-# - Usually you cannot. The visible vessels are clean and correct, they simply stop, and a vessel tree that
-#   stops looks plausible.
-# - The file has two values, vessel and background, and no third value for "nobody looked here".
-# - To tell, you would need to know how the file was made (who annotated, for how long, what they were told
-#   to skip): exactly the information that gets lost.
-# - That is why we hid the labels on purpose: here we know which pixels are missing, so we can measure what
-#   the model does with them.
-#
-# </details>
-
-# %% [markdown]
 # ### 3.2 A metric for the missing vessels: recall
 
 # %% [markdown]
@@ -145,42 +128,16 @@ show_masks(
 # - Precision: it marked 150 pixels and 120 are vessels: 120 ÷ 150 = 80%.
 
 # %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 1 min) -->
-# Fill `my_hidden_recall`: a boolean prediction and a boolean mask of hidden pixels in, one float out.
-#
-# - The share of the hidden pixels that the prediction marks.
-# - Return 0.0 when nothing is hidden.
-# - The play example has 8 hidden pixels and the prediction finds 2 of them: expect 0.25.
-#
-# The cell checks your version on two play masks and continues with ours if you skip it. Stuck? Open the
-# collapsed "Reference solution" cell above it.
+# This helper cell defines `hidden_recall(pred, hidden)`: the share of the `hidden` pixels that the prediction
+# marks (0.0 when nothing is hidden). Every recall below uses it.
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
-    """Reference: the prediction's mean over the hidden pixels."""
+# @title hidden_recall: the share of the hidden pixels found { display-mode: "form" }
+def hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
+    """Share of the `hidden` pixels that `pred` marks as foreground; 0.0 when `hidden` is empty."""
     hidden = np.asarray(hidden, bool)
     return float(np.asarray(pred, bool)[hidden].mean()) if hidden.any() else 0.0
 
-
-# %%
-# ✍️ YOUR CODE
-def my_hidden_recall(pred: np.ndarray, hidden: np.ndarray) -> float:
-    """Share of the `hidden` pixels that `pred` marks as foreground; 0.0 when `hidden` is empty."""
-    ...
-
-
-_play_hidden = np.zeros((8, 8), bool)
-_play_hidden[2, :] = True  # a hidden vessel, 8 px long
-_play_pred = np.zeros((8, 8), bool)
-_play_pred[1:4, :2] = True  # the prediction finds its first 2 px, plus some background
-hidden_recall = use(
-    my_hidden_recall,
-    reference=_ref_hidden_recall,
-    check=lambda f: [round(float(f(_play_pred, h)), 4) for h in (_play_hidden, np.zeros((8, 8), bool))],
-    name="hidden_recall",
-)
-print(f"play example · recall on the hidden vessel: {hidden_recall(_play_pred, _play_hidden):.2f}")
 
 # %% [markdown]
 # ### 3.3 The naive baseline: missing = background
@@ -191,64 +148,6 @@ print(f"play example · recall on the hidden vessel: {hidden_recall(_play_pred, 
 # Two things change from section 2.5, the labels and the loss weighting. The hidden labels cause the gap in
 # the chart below; the plain loss only makes the head believe them more strictly, and 3.4 separates the two.
 # Everything else is the same: the same five images, DINOv3 features, linear head and steps.
-
-# %% [markdown]
-# <!-- callout: theory | Theory: the linear head in one line -->
-# For every patch, the head computes one probability from its 384 DINOv3 numbers:
-#
-# **p = σ(w · f + b)**
-#
-# - `f`: the 384 (standardised) numbers of one patch.
-# - `w`, `b`: 384 weights and one bias (385 learned numbers), the **same for every patch**: a 1 × 1
-#   convolution.
-# - `σ`: squeezes the score into 0 to 1. Example: w · f + b = 2.2 gives p = 0.90, and w · f + b = 0 gives 0.5.
-# - The per-patch map is upsampled to the image, and p > 0.5 means "vessel".
-
-# %% [markdown]
-# This cell runs the section-2 head on one training image and shows each step (patches, one probability per
-# patch, the upsampled map, the final mask), then works through one patch by hand.
-
-# %%
-# @title The linear head step by step on one image { display-mode: "form" }
-hside = SPECIALISED["feat_side"]
-hx = miss_train[0]
-hparams = spec_heads[hside][0]  # section 2.5: trained on full masks
-hfeat = features_for(SPECIALISED, hx, hside)  # [384, h, w]: 384 numbers per patch
-dev = hfeat.device
-with torch.no_grad():
-    hz = (hfeat - hparams["feat_mean"].to(dev).view(-1, 1, 1)) / hparams["feat_std"].to(dev).view(-1, 1, 1)
-    hscore = F.conv2d(hz[None], hparams["weight"].to(dev), hparams["bias"].to(dev))[0, 0]  # w·f + b per patch
-    hprob = torch.sigmoid(hscore)
-    hup = F.interpolate(hprob[None, None], size=hx["mask"].shape, mode="bilinear", align_corners=False)[0, 0]
-gh, gw = hprob.shape
-py, px = np.unravel_index(int(hprob.argmax()), hprob.shape)  # the most vessel-like patch
-f_vec, w_vec = hz[:, py, px], hparams["weight"].reshape(-1).to(dev)
-f_head = ", ".join(f"{v:.2f}" for v in f_vec[:4].tolist())
-dot, bias = float((w_vec * f_vec).sum()), float(hparams["bias"])
-total, p_patch = float(hscore[py, px]), float(hprob[py, px])
-print(f"patch (row {py}, col {px}) · f = [{f_head}, … 384 numbers]")
-print(f"w · f + b = {dot:.2f} + ({bias:.2f}) = {total:.2f} → p = σ({total:.2f}) = {p_patch:.2f}")
-
-prob_cmap = mpl.colors.LinearSegmentedColormap.from_list("prob", ["#FFFFFF", THEME["works"]])
-H, W = hx["mask"].shape
-fig, axes = plt.subplots(1, 4, figsize=(11.6, 3))
-axes[0].imshow(hx["image"])
-axes[0].vlines(np.arange(0, W + 1, W / gw), 0, H, colors="white", linewidths=0.4)
-axes[0].hlines(np.arange(0, H + 1, H / gh), 0, W, colors="white", linewidths=0.4)
-cell_box = plt.Rectangle((px * W / gw, py * H / gh), W / gw, H / gh, fill=False, ec=THEME["fails"], lw=2)
-axes[0].add_patch(cell_box)
-axes[0].set_title("1 · image cut into patches", fontsize=9)
-axes[1].imshow(hprob.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1, interpolation="nearest")
-axes[1].add_patch(plt.Rectangle((px - 0.5, py - 0.5), 1, 1, fill=False, ec=THEME["fails"], lw=2))
-axes[1].set_title("2 · one p per patch (white 0, violet 1)", fontsize=9)
-axes[2].imshow(hup.cpu().numpy(), cmap=prob_cmap, vmin=0, vmax=1)
-axes[2].set_title("3 · upsampled to the image", fontsize=9)
-axes[3].imshow(overlay(hx["image"], predict_head(hparams, hfeat, hx["mask"].shape), THEME["fails"]))
-axes[3].set_title("4 · p > 0.5 → vessel", fontsize=9)
-for ax in axes:
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
 
 # %% [markdown]
 # A playful extreme first, to have a scale: this cell scores a fake model that believes the label file
@@ -396,36 +295,13 @@ show_masks(panels, width=3.4)
 
 # %% [markdown]
 # <!-- callout: question | Question -->
-# Run the next cell: it draws the naive head's failures on a training image, then on the held-out demo image
-# of section 2, from predictions you already have (no new training, no model calls).
-#
-# **Q11.** 🟡 On the training image, which hidden vessels did the naive head miss (green), and which did it
-# still find (violet)? Use the "found X%" in the title. On the held-out image, compare it with the section-2
-# head: does it fail the same way (too wide, the disc, the whole eye) or differently? Try another training
-# image:
-#
-# ```python
-# FAIL_IMAGE = 0   # try 1, 2, ...
-# ```
+# **Q10.** 🟡 Look at the worst, typical and best images above: which hidden vessels did the naive head
+# miss (green), and which did it still find (violet)? Then run the next cell, which draws the naive head's
+# predictions on the held-out demo image of section 2 next to the section-2 head's (no new training, no model
+# calls): does it fail the same way (too wide, the disc, the whole eye) or differently?
 
 # %%
-# Q11 — where the naive head fails: a training image, then the held-out demo image
-FAIL_IMAGE = 0  # try 1, 2, ...
-if not isinstance(FAIL_IMAGE, int) or not 0 <= FAIL_IMAGE < len(miss_train):
-    raise SystemExit(f"FAIL_IMAGE must be a whole number from 0 to {len(miss_train) - 1}.")
-it, pred = miss_train[FAIL_IMAGE], naive["fit_preds"][FAIL_IMAGE]
-found, missed = it["hidden"] & pred, it["hidden"] & ~pred
-show_masks(
-    [
-        ("labels training saw", overlay(it["image"], it["visible"], THEME["scribble"])),
-        ("naive head", overlay(it["image"], pred, THEME["fails"])),
-        (
-            f"hidden vessels · found {hidden_recall(pred, it['hidden']):.0%}",
-            two_colour(it["image"], found, missed, THEME["truth"]),
-        ),
-    ],
-    width=3.0,
-)
+# Q10 — the naive head on the held-out demo image, next to the section-2 head
 k = next(i for i, e in enumerate(SPEC_EVAL) if e is demo)
 show_masks(
     [
@@ -529,7 +405,7 @@ else:
 # balanced loss.
 
 # %% [markdown]
-# **Q12.** 🔴 Train the same naive labels with the balanced loss of section 2.5 and compare its recall on the
+# **Q11.** 🔴 Train the same naive labels with the balanced loss of section 2.5 and compare its recall on the
 # hidden vessels with the plain head's. Does reweighting fix "missing = background"? What did it fix?
 #
 # ```python
@@ -540,7 +416,7 @@ else:
 # to the plain head's.
 
 # %%
-# Q12 — the same "missing = background" labels with the balanced loss of section 2.5
+# Q11 — the same "missing = background" labels with the balanced loss of section 2.5
 balanced_head, balanced_sec = train_head(miss_feats, naive_labels, HEAD_STEPS, balanced=True)
 bal_fit = [
     predict_head(balanced_head, f, it["mask"].shape) for f, it in zip(miss_feats, miss_train, strict=True)
@@ -553,7 +429,7 @@ print(f"{'plain':<12}{naive['recall_hidden_fit']:>15.3f}{naive['recall_visible_f
 print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 
 # %% [markdown]
-# <!-- callout: go-deeper | Q12: what to look for -->
+# <!-- callout: go-deeper | Q11: what to look for -->
 # - Reweighting usually recovers a lot of the hidden vessels. It does not fix the labels, it fixes the
 #   *proportion*: missing = background told the head that vessels are about half as common as they are, and
 #   the balanced loss stops caring about proportions.
@@ -573,27 +449,4 @@ print(f"{'balanced':<12}{bal_hidden:>15.3f}{bal_visible:>9.3f}")
 #   gaps are random, not when thin vessels are skipped.
 # - **Three failures so far** (SAM finds the eye, the head is limited by its 16 px patches, naive training
 #   believes the file) → none of these is a model-size problem we have tested; each needs different
-#   supervision. This section's recall on the hidden vessels is the baseline to beat; Q13 asks how.
-
-# %% [markdown]
-# ### ☕ Before the break
-
-# %% [markdown]
-# <!-- callout: question | Question for the coffee break -->
-# No code, just think about it over coffee.
-#
-# **Q13.** 🟡 You have 50 fundus images and a 4-hour annotation budget. Perfect labels cost 3 to 5 hours per
-# image, and the cheap ones lie: the label file says "background" wherever nobody looked. Without buying more
-# labels, what could you tell the training about a pixel nobody labelled? Think of at least two options before
-# section 4.
-#
-# <details><summary>A hint, for after the break</summary>
-#
-# Three families of answers come back in block 2:
-#
-# - Say "unknown" instead of "background", and let the loss skip those pixels (sections 4 and 5).
-# - Guess the missing labels with another model, for example SAM prompted from the labels you have, and train
-#   on the guesses (section 6).
-# - Skip training and give the cheap labels to the foundation model directly as prompts (section 7).
-#
-# </details>
+#   supervision. This section's recall on the hidden vessels is the baseline to beat; section 4 starts on how.

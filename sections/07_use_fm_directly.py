@@ -135,66 +135,14 @@ def show_boxes(panels: list[tuple[str, np.ndarray, list | None]], width: float =
 
 
 # %% [markdown]
-# This cell draws the two prompt types we take from a person's strokes on the demo image: points `(x, y,
-# label)` with label 1 = "vessel" and 0 = "not vessel", and boxes `(x0, y0, x1, y1)`.
-
-# %%
-# @title Prompt types made from strokes: points and boxes { display-mode: "form" }
-type_fg, type_bg = stroke_points(demo, 1, 8), stroke_points(demo, 2, 8)
-type_boxes, type_centres = [], []
-for stroke in stroke_masks(demo, 1):
-    ys, xs = np.nonzero(stroke)
-    h, w = stroke.shape
-    type_boxes.append(
-        [max(xs.min() - 4, 0), max(ys.min() - 4, 0), min(xs.max() + 4, w - 1), min(ys.max() + 4, h - 1)]
-    )
-    type_centres.append(stroke_click(stroke))
-strokes_rgb = overlay(demo["image"], demo["scribbles"] == 1, THEME["scribble"])
-strokes_rgb = overlay(strokes_rgb, demo["scribbles"] == 2, THEME["background"])
-fig, axes = plt.subplots(1, 4, figsize=(13, 3.4))
-for ax, title, img in [
-    (axes[0], "strokes: teal = vessel, grey = background", strokes_rgb),
-    (axes[1], "points: ★ label 1, ✖ label 0", demo["image"]),
-    (axes[2], "boxes: one per vessel stroke", demo["image"]),
-    (axes[3], "box + centre click: one object each", demo["image"]),
-]:
-    ax.imshow(img)
-    ax.set_title(title, fontsize=9)
-    ax.axis("off")
-for x, y in type_fg:
-    axes[1].plot(x, y, marker="*", markersize=9, color=THEME["scribble"], markeredgecolor="white")
-for x, y in type_bg:
-    axes[1].plot(x, y, marker="X", markersize=7, color=THEME["fails"], markeredgecolor="white")
-for ax in (axes[2], axes[3]):
-    for x0, y0, x1, y1 in type_boxes:
-        ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, lw=1, color=THEME["scribble"]))
-for x, y in type_centres:
-    axes[3].plot(x, y, marker="*", markersize=7, color=THEME["scribble"], markeredgecolor="white")
-plt.tight_layout()
-plt.show()
-print(f"{len(type_boxes)} vessel strokes on the demo image = {len(type_boxes)} possible boxes")
-
-# %% [markdown]
 # ### 7.1 Clicks on the vessels, and "not here"
 #
 # The news is **fairness**: the heads of sections 4 to 6 never saw a stroke on the held-out images, but Path 3
 # gets strokes on every one of them. It gets more help per image, and pays for it at use time.
 #
-# The first recipe is section 6.1 without the head:
-#
-# - Twenty clicks along the vessel strokes and twenty along the background strokes of each *held-out* image.
-# - SAM's mask is the answer. The strokes are prompts a person would draw at use time, and the ground truth
-#   only scores the result.
-
-# %% [markdown]
-# <!-- callout: question | 🤔 Your prediction -->
-# Section 6 turned SAM's guesses into a trained head. Here SAM sees each held-out image's own clicks and
-# nothing is trained. Will its IoU be higher or lower than that head's, and by roughly how much? Write one
-# guess. The table below prints both.
-
-# %% [markdown]
-# This cell prompts SAM with the stroke clicks on every evaluation image, scores the masks against the hidden
-# truth and shows the demo image (one SAM image encoding per image: seconds on a T4, much slower on a CPU).
+# The first recipe is section 6.1 without the head: twenty clicks along the vessel strokes and twenty along
+# the background strokes of each *held-out* image, and SAM's mask is the answer. The next cell prints that
+# one row.
 
 # %%
 # @title SAM from twenty vessel and twenty background clicks per image { display-mode: "form" }
@@ -208,25 +156,13 @@ print(
     f"SAM from {N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} stroke clicks on {len(SPEC_EVAL)} images · "
     f"{clicks_sec} s on {DEVICE}"
 )
-print_path2(path3_report | {"sam_pseudo": path2_report["sam_pseudo"]})
+print_path2({"sam_clicks": path3_report["sam_clicks"]})
 print(f"{'section 2: SAM, 20 vessel clicks only':<46}{RESULTS['sam_prompt_ladder']['20 points']:>6.3f}")
-pos, neg = click_prompts[k_demo]
-show_clicks(
-    [
-        (f"{demo['name']} · vessel clicks", demo["image"], pos),
-        ("background clicks", demo["image"], neg),
-        ("SAM from both vs truth", error_map(demo["image"], path3_preds["sam_clicks"][k_demo], demo), None),
-    ],
-    width=3.0,
-)
 
 # %% [markdown]
-# In the last panel, violet = vessel found, orange = SAM marked background as vessel, green = a vessel SAM
-# missed.
-#
-# **Q27.** 🟡 Did the "not here" clicks pull SAM's mask onto the vessels? Change the number of clicks per kind
-# and run the next cell: does SAM do better with fewer clicks or with more? Why would that be, given that
-# every prompt set describes one object?
+# **Q25.** 🔴 (optional) Did the "not here" clicks pull SAM's mask onto the vessels (compare the row with
+# section 2's vessel-only clicks)? Change the number of clicks per kind and run the next cell: does SAM do
+# better with fewer clicks or with more? Why would that be, given that every prompt set describes one object?
 #
 # ```python
 # N_CLICKS_TRY = 5   # try 1, 5, 50
@@ -237,7 +173,7 @@ show_clicks(
 # default of 20.
 
 # %%
-# Q27 — fewer or more stroke clicks for SAM
+# Q25 — fewer or more stroke clicks for SAM
 N_CLICKS_TRY = 5  # try 1, 5, 50
 if not isinstance(N_CLICKS_TRY, int) or N_CLICKS_TRY < 1:
     raise SystemExit("N_CLICKS_TRY must be a whole number of at least 1.")
@@ -279,12 +215,14 @@ print_path2(
 # along this line, inside this rectangle".
 
 # %% [markdown]
-# This helper cell holds our solution of the next exercise. Open it only if you are stuck.
+# This helper cell defines `stroke_box`, the box around one stroke: the min and max of its columns and rows,
+# grown by a margin and clipped to the image.
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
-    """Reference: min/max of the stroke's columns and rows, padded, then clipped."""
+# @title stroke_box: the box around one stroke { display-mode: "form" }
+def stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
+    """The box [x0, y0, x1, y1] around the True pixels of `stroke`, grown by `pad` pixels on every side and
+    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1. np.nonzero returns rows (y) first."""
     ys, xs = np.nonzero(stroke)
     h, w = stroke.shape
     return [
@@ -294,40 +232,6 @@ def _ref_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
         float(min(ys.max() + pad, h - 1)),
     ]
 
-
-# %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 2 min) -->
-# Fill `my_stroke_box` in the next cell.
-#
-# - **In:** one stroke as a boolean image (`True` on the stroke) and a margin `pad` in pixels.
-# - **Out:** the box `[x0, y0, x1, y1]` around the stroke's pixels, grown by `pad` on every side and
-#   clipped to the image (x from 0 to width − 1, y from 0 to height − 1).
-# - **Careful:** `np.nonzero` returns rows (y) before columns (x).
-#
-# The cell checks your version on a 6 × 8 play stroke, without and with a margin, and continues with ours if
-# you skip it.
-
-
-# %%
-# ✍️ YOUR CODE
-def my_stroke_box(stroke: np.ndarray, pad: int) -> list[float]:
-    """The box [x0, y0, x1, y1] around the True pixels of `stroke`, grown by `pad` pixels on every side and
-    clipped to the image: 0 <= x <= width - 1, 0 <= y <= height - 1."""
-    ...
-
-
-_play_stroke = np.zeros((6, 8), bool)
-_play_stroke[1, 1:4] = True  # a short diagonal stroke near the top-left corner
-_play_stroke[2, 4] = _play_stroke[3, 5] = True
-stroke_box = use(
-    my_stroke_box,
-    reference=_ref_stroke_box,
-    check=lambda f: [[float(v) for v in f(_play_stroke, p)] for p in (0, 2)],
-    name="stroke_box",
-)
-print(
-    "play stroke · box with pad 0:", stroke_box(_play_stroke, 0), "· with pad 2:", stroke_box(_play_stroke, 2)
-)
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -394,13 +298,13 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q28.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
+# **Q26.** 🟡 Compare the box recipe with the clicks of 7.1 and with the thickened strokes: which column
 # moved, recall or precision? Then grow the boxes and drop the centre click in the next cell. What does a
 # larger box let SAM find, and what does it cost?
 #
 # ```python
-# BOX_PAD_TRY = 16      # try 0, 16, 32 (px of the 1024 px crop)
-# WITH_CLICK_TRY = True  # try False: the box alone
+# BOX_PAD_TRY = 16      # slider: try 0, 16, 32 (px of the 1024 px crop)
+# WITH_CLICK_TRY = True  # tick box: untick for the box alone
 # ```
 
 # %% [markdown]
@@ -408,9 +312,9 @@ show_masks(
 # under the default.
 
 # %%
-# Q28 — larger or smaller boxes, with or without the centre click
-BOX_PAD_TRY = 16  # try 0, 16, 32 (px of the 1024 px crop)
-WITH_CLICK_TRY = True  # try False: the box alone
+# Q26 — larger or smaller boxes, with or without the centre click
+BOX_PAD_TRY = 16  # @param {type:"slider", min:0, max:48, step:8}
+WITH_CLICK_TRY = True  # @param {type:"boolean"}
 if not isinstance(BOX_PAD_TRY, int) or BOX_PAD_TRY < 0 or not isinstance(WITH_CLICK_TRY, bool):
     raise SystemExit("BOX_PAD_TRY must be a whole number ≥ 0 and WITH_CLICK_TRY True or False.")
 pad_try = max(BOX_PAD_TRY // 4, 0) if SMOKE else BOX_PAD_TRY  # smoke thumbnails are 4× smaller
@@ -527,26 +431,6 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q29.** 🟡 Path 3 trains nothing, but its annotation never stops. Suppose you must segment 1,000 new fundus
-# images next month. Using the annotation lines above (minutes per image for clicks and for boxes) and the
-# table, when would you prompt SAM directly, and when would you rather train a head once? Is there a way to
-# combine the two?
-#
-# <details><summary>A possible answer</summary>
-#
-# - **Cost:** the heads pay their strokes once, on a few training images, and then segment any number of new
-#   images for free. Path 3 pays per image: at 1,000 images it costs a thousand times the per-image line,
-#   hours or days of clicking.
-# - **Direct prompting wins** when there are few images, when each one matters (a case to review, an image
-#   nobody will see again), or when the task changes too often to retrain.
-# - **A head wins** when the images keep coming.
-# - **Combine them:** prompt SAM on a handful of images, correct its masks by hand, and train the head on
-#   those (Path 2, with a person in the loop). Or let the head propose and a person fix only the worst images.
-# - **Always** compare with the cheapest baseline built from the same hints, such as the thickened strokes.
-#
-# </details>
-
-# %% [markdown]
 # ### 7.4 🔴 Optional: SAM 3 from a word
 #
 # SAM 3 segments every instance of a typed noun phrase, with no click at all. Nothing later depends on it.
@@ -566,12 +450,12 @@ show_masks(
 # Run the next cell if you have SAM 3, then try other words by editing `SAM3_TEXT` in its code (open the
 # collapsed cell).
 #
-# **Q30.** 🔴 Does a word find the vessels better than your strokes did? Try a few phrasings
+# **Q27.** 🔴 Does a word find the vessels better than your strokes did? Try a few phrasings
 # (`"blood vessel"`, `"vessel"`, `"artery"`, `"dark line"`, `"retina"`). Which words work, and what does that
 # tell you about the images SAM 3 learnt its concepts from?
 
 # %%
-# @title Q30 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache) { display-mode: "form" }
+# @title Q27 — 🔴 SAM 3 from a text prompt (optional, only if SAM 3 is in your cache) { display-mode: "form" }
 SAM3_TEXT = "blood vessel"  # @param {type:"string"}
 SAM3_ID, SAM3_LICENCE = "facebook/sam3", "SAM License (Meta)"
 if not isinstance(SAM3_TEXT, str) or not SAM3_TEXT.strip():
@@ -642,62 +526,7 @@ if sam3 is not None:
 # </details>
 
 # %% [markdown]
-# Want to try this on a photo of your own? Section 9 lets you draw the strokes yourself; the optional
-# collapsed cell below is the quick version (details in the box just below).
-
-# %% [markdown]
-# <!-- callout: go-deeper | Try it on your image (optional, 2 min) -->
-# Direct prompting needs no training, so it is the quickest thing to try on a photo of your own. Open the
-# collapsed cell below and edit its first lines.
-#
-# - Upload one with the folder icon on the left and put its path in `MY_IMAGE`.
-# - Add `(x, y)` clicks on the thing (`MY_FG_CLICKS`) and on what you do not want (`MY_BG_CLICKS`).
-# - Add small boxes `(x0, y0, x1, y1)`, one per piece of the thing (`MY_BOXES`).
-# - Left empty, it runs on the demo image with prompts from its strokes. It asks SAM for one mask from all
-#   your clicks together and one from your boxes, each box its own object.
-
-# %%
-# @title Try it on your image (optional): clicks and boxes on a photo { display-mode: "form" }
-MY_IMAGE = ""  # e.g. "/content/my_photo.jpg"; empty = the demo image
-MY_FG_CLICKS = []  # e.g. [(120, 80), (300, 210)] on the thing you want
-MY_BG_CLICKS = []  # e.g. [(20, 20)] on what you do not want
-MY_BOXES = []  # e.g. [(100, 60, 160, 120)], one small box per piece of the thing
-lists = (MY_FG_CLICKS, MY_BG_CLICKS, MY_BOXES)
-if not isinstance(MY_IMAGE, str) or not all(isinstance(v, list) for v in lists):
-    raise SystemExit('MY_IMAGE must be a path in quotes (or "") and the clicks and boxes lists.')
-if MY_IMAGE and not Path(MY_IMAGE).is_file():
-    raise SystemExit(f"{MY_IMAGE} not found. Upload it with the folder icon on the left and copy its path.")
-if MY_IMAGE and not (MY_FG_CLICKS or MY_BOXES):
-    raise SystemExit("Add at least one (x, y) click to MY_FG_CLICKS or one (x0, y0, x1, y1) box to MY_BOXES.")
-my_img = np.array(Image.open(MY_IMAGE).convert("RGB")) if MY_IMAGE else demo["image"]
-my_h, my_w = my_img.shape[:2]
-if MY_IMAGE:
-    my_fg = [[float(x), float(y)] for x, y in MY_FG_CLICKS]
-    my_bg = [[float(x), float(y)] for x, y in MY_BG_CLICKS]
-    my_boxes = [[float(v) for v in b] for b in MY_BOXES]
-else:
-    my_fg, my_bg = stroke_points(demo, 1, 5), stroke_points(demo, 2, 5)
-    my_boxes = box_prompts[k_demo][0]
-if not all(0 <= x < my_w and 0 <= y < my_h for x, y in my_fg + my_bg):
-    raise SystemExit(f"every click must lie inside the image: 0 ≤ x < {my_w}, 0 ≤ y < {my_h}.")
-if not all(len(b) == 4 and 0 <= b[0] < b[2] < my_w and 0 <= b[1] < b[3] < my_h for b in my_boxes):
-    raise SystemExit(
-        f"every box must be (x0, y0, x1, y1) with 0 ≤ x0 < x1 < {my_w} and 0 ≤ y0 < y1 < {my_h}."
-    )
-panels = []
-if my_fg:
-    clicks_mask = (
-        sam.probability(my_img, points=my_fg + my_bg, labels=[1] * len(my_fg) + [0] * len(my_bg)) >= 0.5
-    )
-    panels.append(
-        (f"clicks: {len(my_fg)} on, {len(my_bg)} off", overlay(my_img, clicks_mask, THEME["fails"]), None)
-    )
-if my_boxes:
-    boxes_mask = sam_many(my_img, my_boxes) >= 0.5
-    panels.append(
-        (f"{len(my_boxes)} boxes, one object each", overlay(my_img, boxes_mask, THEME["fails"]), my_boxes)
-    )
-show_boxes([(MY_IMAGE or f"demo · {demo['name']}", my_img, None)] + panels, width=3.0)
+# Want to try this on a photo of your own? Section 9 lets you draw the strokes yourself.
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway: Path 3 -->
@@ -705,10 +534,3 @@ show_boxes([(MY_IMAGE or f"demo · {demo['name']}", my_img, None)] + panels, wid
 #   prompt into one small box and a centre click per stroke.
 # - **Few images, or each one matters** → prompt SAM directly and review every mask.
 # - **Images keep coming** → train a head once (Path 1 or 2); direct prompting pays strokes on every image.
-# - **SAM gives a clean-looking mask** → it looks finished whether or not it is right, so compare it with the
-#   thickened strokes and with a careful manual mask on a few images.
-
-# %% [markdown]
-# <!-- callout: across | Across approaches -->
-# Paths 1 and 2 pay annotation once and reuse a head; Path 3 trains nothing but pays on every image, and how
-# you split the prompt mattered as much as how many hints you gave. Section 8 compares them all.

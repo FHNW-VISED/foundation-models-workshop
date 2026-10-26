@@ -1,7 +1,8 @@
 """Mechanical checks for the rules in RULES.md that a script can decide.
 
 Prints one line per problem (compact on purpose: agents read this output) and exits 1 on any FAIL.
-Rule IDs refer to RULES.md.
+Rule IDs refer to RULES.md. Mentions of a question before it is asked (N-052) only print WARNING lines:
+they never change the exit code.
 """
 
 from __future__ import annotations
@@ -23,14 +24,33 @@ ANY_MARKER_RE = re.compile(r"<!--\s*callout\b")
 TABLE_BOX_RE = re.compile(r"<table\b[^>]*\bbgcolor", re.I | re.S)
 
 Q_RE = re.compile(r"\*\*Q(\d+)\.?\*\*")
+Q_MENTION_RE = re.compile(r"\bQ(\d+)\b")
 LEVELS = ("🟢", "🟡", "🔴")
 HELPER_MIN_LINES = 8
 
 problems: list[str] = []
+warnings: list[str] = []
 
 
 def fail(where: str, msg: str) -> None:
     problems.append(f"FAIL {where}: {msg}")
+
+
+def forward_question_refs(line: str, next_q: int) -> list[int]:
+    """N-052 (4): the question numbers a markdown line mentions before they are asked. `next_q` is the first
+    question not asked yet; the line's own **Qn.** markers count as asked."""
+    for m in Q_RE.finditer(line):
+        next_q = max(next_q, int(m.group(1)) + 1)
+    return [int(m.group(1)) for m in Q_MENTION_RE.finditer(Q_RE.sub(" ", line)) if int(m.group(1)) >= next_q]
+
+
+def yourcode_stubs(src: str) -> list[ast.FunctionDef]:
+    """The top-level functions of a '# ✍️ YOUR CODE' cell (the stubs the learner fills)."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+    return [n for n in tree.body if isinstance(n, ast.FunctionDef)]
 
 
 def is_helper_cell(src: str) -> bool:
@@ -131,11 +151,18 @@ def main() -> int:
                         where,
                         f"helper-only cell ({n_lines} lines) needs '# @title ...' to collapse (N-008)",
                     )
+                if src.lstrip().startswith("# ✍️ YOUR CODE"):
+                    for fn in yourcode_stubs(src):
+                        doc = ast.get_docstring(fn) or ""
+                        if not re.search(r"\be\.g\.", doc):
+                            fail(where, f"✍️ {fn.name} docstring needs an example return 'e.g. …' (N-050)")
                 continue
             is_callout = check_callouts(where, src)
             if not is_callout and re.search(r"\bstyle\s*=", src):  # the build owns callout HTML
                 fail(where, "markdown uses style= — Colab strips it; use a callout marker (N-025, N-034)")
             for line in src.splitlines():
+                for q in forward_question_refs(line, expected_q):
+                    warnings.append(f"WARNING {where}: mentions Q{q} before it is asked (N-052)")
                 for m in Q_RE.finditer(line):
                     q = int(m.group(1))
                     if q != expected_q:
@@ -161,6 +188,8 @@ def main() -> int:
 
     for p in problems:
         print(p)
+    for w in warnings:
+        print(w)
     print(f"lint: {len(files)} sections, {expected_q - 1} questions, {len(problems)} problems")
     return 1 if problems else 0
 

@@ -162,27 +162,7 @@ show_clicks(
 )
 
 # %% [markdown]
-# Is that one image typical? This cell scores each training image's pseudo-label (IoU against the hidden
-# truth, diagnosis only) and shows the worst, median and best side by side.
-
-# %%
-# @title Pseudo-label quality: worst, typical and best training image { display-mode: "form" }
-per_image_iou = [score(p >= 0.5, it)["iou"] for p, it in zip(pseudo_probs, scrib_train, strict=True)]
-rank_iou = np.argsort(per_image_iou)
-picks = [("worst", rank_iou[0]), ("typical (median)", rank_iou[len(rank_iou) // 2]), ("best", rank_iou[-1])]
-show_masks(
-    [
-        (
-            f"{label} · IoU {per_image_iou[k]:.2f}",
-            error_map(scrib_train[k]["image"], pseudo_probs[k] >= 0.5, scrib_train[k]),
-        )
-        for label, k in picks
-    ],
-    width=3.0,
-)
-
-# %% [markdown]
-# **Q22.** 🟡 Look at the three error maps and the probability panel. Where does SAM's guess go wrong: around
+# **Q20.** 🟡 Look at the error map and the probability panel. Where does SAM's guess go wrong: around
 # the thick vessels, along the thin ones, in the background between the strokes? Is SAM sure of itself (deep
 # purple, deep orange) or unsure (pale)? What does that mean for a cut at exactly 0.5?
 #
@@ -275,7 +255,8 @@ def my_pseudo_targets(
 ) -> np.ndarray:
     """Targets (int8) from a pseudo-label probability map: 1 where prob >= threshold + band, 0 where
     prob < threshold - band, -1 in between. Strokes overrule the map (1 vessel stroke -> 1, 2 background
-    stroke -> 0); outside `region` -> -1."""
+    stroke -> 0); outside `region` -> -1.
+    e.g. threshold 0.5, band 0.1, no strokes: prob [[0.9, 0.55, 0.3, 0.05]] -> [[1, -1, 0, 0]]"""
     ...
 
 
@@ -374,15 +355,15 @@ print_path2(path2_report)
 # <!-- callout: question | Question -->
 # Run the next cell, then move the cut.
 #
-# **Q23.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
+# **Q21.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
 # `PSEUDO_THRESHOLD` and give the doubtful pixels an `UNSURE_BAND` to ignore, picking values from the spread
 # printed in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
 # at the held-out line once: does it move the same way? Is there a setting that beats 0.5 on your run?
 #
-# ```python
-# PSEUDO_THRESHOLD = 0.5   # try 0.55, 0.6, 0.7 (or the median printed in 6.1)
-# UNSURE_BAND = 0.0        # try 0.03: pixels within 0.03 of the threshold are ignored
-# ```
+# - `PSEUDO_THRESHOLD`: try 0.55, 0.6, 0.7 (or the median printed in 6.1).
+# - `UNSURE_BAND`: try 0.03; pixels within 0.03 of the threshold are ignored.
+#
+# Both are sliders in the next cell: move one, then run it again.
 
 # %% [markdown]
 # This cell trains the same head on targets made with your setting and prints it under the head at 0.5, with
@@ -391,9 +372,9 @@ print_path2(path2_report)
 # share of true background pixels that got label 1).
 
 # %%
-# Q23 — tune the pseudo-label threshold and the unsure band
-PSEUDO_THRESHOLD = 0.5  # try 0.55, 0.6, 0.7 (or the median printed in 6.1)
-UNSURE_BAND = 0.0  # try 0.03: pixels within 0.03 of the threshold are ignored
+# Q21 — tune the pseudo-label threshold and the unsure band
+PSEUDO_THRESHOLD = 0.5  # @param {type:"slider", min:0.45, max:0.75, step:0.025}
+UNSURE_BAND = 0.0  # @param {type:"slider", min:0, max:0.1, step:0.01}
 ok = all(isinstance(v, (int, float)) for v in (PSEUDO_THRESHOLD, UNSURE_BAND))
 if not ok or UNSURE_BAND < 0 or PSEUDO_THRESHOLD - UNSURE_BAND <= 0 or PSEUDO_THRESHOLD + UNSURE_BAND > 1:
     raise SystemExit(
@@ -468,8 +449,6 @@ print_path2({"threshold 0.5, no band": path2_report["sam_pseudo"], "your setting
 #    know" anywhere.
 # 2. The head cannot tell a guess from a drawing. **Consequence:** it learns SAM's habit (a region where you
 #    wanted a line) as faithfully as the vessels.
-# 3. The habit repeats on every new image. **Consequence:** the error is systematic, so more images do not
-#    average it out.
 
 # %% [markdown]
 # This simulation invents a teacher that is right about the strokes but confidently calls the brightest blob
@@ -669,74 +648,7 @@ print(f"held-out truth (evaluation only): {vessel_tile_share:.0%} of the fundus 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
 # The classifier only ever answered "vessel in this tile, yes or no". Will its heat map look like a vessel
-# tree, like blobs, or like noise? Write one guess. The sketches below show the three shapes.
-
-# %% [markdown]
-# This cell draws the three possible shapes as tiny made-up heat maps, on the same colour scale as the real
-# ones (purple = strongest evidence, orange = none).
-
-# %%
-# @title Sketch: three shapes a heat map could take { display-mode: "form" }
-sketch_rng = np.random.default_rng(SEED)
-tree = np.zeros((48, 48))
-for x0, y0, x1, y1 in [(24, 47, 24, 18), (24, 30, 8, 8), (24, 26, 42, 6), (24, 38, 40, 30), (24, 40, 10, 32)]:
-    for s in np.linspace(0, 1, 80):
-        tree[int(y0 + s * (y1 - y0)), int(x0 + s * (x1 - x0))] = 1
-tree = ndi.gaussian_filter(tree, 0.8)
-yy, xx = np.mgrid[0:48, 0:48]
-centres = [(14, 14), (32, 28), (18, 38)]
-blobs = sum(np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * 5**2)) for cx, cy in centres)
-noise = ndi.gaussian_filter(sketch_rng.random((48, 48)), 0.7)
-shapes = [("vessel tree: thin lines", tree), ("blobs: a few patches", blobs), ("noise: no structure", noise)]
-show_masks(
-    [(title, prob_rgb(0.5 + 0.5 * (m - m.min()) / (m.max() - m.min()))) for title, m in shapes],
-    width=2.0,
-)
-
-# %% [markdown]
-# This cell runs the four steps of Grad-CAM by hand on one training image; its last panel is the heat map
-# itself.
-
-# %%
-# @title Grad-CAM step by step on one training image { display-mode: "form" }
-cam_feat = std_feats[0]
-with torch.enable_grad():
-    act = clf.act(clf.hidden(cam_feat[None]))  # the feature maps A_k: [1, 32, h, w]
-    yes_score = clf.out(act).mean((2, 3))[0, 0]  # the "vessel" score
-    grads = torch.autograd.grad(yes_score, act)[0]  # how the score changes with each A_k pixel
-maps_a = act[0].detach().cpu().numpy()
-alpha = grads[0].mean((1, 2)).cpu().numpy()  # step 1: one weight per feature map
-weighted = np.tensordot(alpha, maps_a, axes=1)  # step 2: sum of alpha_k * A_k
-positive = np.maximum(weighted, 0)  # step 3: keep only the evidence FOR "vessel"
-positive = positive - positive.min()
-steps_heat = positive / (1e-7 + positive.max())  # step 4: rescale to [0, 1]
-k_hi, k_lo = int(alpha.argmax()), int(alpha.argmin())
-fig, axes = plt.subplots(1, 6, figsize=(14, 2.6))
-axes[0].imshow(ex["image"])
-axes[0].set_title("training image", fontsize=9)
-axes[1].imshow(maps_a[k_hi], cmap="Greys")
-axes[1].set_title(f"A_k with the largest α ({alpha[k_hi]:+.2f})", fontsize=8)
-axes[2].imshow(maps_a[k_lo], cmap="Greys")
-axes[2].set_title(f"A_k with the smallest α ({alpha[k_lo]:+.2f})", fontsize=8)
-sorted_alpha = np.sort(alpha)
-axes[3].bar(
-    range(len(alpha)), sorted_alpha, color=[THEME["works"] if a > 0 else THEME["fails"] for a in sorted_alpha]
-)
-axes[3].set_title("1 · weights α_k (one per map)", fontsize=8)
-limit = np.abs(weighted).max() + 1e-9
-axes[4].imshow(weighted, cmap="PuOr", vmin=-limit, vmax=limit)
-axes[4].set_title("2 · Σ α_k·A_k (purple +, orange −)", fontsize=8)
-axes[5].imshow(prob_rgb(steps_heat))
-axes[5].set_title("3 + 4 · ReLU, rescale: the heat map", fontsize=8)
-for a in axes:
-    if a is not axes[3]:
-        a.axis("off")
-plt.tight_layout()
-plt.show()
-print(
-    f"{(alpha > 0).sum()} of {len(alpha)} feature maps have a positive weight · "
-    f"max difference to the grad-cam package: {np.abs(steps_heat - cam_map(clf, cam_feat)).max():.4f}"
-)
+# tree, like blobs, or like noise? Write one guess.
 
 # %% [markdown]
 # This cell cuts each training image's Grad-CAM map at half its peak into a pseudo-mask (strokes still win),
@@ -806,7 +718,7 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q24.** 🟡 Compare the two pseudo-labels of the same training image. What shape does the Grad-CAM
+# **Q22.** 🟡 Compare the two pseudo-labels of the same training image. What shape does the Grad-CAM
 # evidence have, and where does it sit? Which of the two would you rather correct by hand, and why?
 #
 # <details><summary>What to look for</summary>
@@ -825,10 +737,76 @@ show_masks(
 # </details>
 
 # %% [markdown]
+# <!-- callout: go-deeper | Go deeper · how the heat map is made -->
+# Two cells for the curious. The first runs the four steps of Grad-CAM by hand on one training image, and
+# checks the result against the package. The second draws the three shapes a heat map could take (a vessel
+# tree, blobs, noise), to compare with the real one.
+
+# %%
+# @title Grad-CAM step by step on one training image { display-mode: "form" }
+cam_feat = std_feats[0]
+with torch.enable_grad():
+    act = clf.act(clf.hidden(cam_feat[None]))  # the feature maps A_k: [1, 32, h, w]
+    yes_score = clf.out(act).mean((2, 3))[0, 0]  # the "vessel" score
+    grads = torch.autograd.grad(yes_score, act)[0]  # how the score changes with each A_k pixel
+maps_a = act[0].detach().cpu().numpy()
+alpha = grads[0].mean((1, 2)).cpu().numpy()  # step 1: one weight per feature map
+weighted = np.tensordot(alpha, maps_a, axes=1)  # step 2: sum of alpha_k * A_k
+positive = np.maximum(weighted, 0)  # step 3: keep only the evidence FOR "vessel"
+positive = positive - positive.min()
+steps_heat = positive / (1e-7 + positive.max())  # step 4: rescale to [0, 1]
+k_hi, k_lo = int(alpha.argmax()), int(alpha.argmin())
+fig, axes = plt.subplots(1, 6, figsize=(14, 2.6))
+axes[0].imshow(ex["image"])
+axes[0].set_title("training image", fontsize=9)
+axes[1].imshow(maps_a[k_hi], cmap="Greys")
+axes[1].set_title(f"A_k with the largest α ({alpha[k_hi]:+.2f})", fontsize=8)
+axes[2].imshow(maps_a[k_lo], cmap="Greys")
+axes[2].set_title(f"A_k with the smallest α ({alpha[k_lo]:+.2f})", fontsize=8)
+sorted_alpha = np.sort(alpha)
+axes[3].bar(
+    range(len(alpha)), sorted_alpha, color=[THEME["works"] if a > 0 else THEME["fails"] for a in sorted_alpha]
+)
+axes[3].set_title("1 · weights α_k (one per map)", fontsize=8)
+limit = np.abs(weighted).max() + 1e-9
+axes[4].imshow(weighted, cmap="PuOr", vmin=-limit, vmax=limit)
+axes[4].set_title("2 · Σ α_k·A_k (purple +, orange −)", fontsize=8)
+axes[5].imshow(prob_rgb(steps_heat))
+axes[5].set_title("3 + 4 · ReLU, rescale: the heat map", fontsize=8)
+for a in axes:
+    if a is not axes[3]:
+        a.axis("off")
+plt.tight_layout()
+plt.show()
+print(
+    f"{(alpha > 0).sum()} of {len(alpha)} feature maps have a positive weight · "
+    f"max difference to the grad-cam package: {np.abs(steps_heat - cam_map(clf, cam_feat)).max():.4f}"
+)
+
+
+# %%
+# @title Sketch: three shapes a heat map could take { display-mode: "form" }
+sketch_rng = np.random.default_rng(SEED)
+tree = np.zeros((48, 48))
+for x0, y0, x1, y1 in [(24, 47, 24, 18), (24, 30, 8, 8), (24, 26, 42, 6), (24, 38, 40, 30), (24, 40, 10, 32)]:
+    for s in np.linspace(0, 1, 80):
+        tree[int(y0 + s * (y1 - y0)), int(x0 + s * (x1 - x0))] = 1
+tree = ndi.gaussian_filter(tree, 0.8)
+yy, xx = np.mgrid[0:48, 0:48]
+centres = [(14, 14), (32, 28), (18, 38)]
+blobs = sum(np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * 5**2)) for cx, cy in centres)
+noise = ndi.gaussian_filter(sketch_rng.random((48, 48)), 0.7)
+shapes = [("vessel tree: thin lines", tree), ("blobs: a few patches", blobs), ("noise: no structure", noise)]
+show_masks(
+    [(title, prob_rgb(0.5 + 0.5 * (m - m.min()) / (m.max() - m.min()))) for title, m in shapes],
+    width=2.0,
+)
+
+# %% [markdown]
 # <!-- callout: question | Question (optional) -->
 # Run the next cell to use the heat map as a SAM prompt instead of a mask.
 #
-# **Q25.** 🔴 Instead of cutting the heat map, let it pick SAM clicks: the hottest patches as "vessel", the
+# **Q23.** 🔴 Instead of cutting the heat map, let it pick SAM clicks: the hottest patches as "vessel", the
 # coldest as "not vessel" (the trick of section 4.2, with Grad-CAM in place of the prototype). Do SAM's
 # masks from these clicks look more like the SAM pseudo-labels of 6.1 or like the Grad-CAM blobs?
 #
@@ -841,7 +819,7 @@ show_masks(
 # of pseudo-label on the training images (diagnosis only, no training).
 
 # %%
-# Q25 — Grad-CAM as a SAM prompt: hottest patches = vessel clicks, coldest = background clicks
+# Q23 — Grad-CAM as a SAM prompt: hottest patches = vessel clicks, coldest = background clicks
 N_CAM_CLICKS = 5  # try 2, 10
 if not isinstance(N_CAM_CLICKS, int) or N_CAM_CLICKS < 1:
     raise SystemExit("N_CAM_CLICKS must be a whole number of at least 1.")
@@ -931,7 +909,7 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q26.** 🟡 All three heads cost the same strokes. You can add one more afternoon (about 4 hours) of work.
+# **Q24.** 🟡 All three heads cost the same strokes. You can add one more afternoon (about 4 hours) of work.
 # Suppose a pilot (invented numbers) says:
 #
 # - **A, more strokes:** a second round on the same five images would lift the scribble head's held-out IoU
@@ -965,8 +943,3 @@ show_masks(
 #   have real image-level labels (defects, tumours).
 # - **You need more labels but cannot pay for strokes** → pseudo-labels add compute, not annotation, and
 #   bring the teacher's bias with them.
-
-# %% [markdown]
-# <!-- callout: across | Across approaches -->
-# Path 1 told the loss to ignore the gaps; Path 2 lets another model fill them, and the head inherits its bias
-# without knowing it. Section 7 drops the head and asks SAM directly, with the same clicks.

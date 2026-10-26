@@ -1,8 +1,8 @@
 # %% [markdown]
 # ## 4. The adaptation ladder
 #
-# Welcome back. Before the break the head believed a label file that said "background" wherever nobody
-# had looked. Block 2 is about ways out, and the first is a ladder: give the foundation model a little
+# In section 3 the head believed a label file that said "background" wherever nobody
+# had looked. Now the ways out, and the first is a ladder: give the foundation model a little
 # more task information at each rung, and look at what changes. Higher is not automatically better, and
 # each rung fails in its own way, so we look at the masks, not only at the numbers.
 
@@ -253,13 +253,21 @@ show_extremes(sam_box_masks)
 # - Will it find the thin vessels, or only the thick ones?
 
 # %% [markdown]
+# **Q12.** 🟡 Look at the similarity map and the IoU you got:
+#
+# - Which parts of the held-out image look most like the annotated vessels (purple), and which like the
+#   background (orange)?
+# - Pick another annotated image: does the held-out IoU move much?
+# - What does that say about relying on a single example?
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn: swap the annotated image -->
 # - Run the next cell: it builds the two prototypes from one annotated image, scores every evaluation image
 #   (seconds), and shows the similarity map and the mask on the demo image.
-# - Then set `ONE_SHOT_IMAGE` to 1, 2, … and run it again, to answer Q14.
+# - Then set `ONE_SHOT_IMAGE` to 1, 2, … and run it again, to answer Q12.
 
 # %%
-# Q14 — one-shot: the prototypes of one annotated image, applied to every held-out image
+# Q12 — one-shot: the prototypes of one annotated image, applied to every held-out image
 ONE_SHOT_IMAGE = 0  # which training image is the annotated one; try 1, 2, ...
 if not isinstance(ONE_SHOT_IMAGE, int) or not 0 <= ONE_SHOT_IMAGE < len(SPECIALISED["fit"]):
     raise SystemExit(f"ONE_SHOT_IMAGE must be a whole number from 0 to {len(SPECIALISED['fit']) - 1}.")
@@ -297,14 +305,6 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q14.** 🟡 Look at the similarity map and the IoU you got:
-#
-# - Which parts of the held-out image look most like the annotated vessels (purple), and which like the
-#   background (orange)?
-# - Pick another annotated image: does the held-out IoU move much?
-# - What does that say about relying on a single example?
-
-# %% [markdown]
 # <details><summary>What to look for</summary>
 #
 # The purple follows the thick vessels and the dark, textured parts of the fundus, and the mask is as wide
@@ -318,7 +318,10 @@ show_masks(
 # </details>
 
 # %% [markdown]
-# The same similarity map can also point SAM at the right places (rung 1, second variant). On every
+# ### 🔴 Optional: the same map, pointing SAM
+#
+# The same similarity map can also point SAM at the right places (rung 1, second variant). The cell below
+# runs under "Run all" even if you skip the reading: its row appears in the table of 4.4. On every
 # evaluation image:
 #
 # 1. The five patches most like a vessel become positive clicks.
@@ -357,7 +360,7 @@ show_clicks(
 )
 
 # %% [markdown]
-# **Q15.** 🟡 Same annotated image, same similarity map, two ways to use it. Compare the prototype mask
+# **Q13.** 🔴 Same annotated image, same similarity map, two ways to use it. Compare the prototype mask
 # with the SAM mask:
 #
 # - Which one draws wider vessels, and which loses thin branches?
@@ -377,11 +380,34 @@ show_clicks(
 # </details>
 
 # %% [markdown]
+# ### ☕ Before the break
+
+# %% [markdown]
+# <!-- callout: question | Question for the coffee break -->
+# No code, just think about it over coffee.
+#
+# **Q14.** 🟡 You have 50 fundus images and a 4-hour annotation budget. Perfect labels cost 3 to 5 hours per
+# image, and the cheap ones lie: the label file says "background" wherever nobody looked. Without buying more
+# labels, what could you tell the training about a pixel nobody labelled? Think of at least two options before
+# 4.3.
+#
+# <details><summary>A hint, for after the break</summary>
+#
+# Three families of answers come back in block 2:
+#
+# - Say "unknown" instead of "background", and let the loss skip those pixels (sections 4 and 5).
+# - Guess the missing labels with another model, for example SAM prompted from the labels you have, and train
+#   on the guesses (section 6).
+# - Skip training and give the cheap labels to the foundation model directly as prompts (section 7).
+#
+# </details>
+
+# %% [markdown]
 # ### 4.3 Rung 2: scribbles
 #
-# The annotator from section 3 again, with a new instruction: "don't trace everything; draw a few strokes
-# along some vessels and a few on clear background, in each of five images, then stop". Every other pixel
-# is *unlabelled*, and this time the stroke map says so, so the loss can skip it.
+# Welcome back. The annotator from section 3 again, with a new instruction: "don't trace everything;
+# draw a few strokes along some vessels and a few on clear background, in each of five images, then stop".
+# Every other pixel is *unlabelled*, and this time the stroke map says so, so the loss can skip it.
 
 # %% [markdown]
 # Three label encodings meet here, and the number 0 means something different in each:
@@ -458,7 +484,7 @@ def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_p
 # - In: 0 unlabelled, 1 vessel stroke, 2 background stroke. Out: 1, 0, or −1 for "ignore".
 # - Pixels outside `region` are always −1.
 # - Start with the default, `bg_beyond_px=None`: every unlabelled pixel is ignored.
-# - **Ignore the number setting of `bg_beyond_px` until 4.5.** There, unlabelled pixels farther than that
+# - **Ignore the number setting of `bg_beyond_px` until 4.6.** There, unlabelled pixels farther than that
 #   from every vessel stroke count as background; `ndi.distance_transform_edt(scribbles != 1)` gives each
 #   pixel's distance to the nearest vessel stroke.
 #
@@ -470,7 +496,8 @@ def _ref_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_p
 def my_scribble_targets(scribbles: np.ndarray, region: np.ndarray, bg_beyond_px: float | None = None):
     """Targets (int8) from a scribble map: 1 vessel stroke, 0 background stroke, -1 ignored. Outside
     `region`: -1. If bg_beyond_px is a number, unlabelled pixels farther than bg_beyond_px from every vessel
-    stroke become 0 (background); the others stay -1."""
+    stroke become 0 (background); the others stay -1.
+    e.g. on a 3×4 crop, same shape as `scribbles`: [[-1, -1, 1, -1], [0, -1, 1, -1], [0, 0, -1, -1]]"""
     ...
 
 
@@ -611,6 +638,32 @@ show_masks(
 )
 
 # %% [markdown]
+# **Q15.** 🟡 Read the table and the error maps rung by rung:
+#
+# - Which rung has the lowest recall (misses the most, green)? Which has the lowest precision (invents the
+#   most, orange)? Is it the rung with the lowest IoU?
+# - You need a screening tool that must not miss a vessel, and a tool whose every mark must be right. Do you
+#   pick the same rung for both?
+
+# %% [markdown]
+# <details><summary>What to look for</summary>
+#
+# The rungs do not line up on one "quality" axis. SAM's box tends to mark a region or the whole eye: high
+# recall, many false alarms, an IoU near the grey line. The prototype labels by patch, so it draws vessels
+# as wide as a square and confuses dark, textured background with vessel. SAM from prototype clicks is
+# sharper but only covers what its clicks touched.
+#
+# The scribble head saw the fewest labelled pixels, yet from several images, and it was never told a vessel
+# was background. Its errors are not the section-3 errors: compare its recall with the naive head's.
+#
+# Which rung is "best" depends on whether missing or inventing a vessel costs you more, and on the minutes
+# in the last column. Your order may differ from your neighbour's: that is why we read the maps.
+#
+# </details>
+
+# %% [markdown]
+# ### 🔴 Optional: what changes from one rung to the next
+#
 # Several of those error maps look alike, so the next cell shows only what changes from one rung to the next
 # on the demo image (grey = both mark it, a colour = only that one).
 
@@ -641,31 +694,7 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# **Q16.** 🟡 Read the table, the error maps and the difference maps rung by rung:
-#
-# - Which rung has the lowest recall (misses the most, green)? Which has the lowest precision (invents the
-#   most, orange)? Is it the rung with the lowest IoU?
-# - You need a screening tool that must not miss a vessel, and a tool whose every mark must be right. Do you
-#   pick the same rung for both?
-
-# %% [markdown]
-# <details><summary>What to look for</summary>
-#
-# The rungs do not line up on one "quality" axis. SAM's box tends to mark a region or the whole eye: high
-# recall, many false alarms, an IoU near the grey line. The prototype labels by patch, so it draws vessels
-# as wide as a square and confuses dark, textured background with vessel. SAM from prototype clicks is
-# sharper but only covers what its clicks touched.
-#
-# The scribble head saw the fewest labelled pixels, yet from several images, and it was never told a vessel
-# was background. Its errors are not the section-3 errors: compare its recall with the naive head's.
-#
-# Which rung is "best" depends on whether missing or inventing a vessel costs you more, and on the minutes
-# in the last column. Your order may differ from your neighbour's: that is why we read the maps.
-#
-# </details>
-
-# %% [markdown]
-# ### 4.5 Your choice: which unlabelled pixels to ignore
+# ### 4.5 A tempting shortcut: which unlabelled pixels to ignore
 #
 # Ignoring every unlabelled pixel is safe, and wasteful: over 98 % of the fundus says nothing. A tempting
 # shortcut is "far from every vessel stroke, it's surely background". That is the second setting of your
@@ -679,16 +708,28 @@ plt.show()
 #    side door.
 
 # %% [markdown]
+# ### 4.6 🔴 Optional: choose a distance
+#
+# Want to see what the shortcut costs? The next cell tries it on the real scribbles.
+
+# %% [markdown]
+# **Q16.** 🔴 Compare your distance with the scribble head of 4.3:
+#
+# - How many true vessel pixels did your rule call background?
+# - Did recall, precision and IoU on the held-out images move, and in which direction?
+# - Is there a distance that helps without hurting?
+
+# %% [markdown]
 # <!-- callout: your-turn | Your turn: choose a distance -->
 # - Set `BG_BEYOND_PX` (try 20, 80, `None` = ignore every unlabelled pixel) and run the next cell.
 # - It turns the scribbles into targets with your distance, trains the same head on them (seconds), and
 #   prints its numbers next to the scribble head of 4.3, which ignored every unlabelled pixel.
 # - It also measures how much true vessel your rule mislabels (the hidden ground truth is used for that
 #   diagnosis only, never for training).
-# - Try a few distances before you answer Q17.
+# - Try a few distances before you answer Q16.
 
 # %%
-# Q17 — scribbles plus "far from every vessel stroke = background"
+# Q16 — scribbles plus "far from every vessel stroke = background"
 BG_BEYOND_PX = 40  # pixels, on the 1024 px crops; try 20, 80, None (= ignore every unlabelled pixel)
 if BG_BEYOND_PX is not None and (not isinstance(BG_BEYOND_PX, (int, float)) or BG_BEYOND_PX <= 0):
     raise SystemExit("BG_BEYOND_PX must be a positive number of pixels, or None.")
@@ -736,13 +777,6 @@ show_masks(
 )
 
 # %% [markdown]
-# **Q17.** 🟡 Compare your distance with the scribble head of 4.3:
-#
-# - How many true vessel pixels did your rule call background?
-# - Did recall, precision and IoU on the held-out images move, and in which direction?
-# - Is there a distance that helps without hurting?
-
-# %% [markdown]
 # <details><summary>What to look for</summary>
 #
 # A large distance adds a lot of background that really is background, and a little that is not; a small
@@ -757,63 +791,7 @@ show_masks(
 # </details>
 
 # %% [markdown]
-# Optional: the cell below (collapsed) runs the one-shot prototype on your own photo. Section 9 runs the
-# whole ladder on your own scribbles.
-
-# %% [markdown]
-# <!-- callout: go-deeper | Try it on your image (optional, 2 min) -->
-# The one-shot idea works from clicks too: a few clicks on the thing you want and a few on what you do not
-# want give two prototypes, and every similar patch is marked.
-#
-# - Open the cell below ("Try the prototype on your own image"), upload a photo with the folder icon on the
-#   left and put its path in `MY_IMAGE`.
-# - Put some `(x, y)` clicks in `MY_FG_CLICKS` and `MY_BG_CLICKS`.
-# - Left empty, it runs on the demo image with clicks along its scribbles.
-#
-# The cell computes DINOv3 features of your image, builds the prototypes from the patches under your
-# clicks, and shows the similarity map and the mask: one model pass, no training.
-
-# %%
-# @title Try the prototype on your own image (optional) { display-mode: "form" }
-MY_IMAGE = ""  # e.g. "/content/my_photo.jpg"; empty = the demo image
-MY_FG_CLICKS = []  # e.g. [(120, 80), (300, 210)] on the thing you want
-MY_BG_CLICKS = []  # e.g. [(20, 20)] on what you do not want; empty = every other patch
-if not isinstance(MY_IMAGE, str) or not isinstance(MY_FG_CLICKS, list) or not isinstance(MY_BG_CLICKS, list):
-    raise SystemExit('MY_IMAGE must be a path in quotes (or "") and the clicks lists of (x, y) pairs.')
-if MY_IMAGE and not Path(MY_IMAGE).is_file():
-    raise SystemExit(f"{MY_IMAGE} not found. Upload it with the folder icon on the left and copy its path.")
-if MY_IMAGE and not MY_FG_CLICKS:
-    raise SystemExit("Add at least one (x, y) click on the thing you want to MY_FG_CLICKS.")
-my_img = np.array(Image.open(MY_IMAGE).convert("RGB")) if MY_IMAGE else demo["image"]
-my_h, my_w = my_img.shape[:2]
-if MY_IMAGE:
-    my_fg = [[float(x), float(y)] for x, y in MY_FG_CLICKS]
-    my_bg = [[float(x), float(y)] for x, y in MY_BG_CLICKS]
-else:
-    ys, xs = np.nonzero(demo["scribbles"] == 2)
-    picks = np.linspace(0, len(ys) - 1, 3).astype(int) if len(ys) else []
-    my_fg, my_bg = scribble_points(demo, 3), [[float(xs[k]), float(ys[k])] for k in picks]
-if not all(0 <= x < my_w and 0 <= y < my_h for x, y in my_fg + my_bg):
-    raise SystemExit(f"every click must lie inside the image: 0 ≤ x < {my_w}, 0 ≤ y < {my_h}.")
-my_feat = dino.features(my_img, min(side, max(my_h, my_w)))
-gh, gw = my_feat.shape[1:]
-w_fg, w_bg = torch.zeros(gh, gw, device=DEVICE), torch.zeros(gh, gw, device=DEVICE)
-for weights, pts in ((w_fg, my_fg), (w_bg, my_bg)):
-    for x, y in pts:
-        weights[min(int(y * gh / my_h), gh - 1), min(int(x * gw / my_w), gw - 1)] = 1.0
-if not my_bg:
-    w_bg = 1.0 - w_fg  # no background clicks: every other patch is the background prototype
-my_score = prototype_score(my_feat, prototypes(my_feat, w_fg, w_bg))
-my_mask = score_to_mask(my_score, (my_h, my_w))
-show_clicks(
-    [
-        (MY_IMAGE or f"demo · {demo['name']} · clicks on the thing", my_img, my_fg),
-        ("clicks on what you do not want", my_img, my_bg),
-        ("similarity: thing − not", heat_rgb(my_score, (my_h, my_w)), None),
-        (f"prototype mask · marks {my_mask.mean():.0%}", overlay(my_img, my_mask, THEME["fails"]), my_fg),
-    ],
-    width=2.8,
-)
+# Want to try the one-shot idea on your own photo? Section 9 runs the whole ladder on your own images.
 
 # %% [markdown]
 # <!-- callout: takeaway | Takeaway -->
@@ -823,5 +801,5 @@ show_clicks(
 #   much the result depends on your choice.
 # - **You have cheap scribbles** → train with a loss that ignores unlabelled pixels, and measure what any
 #   "far from a stroke = background" rule mislabels before you use it (4.5).
-# - **Two rungs score alike** → compare their difference maps and the minutes of annotation: they differ more
+# - **Two rungs score alike** → compare their error maps and the minutes of annotation: they differ more
 #   in how they fail than in one number. Keep the rung colours; they return in section 8.

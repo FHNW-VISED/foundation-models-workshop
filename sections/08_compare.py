@@ -46,7 +46,7 @@
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
 APPROACH_COLOURS |= {"full_masks": THEME["works"]}
 APPROACH_NAMES |= {"full_masks": "full masks: complete maps (section 2)"}
-ALL_APPROACHES = [  # the short names Q31 accepts
+ALL_APPROACHES = [  # the short names Q28 accepts
     "zero_shot",
     "one_shot",
     "one_shot_sam",
@@ -181,56 +181,36 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction (1 min) -->
-# **Q31.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
+# **Q28.** 🟡 Before the table appears: which approach will have the **highest mean IoU**, and which will be
 # the **steadiest** (the smallest spread of IoU from image to image)?
 #
-# - Write your two picks in the next cell and run it; leave `""` to skip. The table further down shows where
+# - Choose your two picks from the dropdowns in the next cell and run it; leave them blank to skip. The
+#   short names are the second line of each picture title above. The table further down shows where
 #   they landed.
-# - Short names you can use: `zero_shot`, `one_shot`, `one_shot_sam`, `scribbles`, `naive`, `masked`, `pu`,
-#   `sam_pseudo`, `gradcam_pseudo`, `sam_clicks`, `sam_boxes`, `full_masks`.
 
 # %%
-# Q31 — your two predictions (short names from the list above, or leave "" to skip)
-MY_WINNER = ""  # e.g. "scribbles"
-MY_STEADIEST = ""  # e.g. "full_masks"
+# Q28 — your two predictions (pick from the dropdowns, or leave blank to skip)
+MY_WINNER = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
+MY_STEADIEST = ""  # @param ["", "zero_shot", "one_shot", "one_shot_sam", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
 for label, pick in (("MY_WINNER", MY_WINNER), ("MY_STEADIEST", MY_STEADIEST)):
     if not isinstance(pick, str) or (pick and pick not in ALL_APPROACHES):
         raise SystemExit(f'{label} must be "" or one of: {", ".join(ALL_APPROACHES)}.')
 print(f"your picks · highest IoU: {MY_WINNER or '(none)'} · steadiest: {MY_STEADIEST or '(none)'}")
 
 # %% [markdown]
-# ### 8.2 What "reliable" means here
-
-# %% [markdown]
-# <!-- callout: your-turn | Your turn (optional, 2 min) -->
-# Fill `my_spread`.
-#
-# - **In:** the IoU of one approach on each held-out image, a list of floats.
-# - **Out:** their standard deviation (divide by the number of images, not by one less), a float.
-# - **Example:** `[0.1, 0.3, 0.2, 0.6]` has mean 0.3 and spread 0.19.
-#
-# The cell checks your version on those four play values and continues with ours if you skip it.
+# This helper cell defines `spread`, the population standard deviation of one approach's per-image IoUs
+# (divided by the number of images, as in the theory box above).
 
 # %%
-# @title Reference solution (open only if stuck) { display-mode: "form" }
-def _ref_spread(per_image_iou: list[float]) -> float:
-    """Reference: numpy's standard deviation, which divides by n by default."""
+# @title spread: the standard deviation of the per-image IoU { display-mode: "form" }
+def spread(per_image_iou: list[float]) -> float:
+    """Reference: numpy's standard deviation, which divides by n by default.
+    e.g. [0.1, 0.3, 0.2, 0.6] -> 0.19"""
     return float(np.std(np.asarray(per_image_iou, dtype=float)))
 
 
-# %%
-# ✍️ YOUR CODE
-def my_spread(per_image_iou: list[float]) -> float:
-    """The population standard deviation of the per-image IoUs: sqrt(mean((x - mean(x))²))."""
-    ...
-
-
-_play_ious = [0.1, 0.3, 0.2, 0.6]  # four images: three middling, one much better
-spread = use(my_spread, reference=_ref_spread, check=lambda f: round(float(f(_play_ious)), 4), name="spread")
-print("play IoUs", _play_ious, "· spread", round(spread(_play_ious), 4))
-
 # %% [markdown]
-# ### 8.3 The table
+# ### 8.2 The table
 #
 # This cell scores every approach image by image against the hidden ground truth and shows the table sorted
 # by IoU (best value of each column in bold), then where your two picks landed.
@@ -353,10 +333,10 @@ if MY_STEADIEST in by_spread:
 for pick in {MY_WINNER, MY_STEADIEST} - {"", *by_spread}:
     print(f"(your pick {pick} was left out: {SKIPPED.get(pick, 'not run')})")
 if not (MY_WINNER or MY_STEADIEST):
-    print("no prediction written in Q31; fine, but next time guess first: it is the cheapest lesson here")
+    print("no prediction written in Q28; fine, but next time guess first: it is the cheapest lesson here")
 
 # %% [markdown]
-# ### 8.4 The trade-off in one picture
+# ### 8.3 The trade-off in one picture
 #
 # This cell draws the table: IoU against annotation minutes on the left (log scale, with a bar for each
 # spread), compute seconds on the right.
@@ -421,7 +401,7 @@ plt.show()
 # - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
 
 # %% [markdown]
-# **Q32.** 🟡 Pick one approach for each situation and name the column that decided it.
+# **Q29.** 🟡 Pick one approach for each situation and name the column that decided it.
 #
 # - (a) A screening study of 1,000 new images next month.
 # - (b) One difficult image a clinician needs today.
@@ -446,7 +426,7 @@ plt.show()
 
 # %% [markdown]
 # <!-- callout: question | 👥 Pairs, 4 min: defend a row -->
-# Use your Q32 answers. **A** defends one row for situation (a), **B** defends another row for situation
+# Use your Q29 answers. **A** defends one row for situation (a), **B** defends another row for situation
 # (c), one minute each, naming the column that decides. Then swap: attack the other's row.
 #
 # - Which column did the defence rest on, and which column of the same row would hurt it most?
@@ -464,7 +444,7 @@ plt.show()
 # </details>
 
 # %% [markdown]
-# ### 8.5 Who is steady, and who fails on some images
+# ### 8.4 Who is steady, and who fails on some images
 #
 # This cell draws one dot per held-out image and a violin around the dots for each approach (a wide violin
 # means the IoU varies a lot; the short bar is the median image).
