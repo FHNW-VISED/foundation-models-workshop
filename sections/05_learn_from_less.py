@@ -112,17 +112,30 @@ def path_report(tensors: dict) -> dict:
     return out | rung_report(held_preds) | {"fit_preds": fit_preds, "held_preds": held_preds}
 
 
-def print_reports(reports: dict) -> None:
-    """One line per head: on the training images, the share of the hidden and of the painted vessels it finds;
-    on the held-out images, IoU, recall and the share of the fundus it calls vessel."""
-    print(f"{'':<34}{'training images · found':^26}   {'held-out images':^30}")
-    print(f"{'head':<34}{'hidden':>12}{'painted':>12}   {'IoU':>7}{'recall':>9}{'calls vessel':>14}")
-    for name, r in reports.items():
-        print(
-            f"{name:<34}{r['recall_hidden_fit']:>12.0%}{r['recall_visible_fit']:>12.0%}   {r['iou']:>7.3f}"
-            f"{r['recall']:>9.0%}{r['marked']:>14.0%}"
-        )
-    print(f"{'really vessel (the ground truth)':<34}{'':>24}   {'':>16}{fg_share:>14.0%}")
+def path1_table(reports: dict, title: str, meta: str | None = None) -> None:
+    """One row per head: on the training images, the share of the hidden and of the painted vessels it finds;
+    on the held-out images, IoU, recall and the share of the fundus it calls vessel; and the annotation it
+    needed (from RESULTS["path1_effort_min"], when set)."""
+    effort = {approach_names[k]: v for k, v in RESULTS.get("path1_effort_min", {}).items()}
+    rows = [
+        {
+            "name": name,
+            "colour": path_colours.get(name),
+            **r,
+            "effort": effort.get(name),
+        }
+        for name, r in reports.items()
+    ]
+    columns = [
+        ("recall_hidden_fit", "found: hidden", "training images, unpainted vessels", "pct"),
+        ("recall_visible_fit", "found: painted", "training images, painted vessels", "pct"),
+        "iou",
+        "recall",
+        "marked",
+        ("effort", "annotation", "a person's time, about", "min"),
+    ]
+    truth = {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True}
+    show_table(title, rows, columns, refs=[truth], meta=meta)
 
 
 def public(r: dict) -> dict:
@@ -184,10 +197,28 @@ known = {
     "masked": np.mean([(lab >= 0).mean() for lab in masked_labels]),
 }
 n_bg_strokes = sum(m.get("n_bg_strokes", 0) for m in specialised["fit"][: len(miss_train)])
-print(
-    f"pixels the loss hears about · naive {known['naive']:.1%} (all called background unless painted) · "
-    f"masked {known['masked']:.1%} ({n_bg_strokes} background strokes over {len(miss_train)} images) · "
-    "PU: all of them, as vessel or unlabelled"
+pu_known = float(np.mean([(lab >= 0).mean() for lab in pu_labels]))
+show_table(
+    "What each recipe tells the loss",
+    [
+        {
+            "name": approach_names[k],
+            "colour": approach_colours[k],
+            "known": share,
+            "unpainted": how,
+        }
+        for k, share, how in (
+            ("naive", known["naive"], "background"),
+            ("masked", known["masked"], f"ignored, except {n_bg_strokes} background strokes"),
+            ("pu", pu_known, "unlabelled: background or hidden vessel"),
+        )
+    ],
+    [
+        ("known", "pixels used", "share of the fundus the loss uses", "pct"),
+        ("unpainted", "unpainted pixels count as", "what the recipe makes of them", "text"),
+    ],
+    name_label="recipe",
+    meta=f"{len(miss_train)} training images · no ground truth goes in",
 )
 
 ex, k_ex = miss_train[0], 0
@@ -322,9 +353,9 @@ masked_head, masked_sec = train_masked_head(TRAIN_MASKED_HEAD)
 
 # %% [markdown]
 # The next cell scores the masked head next to the naive head and the full-mask head, on the hidden and
-# visible vessels of the training images and on the held-out images. "Marked" is the share of the fundus a
-# mask covers. What to look for: how much of the fundus each head marks, against the share that is really
-# vessel.
+# visible vessels of the training images and on the held-out images. "Calls vessel" is the share of the
+# fundus a mask covers. What to look for: how much of the fundus each head calls vessel, against the share
+# that is really vessel (the "really vessel" row under the table).
 
 # %%
 # @title Score the masked head next to the earlier heads { display-mode: "form" }
@@ -353,13 +384,6 @@ RESULTS["masked_head"] = public(masked) | {
     "train_sec": round(float(masked_sec), 2),
     "infer_sec": masked_infer,
 }
-print_reports(path_reports)
-truth_share = float(np.mean([it["mask"][region(it)].mean() for it in spec_eval]))
-print(
-    f"the true vessels cover {truth_share:.1%} of the fundus · the masked head calls {masked['marked']:.1%} "
-    f"of it vessel · the naive head {path_reports[approach_names['naive']]['marked']:.1%}"
-)
-
 # annotation effort of the three Path 1 heads, for the comparison table of section 8: the painted half of
 # each vessel map (the dataset's share), plus seconds per background stroke
 painted_masks = len(miss_train) * (1 - missing_labels["hidden_fraction"])
@@ -368,11 +392,12 @@ RESULTS["path1_effort_min"] = {
     "masked": round(effort_minutes(n_strokes=n_bg_strokes, n_full_masks=painted_masks), 2),
     "pu": round(effort_minutes(n_full_masks=painted_masks), 2),
 }
-print(
-    "annotation effort · "
-    + " · ".join(
-        f"{approach_names[k].split(':')[0]} {v:.0f} min" for k, v in RESULTS["path1_effort_min"].items()
-    )
+path1_table(
+    path_reports,
+    "The masked head next to the earlier heads",
+    meta=f"found: training images ({len(miss_train)}) · IoU, recall, calls vessel: {len(spec_eval)} "
+    f"held-out images · masked head {'trained here' if TRAIN_MASKED_HEAD else 'our checkpoint'}, "
+    f"scored in {masked_infer} s on {DEVICE}",
 )
 
 # %% [markdown]
@@ -386,11 +411,17 @@ _lab = torch.cat([torch.from_numpy(x.astype(np.int8)).flatten() for x in masked_
 _y, _ignored = (_lab == 1).float(), _lab < 0
 _all_vessel = torch.full_like(_y, 8.0)  # a head that says "vessel" everywhere
 _bce = F.binary_cross_entropy_with_logits(_all_vessel, _y, reduction="none")
-print(
-    "mean loss of 'vessel everywhere' on the labels the masked loss keeps: "
-    f"{float(_bce[~_ignored].mean()):.3f} with the background strokes, "
-    f"{float(_bce[~_ignored & (_lab == 1)].mean()):.5f} without them "
-    "(≈ 0: a perfect score for a useless head)"
+show_result(
+    "Loss of a head that says 'vessel' everywhere",
+    {
+        "with": f"{float(_bce[~_ignored].mean()):.3f}",
+        "without": f"{float(_bce[~_ignored & (_lab == 1)].mean()):.5f}",
+    },
+    [
+        ("with", "with background strokes", "mean loss on the labels kept", "text"),
+        ("without", "without them", "vessel labels only", "text"),
+    ],
+    note="Without the strokes the loss is about 0: a perfect score for a useless head.",
 )
 
 # %% [markdown]
@@ -636,7 +667,12 @@ def train_pu_head(labelled_share: float):
         f"PU head · painted {painted_share:.1%} of the fundus ÷ labelled share {labelled_share:.2f} → "
         f"{prior:.1%} of the fundus is vessel (the prior) · trained in {sec:.1f} s on {DEVICE}"
     )
-    print_reports({k: path_reports[approach_names[k]] for k in ("naive", "masked", "pu")})
+    path1_table(
+        {approach_names[k]: path_reports[approach_names[k]] for k in ("naive", "masked", "pu")},
+        "The three recipes, trained on the same label file",
+        meta=f"found: training images ({len(miss_train)}) · IoU, recall, calls vessel: {len(spec_eval)} "
+        "held-out images",
+    )
     return head
 
 

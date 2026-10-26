@@ -86,6 +86,159 @@ def tag_panel(ax, role: str | None) -> None:
         spine.set_linewidth(2.5)
 
 
+# Result cards: every printed result in the notebook uses one of two layouts, so the reader always finds the
+# same things in the same place. A column (or tile) is (key, label, meaning, kind); kind formats the value:
+# "iou" 0.00, "pct" 12 %, "sec" 1.2 s, "min" ≈ 3 min, "text" as given. "iou" and "pct" also get a 0-1 bar.
+COLUMNS = {  # the standard columns: the same words for the same number everywhere
+    "iou": ("IoU", "overlap with the truth (0 to 1)", "iou"),
+    "cldice": ("clDice", "centre-line overlap (0 to 1)", "iou"),
+    "recall": ("recall", "share of the true vessels found", "pct"),
+    "precision": ("precision", "share of its marks that are vessel", "pct"),
+    "marked": ("calls vessel", "share of the fundus it calls vessel", "pct"),
+}
+CARD_CSS = {  # inline styles: Colab keeps them in cell outputs
+    "card": "font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#FFFFFF;color:#212121;"
+    "border:1px solid #DDD8E8;border-radius:8px;padding:12px 14px;margin:6px 0;max-width:900px",
+    "title": "font-weight:600;font-size:14px;color:#311B92",
+    "meta": "font-weight:400;font-size:12px;color:#757575;margin-left:10px",
+    "note": "font-size:12px;color:#616161;margin-top:8px",
+    "track": "height:4px;background:#ECEAF2;border-radius:2px;margin-top:3px",
+    "fill": "height:4px;border-radius:2px",
+    "tile": "flex:1 1 130px;min-width:120px;background:#F7F5FB;border-radius:6px;padding:8px 10px",
+    "label": "font-size:12px;color:#5E35B1;font-weight:600",
+    "big": "font-size:20px;font-variant-numeric:tabular-nums",
+    "small": "font-size:11px;color:#757575",
+    "truth": "font-size:11px;color:#2E7D32",
+    "th": "text-align:right;padding:4px 0 6px 14px;vertical-align:bottom;min-width:90px",
+    "th0": "text-align:left;padding:4px 10px 6px 0;vertical-align:bottom;font-size:12px;color:#5E35B1",
+    "help": "font-size:10.5px;font-weight:400;color:#8A8A8A",
+    "td": "text-align:right;padding:5px 0 5px 14px;font-variant-numeric:tabular-nums;",
+    "td0": "padding:5px 10px 5px 0;",
+    "ref": "color:#757575;font-style:italic",
+    "chip": "display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:",
+}
+
+
+def _cell(value, kind: str, bar: str = "#7E57C2") -> str:
+    """One formatted value, with a thin 0-1 bar (colour `bar`) under shares and IoUs."""
+    import html as _html
+
+    if value is None or value == "":
+        return ""
+    if kind not in ("iou", "pct", "sec", "min"):
+        return _html.escape(str(value))
+    v = float(value)
+    text = {"iou": f"{v:.2f}", "pct": f"{v:.0%}", "sec": f"{v:.1f} s", "min": f"≈ {v:.0f} min"}
+    if kind not in ("iou", "pct"):
+        return text[kind]
+    width = max(0.0, min(1.0, float(value))) * 100
+    fill = f'<div style="{CARD_CSS["fill"]};width:{width:.0f}%;background:{bar}"></div>'
+    return f'{text[kind]}<div style="{CARD_CSS["track"]}">{fill}</div>'
+
+
+def _col(c) -> tuple:
+    """A column given by its standard key ("iou"), or spelled out as (key, label, meaning, kind)."""
+    return (c, *COLUMNS[c]) if isinstance(c, str) else tuple(c)
+
+
+def _card(title: str, meta: str | None, body: str, note: str | None) -> str:
+    """The frame every result shares: title, grey details, the body, an optional one-line note."""
+    import html as _html
+
+    head = f'<div style="{CARD_CSS["title"]}">{_html.escape(title)}'
+    if meta:
+        head += f'<span style="{CARD_CSS["meta"]}">{_html.escape(meta)}</span>'
+    foot = f'<div style="{CARD_CSS["note"]}">{_html.escape(note)}</div>' if note else ""
+    return f'<div style="{CARD_CSS["card"]}">{head}</div>{body}{foot}</div>'
+
+
+def show_result(
+    title: str,
+    values: dict,
+    columns: list,
+    meta: str | None = None,
+    note: str | None = None,
+    truth_share: float | None = None,
+) -> None:
+    """One approach's numbers as a row of tiles: value, plain label, one-line meaning. `columns` are standard
+    keys ("iou", "recall", "precision", "marked") or (key, label, meaning, kind). With `truth_share`, the
+    "calls vessel" tile also says how much really is vessel."""
+    import html as _html
+
+    from IPython.display import HTML, display
+
+    tiles = []
+    for key, label, meaning, kind in map(_col, columns):
+        extra = ""
+        if key == "marked" and truth_share is not None:
+            extra = f'<div style="{CARD_CSS["truth"]}">really vessel: {truth_share:.0%}</div>'
+        tiles.append(
+            f'<div style="{CARD_CSS["tile"]}"><div style="{CARD_CSS["label"]}">{_html.escape(label)}</div>'
+            f'<div style="{CARD_CSS["big"]}">{_cell(values.get(key), kind)}</div>{extra}'
+            f'<div style="{CARD_CSS["small"]}">{_html.escape(meaning)}</div></div>'
+        )
+    body = f'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">{"".join(tiles)}</div>'
+    display(HTML(_card(title, meta, body, note)))
+
+
+def show_table(
+    title: str,
+    rows: list[dict],
+    columns: list,
+    refs: list[dict] | None = None,
+    meta: str | None = None,
+    note: str | None = None,
+    name_label: str = "approach",
+) -> None:
+    """Several approaches in one table with the standard columns. A row is {"name": ..., "colour": optional
+    hex, <column key>: value}. `refs` are reference rows ("everything is foreground", an earlier baseline),
+    drawn in grey under a divider; a reference row fills only the columns it has, and one with "truth": True
+    (the ground truth's own share) gets a green bar."""
+    import html as _html
+
+    from IPython.display import HTML, display
+
+    cols = [_col(c) for c in columns]
+    th = f'<th style="{CARD_CSS["th0"]}">{_html.escape(name_label)}</th>'
+    for _, label, meaning, _ in cols:
+        th += (
+            f'<th style="{CARD_CSS["th"]}"><div style="{CARD_CSS["label"]}">{_html.escape(label)}</div>'
+            f'<div style="{CARD_CSS["help"]}">{_html.escape(meaning)}</div></th>'
+        )
+
+    def tr(row: dict, ref: bool) -> str:
+        chip = f'<span style="{CARD_CSS["chip"]}{row["colour"]}"></span>' if row.get("colour") else ""
+        look = CARD_CSS["ref"] if ref else ""
+        out = f'<td style="{CARD_CSS["td0"]}{look}">{chip}{_html.escape(str(row["name"]))}</td>'
+        for key, _, _, kind in cols:
+            bar = THEME["truth"] if row.get("truth") else "#BDBDBD" if ref else "#7E57C2"
+            out += f'<td style="{CARD_CSS["td"]}{look}">{_cell(row.get(key), kind, bar)}</td>'
+        return f'<tr style="border-top:1px solid #EEEAF4">{out}</tr>'
+
+    body = "".join(tr(r, False) for r in rows)
+    if refs:
+        body += f'<tr><td colspan="{len(cols) + 1}" style="border-top:2px solid #DDD8E8;padding:0"></td></tr>'
+        body += "".join(tr(r, True) for r in refs)
+    table = (
+        '<div style="overflow-x:auto"><table style="border-collapse:collapse;margin-top:8px;font-size:13px">'
+        f"<thead><tr>{th}</tr></thead><tbody>{body}</tbody></table></div>"
+    )
+    display(HTML(_card(title, meta, table, note)))
+
+
+def show_list(title: str, items: list[str], meta: str | None = None, note: str | None = None,
+              numbered: bool = True) -> None:
+    """Sentences (principles, steps, what each line means) as a numbered or bulleted list in the same card."""
+    import html as _html
+
+    from IPython.display import HTML, display
+
+    tag = "ol" if numbered else "ul"
+    lis = "".join(f'<li style="margin:4px 0">{_html.escape(t)}</li>' for t in items)
+    body = f'<{tag} style="margin:8px 0 0 0;padding-left:22px;font-size:13px;line-height:1.5">{lis}</{tag}>'
+    display(HTML(_card(title, meta, body, note)))
+
+
 def browse_figures(figures: list, labels: list[str], title: str) -> None:
     """Show one figure at a time with ◀ ▶ buttons and a slider: `figures` are matplotlib figures (closed
     here), `labels` one line each. Pure HTML + JavaScript, so it needs no running Python and works in Colab
@@ -406,9 +559,14 @@ RESULTS["pets_zero_shot_iou"] = zero_shot["box"]  # the headline: SAM's best sin
 RESULTS["pets_zero_shot_point_iou"] = zero_shot["point"]
 RESULTS["pets_zero_shot_box_iou"] = zero_shot["box"]
 RESULTS["pets_zero_shot_seconds"] = round(time.monotonic() - t0, 1)
-print(
-    f"SAM zero-shot on {len(pets_eval)} held-out pets · mean IoU one click {zero_shot['point']:.3f} · "
-    f"one box {zero_shot['box']:.3f} · {RESULTS['pets_zero_shot_seconds']} s"
+show_table(
+    "SAM with no training, on the held-out pets",
+    [
+        {"name": "SAM, one click", "iou": zero_shot["point"]},
+        {"name": "SAM, one box", "iou": zero_shot["box"]},
+    ],
+    ["iou"],
+    meta=f"{len(pets_eval)} held-out pets · mean over the pets · {RESULTS['pets_zero_shot_seconds']} s",
 )
 
 # %% [markdown]
@@ -665,11 +823,16 @@ RESULTS["pets_head"] = {
     "infer_sec": round(time.monotonic() - t0, 1),
 }
 n_eval = len(pets_eval)
-print(f"Linear head: trained in 1.4 on {len(train_items)} pets with full masks, run on {n_eval} unseen pets.")
-print(f"Score: per-pet IoU with the ground truth (grey band not scored), averaged over the {n_eval} pets.")
-print(f"  linear head       mean IoU {RESULTS['pets_head_iou']:.3f}")
-print(f"  SAM, one click    mean IoU {RESULTS['pets_zero_shot_point_iou']:.3f}  (the 1.2 masks)")
-print(f"  SAM, one box      mean IoU {RESULTS['pets_zero_shot_box_iou']:.3f}  (the 1.2 masks)")
+show_table(
+    "Linear head and SAM on the held-out pets",
+    [
+        {"name": "linear head (trained on five pets)", "iou": RESULTS["pets_head_iou"]},
+        {"name": "SAM, one click (from 1.2)", "iou": RESULTS["pets_zero_shot_point_iou"]},
+        {"name": "SAM, one box (from 1.2)", "iou": RESULTS["pets_zero_shot_box_iou"]},
+    ],
+    ["iou"],
+    meta=f"{n_eval} unseen pets · mean IoU per pet, grey band not scored",
+)
 pet_order = np.argsort(zero_shot_all["box"])  # the same three pets in both rows
 picked = [("worst", pet_order[0]), ("median", pet_order[n_eval // 2]), ("best", pet_order[-1])]
 sam_row, head_row, boxes = [], [], []

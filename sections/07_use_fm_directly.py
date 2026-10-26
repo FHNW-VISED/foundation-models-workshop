@@ -149,12 +149,26 @@ def show_boxes(
     plt.show()
 
 
-def print_path3(reports: dict) -> None:
-    """One line per approach: IoU, recall and the share of the fundus the mask calls vessel."""
-    print(f"{'approach (held-out images)':<46}{'IoU':>6}{'recall':>8}{'calls vessel':>14}")
-    for k, v in reports.items():
-        print(f"{approach_names.get(k, k):<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>14.0%}")
-    print(f"{'really vessel (the ground truth)':<46}{'':>14}{fg_share:>14.0%}")
+def path3_table(
+    reports: dict, title: str, meta: str | None = None, refs: list | None = None, extra: dict | None = None
+) -> None:
+    """The standard table of this path on the held-out images: IoU, recall and "calls vessel" per approach,
+    then the reference rows (`refs`, then the ground truth). `extra` = {column: {approach: value}}."""
+    extra = extra or {}
+    rows = [
+        {
+            "name": approach_names.get(k, k),
+            "colour": approach_colours.get(k),
+            **v,
+            **{c: vals.get(k) for c, vals in extra.items()},
+        }
+        for k, v in reports.items()
+    ]
+    columns = ["iou", "recall", "marked"] + [
+        ("annotation", "annotation", "what a person draws", "text")
+    ] * bool("annotation" in extra)
+    truth = {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True}
+    show_table(title, rows, columns, refs=[*(refs or []), truth], meta=meta)
 
 
 def try_boxes(box_pad: int, with_click: bool) -> None:
@@ -166,13 +180,14 @@ def try_boxes(box_pad: int, with_click: bool) -> None:
     pad = max(box_pad // 4, 0) if SMOKE else box_pad  # smoke thumbnails are 4× smaller
     preds, _ = direct_boxes(spec_eval, pad, with_click)
     RESULTS["sam_direct_boxes_try"] = rung_report(preds) | {"pad": box_pad, "with_click": with_click}
-    print_path3(
+    path3_table(
         {
             f"pad {BOX_PAD} px, with click (default)": path3_report["sam_boxes"],
             f"pad {box_pad} px, {'with' if with_click else 'no'} click (yours)": RESULTS[
                 "sam_direct_boxes_try"
             ],
-        }
+        },
+        "Your box setting next to the default",
     )
 
 
@@ -194,13 +209,15 @@ path3_preds = {"zero_shot": ladder_preds["zero_shot"], "scribbles": ladder_preds
 path3_preds["sam_clicks"], click_prompts = direct_clicks(spec_eval, N_DIRECT_CLICKS)
 clicks_sec = round(time.monotonic() - t0, 1)
 path3_report = {k: rung_report(v) for k, v in path3_preds.items()}
-print(
-    f"SAM from {N_DIRECT_CLICKS} + {N_DIRECT_CLICKS} stroke clicks on {len(spec_eval)} images · "
-    f"{clicks_sec} s on {DEVICE}"
+path3_table(
+    {"sam_clicks": path3_report["sam_clicks"]},
+    f"SAM from {N_DIRECT_CLICKS} vessel + {N_DIRECT_CLICKS} background clicks per image",
+    meta=f"{len(spec_eval)} held-out images · {clicks_sec} s on {DEVICE}",
+    refs=[
+        {"name": "section 2: SAM, 20 vessel clicks only", "iou": RESULTS["sam_prompt_ladder"]["20 points"]},
+        {"name": "everything is foreground", "iou": RESULTS["specialised_everything_iou"], "marked": 1.0},
+    ],
 )
-print_path3({"sam_clicks": path3_report["sam_clicks"]})
-print(f"{'section 2: SAM, 20 vessel clicks only (IoU)':<46}{RESULTS['sam_prompt_ladder']['20 points']:>6.3f}")
-print(f"{'everything is foreground (IoU)':<46}{RESULTS['specialised_everything_iou']:>6.3f}")
 
 # %% [markdown]
 # **What to look for.** Read *calls vessel* first. A value near 100 % means the "not here" clicks only cut a
@@ -262,11 +279,12 @@ path3_report["sam_boxes"] = rung_report(path3_preds["sam_boxes"])
 strokes_alone = [ndi.binary_dilation(it["scribbles"] == 1, iterations=THICKEN) for it in spec_eval]
 strokes_report = rung_report(strokes_alone)
 n_boxes = [len(b) for b, _ in box_prompts]
-print(
-    f"SAM, one box + click per vessel stroke · {int(np.mean(n_boxes))} boxes per image on average · "
-    f"{boxes_sec} s on {DEVICE}"
+path3_table(
+    {k: path3_report[k] for k in ("sam_clicks", "sam_boxes")},
+    "SAM with one box and one centre click per vessel stroke",
+    meta=f"{int(np.mean(n_boxes))} boxes per image on average · {boxes_sec} s on {DEVICE}",
+    refs=[{"name": f"no model: the strokes thickened by {THICKEN} px", **strokes_report}],
 )
-print_path3(path3_report | {f"no model: the strokes thickened by {THICKEN} px": strokes_report})
 boxes, centre_clicks = box_prompts[k_demo]
 box_nums = image_numbers(path3_preds["sam_boxes"][k_demo], demo)
 thick_nums = image_numbers(strokes_alone[k_demo], demo)
@@ -365,20 +383,21 @@ RESULTS["sam_direct_strokes_alone"] = strokes_report | {"thicken_px": THICKEN}
 RESULTS["path3_effort_min"] = {k: round(v, 2) for k, v in effort.items()}
 
 order = ["zero_shot", "scribbles", "sam_pseudo", "sam_clicks", "sam_boxes"]
-print_path3({k: path3_report[k] for k in order})
-print(
-    f"{'no model: strokes thickened (IoU)':<46}{strokes_report['iou']:>6.3f}\n"
-    f"{'everything is foreground (IoU)':<46}{RESULTS['specialised_everything_iou']:>6.3f}"
+once = f"{n_strokes} strokes once (≈ {effort_minutes(n_strokes=n_strokes):.0f} min)"
+annotation = {"zero_shot": "1 box per image", "scribbles": once, "sam_pseudo": once} | {
+    k: f"≈ {RESULTS[result_key[k]]['effort_min_per_image']:.1f} min on every image"
+    for k in ("sam_clicks", "sam_boxes")
+}
+path3_table(
+    {k: path3_report[k] for k in order},
+    "Path 3 next to the trained heads",
+    meta=f"{len(spec_eval)} held-out images",
+    refs=[
+        {"name": "no model: the strokes thickened", **strokes_report},
+        {"name": "everything is foreground", "iou": RESULTS["specialised_everything_iou"], "marked": 1.0},
+    ],
+    extra={"annotation": annotation},
 )
-print(
-    f"\nannotation · the heads: {n_strokes} strokes on {len(scrib_train)} training images, once "
-    f"(≈ {effort_minutes(n_strokes=n_strokes):.1f} min)"
-)
-for k in ("sam_clicks", "sam_boxes"):
-    print(
-        f"annotation · {approach_names[k]}: ≈ {RESULTS[result_key[k]]['effort_min_per_image']:.1f} min on "
-        f"every image you segment ({effort[k]:.0f} min for these {len(spec_eval)})"
-    )
 short3 = {
     "zero_shot": "zero-shot\n(one box)",
     "scribbles": "scribble head\n(trained once)",
@@ -478,11 +497,13 @@ else:
         sam3_report = rung_report(sam3_preds)
         RESULTS["sam3_text_iou"] = sam3_report["iou"]
         RESULTS["sam3_text"] = sam3_report | {"text": SAM3_TEXT, "infer_sec": round(time.monotonic() - t0, 1)}
-        print_path3(
+        path3_table(
             {
                 f'SAM 3, "{SAM3_TEXT}"': sam3_report,
                 "SAM 2.1, one box + click per stroke": path3_report["sam_boxes"],
-            }
+            },
+            "SAM 3 from one phrase, next to SAM 2.1 from the strokes",
+            meta=f"{len(spec_eval)} held-out images · {RESULTS['sam3_text']['infer_sec']} s",
         )
     except Exception as err:  # noqa: BLE001 - an optional extension must never stop the notebook
         RESULTS["sam3_note"] = f"SAM 3 loaded but failed: {type(err).__name__}: {err}"

@@ -166,13 +166,18 @@ def sam_pseudo_labels(run_sam: bool, n_clicks: int):
         np.concatenate([p[region(it)] for p, it in zip(probs, scrib_train, strict=True)]), [0.05, 0.5, 0.95]
     )
     train_truth = float(np.mean([it["mask"][region(it)].mean() for it in scrib_train]))
-    print(
-        f"SAM pseudo-labels on {len(scrib_train)} training images · {src} · {sec} s on {DEVICE}\n"
-        f"how sure SAM is: 90 % of the fundus pixels get a probability between {spread[0]:.2f} and "
-        f"{spread[2]:.2f} (middle value {spread[1]:.2f})\n"
-        f"checked against the truth (never used for training), cutting at 0.5: the pseudo-labels "
-        f"{called_vessel(quality['marked'], train_truth)} · recall {quality['recall']:.2f} · "
-        f"IoU {quality['iou']:.3f}"
+    show_result(
+        "SAM pseudo-labels on the training images",
+        quality | {"spread": f"{spread[0]:.2f} to {spread[2]:.2f}"},
+        [
+            ("spread", "how sure SAM is", "range holding 90 % of the pixels", "text"),
+            "iou",
+            "recall",
+            "marked",
+        ],
+        meta=f"{len(scrib_train)} images · {src} · {sec} s on {DEVICE} · cut at 0.5",
+        note=f"Checked against the truth, never used for training. Middle probability: {spread[1]:.2f}.",
+        truth_share=train_truth,
     )
     scrib_ex, (pos, neg) = scrib_train[0], clicks_used[0]
     fig, axes = plt.subplots(1, 3, figsize=(10.2, 3.6))
@@ -211,11 +216,11 @@ def sam_pseudo_labels(run_sam: bool, n_clicks: int):
 # %% [markdown]
 # The next cell draws three panels, left to right: what SAM gets (the photo and the clicks), what it answers
 # (a probability per pixel), and the pseudo-label you get by cutting that probability at 0.5, checked
-# against the truth. The printout says the same in numbers:
+# against the truth. The card above the figure says the same in numbers:
 #
-# - **How sure SAM is:** 90 % of the pixels fall between the two printed values. Values near 0 or 1 mean
-#   sure, near 0.5 unsure.
-# - **Calls … vessel:** how much of the fundus the pseudo-label calls vessel, next to how much really is.
+# - **How sure SAM is:** 90 % of the pixels fall inside the range shown. Values near 0 or 1 mean sure, near
+#   0.5 unsure.
+# - **Calls vessel:** how much of the fundus the pseudo-label calls vessel, with how much really is under it.
 # - **Colours in the last panel:** $\color{#6A1B9A}{\blacksquare}$ violet = a real vessel found,
 #   $\color{#E65100}{\blacksquare}$ orange = a vessel SAM invented, $\color{#2E7D32}{\blacksquare}$ green = a
 #   vessel SAM left out. Every $\color{#E65100}{\blacksquare}$ orange and
@@ -365,10 +370,10 @@ TRAIN_SAM_HEAD = True  # @param {type:"boolean"}
 sam_head, sam_sec, sam_targets = train_sam_head(TRAIN_SAM_HEAD)
 
 # %% [markdown]
-# This cell scores the new head on the held-out images and prints it under the scribble head, which saw the
+# This cell scores the new head on the held-out images and shows it under the scribble head, which saw the
 # same strokes but kept every other pixel unknown. Columns: **IoU** (overlap with the truth), **recall** (the
-# share of the true vessels it finds) and **calls vessel** (the share of the fundus it calls vessel; the last
-# line says how much really is).
+# share of the true vessels it finds) and **calls vessel** (the share of the fundus it calls vessel; the
+# "really vessel" row says how much really is).
 
 # %%
 # @title Score the SAM pseudo-label head on the held-out images { display-mode: "form" }
@@ -396,16 +401,23 @@ RESULTS["sam_pseudo_head"] = path2_report["sam_pseudo"] | {
 }
 
 
-def print_path2(reports: dict) -> None:
-    """One line per head on the held-out images: IoU, recall and the share of the fundus it calls vessel."""
-    print(f"{'approach (held-out images)':<46}{'IoU':>6}{'recall':>8}{'calls vessel':>14}")
-    for k, v in reports.items():
-        name = approach_names.get(k, k)
-        print(f"{name:<46}{v['iou']:>6.3f}{v['recall']:>8.3f}{v['marked']:>14.0%}")
-    print(f"{'really vessel (the ground truth)':<46}{'':>14}{fg_share:>14.0%}")
+def path2_table(
+    reports: dict, title: str, meta: str | None = None, note: str | None = None, refs: list | None = None
+) -> None:
+    """One row per head on the held-out images: IoU, recall and the share of the fundus it calls vessel,
+    then the reference rows (`refs`, then the ground truth)."""
+    rows = [
+        {"name": approach_names.get(k, k), "colour": approach_colours.get(k), **v} for k, v in reports.items()
+    ]
+    truth = {"name": "really vessel (the ground truth)", "marked": fg_share, "truth": True}
+    show_table(title, rows, ["iou", "recall", "marked"], refs=[*(refs or []), truth], meta=meta, note=note)
 
 
-print_path2(path2_report)
+path2_table(
+    path2_report,
+    "The scribble head and the SAM pseudo-label head on the held-out images",
+    meta=f"{len(spec_eval)} images · pseudo-label head scored in {sam_infer} s on {DEVICE}",
+)
 
 # %% [markdown]
 # This helper cell defines `tune_pseudo_labels`, which trains a head on targets made with your cut and band.
@@ -434,7 +446,7 @@ def target_errors(targets: list[np.ndarray]) -> dict:
 
 def tune_pseudo_labels(threshold: float, band: float) -> None:
     """Targets from SAM's maps with this cut and unsure band, a head trained on them, and its numbers
-    printed under the head at 0.5."""
+    shown under the head at 0.5."""
     ok = all(isinstance(v, (int, float)) for v in (threshold, band))
     if not ok or band < 0 or threshold - band <= 0 or threshold + band > 1:
         raise SystemExit(
@@ -452,14 +464,26 @@ def tune_pseudo_labels(threshold: float, band: float) -> None:
     tuned_report = rung_report(tuned_preds)
     RESULTS["sam_pseudo_tuned"] = tuned_report | {"threshold": threshold, "band": band}
     yours = f"yours (cut {threshold:g}, band {band:g})"
-    print("1 · the labels the head trains on (training images, checked against the truth):")
-    print(f"{'':<30}{'ignored':>10}{'true vessel':>14}{'true background':>18}")
-    print(f"{'':<30}{'':>10}{'labelled bg':>14}{'labelled vessel':>18}")
+    label_rows = []
     for name, t in {"usual (cut 0.5, no band)": sam_targets, yours: tuned_targets}.items():
-        e = target_errors(t)
-        print(f"{name:<30}{e['ignored']:>10.0%}{e['vessel_as_bg']:>14.0%}{e['bg_as_vessel']:>18.0%}")
-    print(f"\n2 · the head trained on them, on the held-out images (trained in {tuned_sec:.1f} s):")
-    print_path2({"usual (cut 0.5, no band)": path2_report["sam_pseudo"], yours: tuned_report})
+        label_rows.append({"name": name, **target_errors(t)})
+    show_table(
+        "1 · The labels the head trains on",
+        label_rows,
+        [
+            ("ignored", "ignored", "share of the fundus left out", "pct"),
+            ("vessel_as_bg", "vessel labelled background", "share of the true vessel pixels", "pct"),
+            ("bg_as_vessel", "background labelled vessel", "share of the true background", "pct"),
+        ],
+        name_label="setting",
+        meta=f"{len(scrib_train)} training images, checked against the truth · lower is better for the "
+        "last two",
+    )
+    path2_table(
+        {"usual (cut 0.5, no band)": path2_report["sam_pseudo"], yours: tuned_report},
+        "2 · The heads trained on those labels",
+        meta=f"{len(spec_eval)} held-out images · your head trained in {tuned_sec:.1f} s on {DEVICE}",
+    )
     if threshold == 0.5 and band == 0:
         print("\nℹ️ Your setting equals the usual one: move a slider, then run this cell again.")
     k_demo = next(i for i, it in enumerate(spec_eval) if it is demo)
@@ -501,10 +525,10 @@ def tune_pseudo_labels(threshold: float, band: float) -> None:
 #
 # **Q15.** 🟡 Tune the pseudo-labels on the **training images**, never on the test images. Raise or lower
 # `PSEUDO_THRESHOLD` and give the doubtful pixels an `UNSURE_BAND` to ignore, picking values from the spread
-# printed in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
-# at the held-out line once: does it move the same way? Is there a setting that beats 0.5 on your run?
+# shown in 6.1 and judging them by how many training targets are wrong (the two error columns). Then look
+# at the held-out table once: does it move the same way? Is there a setting that beats 0.5 on your run?
 #
-# - `PSEUDO_THRESHOLD`: try 0.55, 0.6, 0.7 (or the median printed in 6.1).
+# - `PSEUDO_THRESHOLD`: try 0.55, 0.6, 0.7 (or the middle probability shown in 6.1).
 # - `UNSURE_BAND`: try 0.03; pixels within 0.03 of the threshold are ignored.
 #
 # Both are sliders in the next cell: move one, then run it again.
@@ -531,7 +555,7 @@ tune_pseudo_labels(PSEUDO_THRESHOLD, UNSURE_BAND)
 # <!-- callout: question | 👥 Pair moment (optional, 4 min) -->
 # One of you tries a low cut (`PSEUDO_THRESHOLD = 0.55`), the other a high one (`0.7`). Compare your two
 # error columns (true vessel labelled background, true background labelled vessel): which kind of wrong
-# label did each of you buy, and what happened to the held-out line?
+# label did each of you buy, and what happened to the held-out row?
 
 # %% [markdown]
 # <details><summary>What to look for</summary>
@@ -589,11 +613,24 @@ feat_demo = features_for(specialised, demo, side)
 p_clean = predict_head(clean_head, feat_demo, demo["mask"].shape)
 p_biased = predict_head(biased_head, feat_demo, demo["mask"].shape)
 blob_demo = bright_blob(demo)
-print(
-    f"blind spot ({blob_demo.mean():.1%} of the image) marked as vessel · head on strokes alone "
-    f"{p_clean[blob_demo].mean():.0%} · head on the biased teacher {p_biased[blob_demo].mean():.0%}\n"
-    f"share of the fundus marked as vessel · strokes alone {p_clean[region(demo)].mean():.0%} · "
-    f"biased teacher {p_biased[region(demo)].mean():.0%}"
+show_table(
+    "Heads trained with and without the teacher's blind spot",
+    [
+        {
+            "name": "head on the strokes alone",
+            "blob": p_clean[blob_demo].mean(),
+            "marked": p_clean[region(demo)].mean(),
+        },
+        {
+            "name": "head on the biased teacher",
+            "blob": p_biased[blob_demo].mean(),
+            "marked": p_biased[region(demo)].mean(),
+        },
+    ],
+    [("blob", "blind spot marked", "share of the blind spot it calls vessel", "pct"), "marked"],
+    refs=[{"name": "the biased teacher itself", "blob": 1.0}],
+    name_label="head",
+    meta=f"held-out demo image · the blind spot covers {blob_demo.mean():.1%} of the image",
 )
 show_masks(
     [
@@ -615,7 +652,7 @@ show_masks(
 # %% [markdown]
 # <details><summary>What to look for</summary>
 #
-# - Compare the blind-spot share in the printout with the $\color{#6A1B9A}{\blacksquare}$ violet inside the
+# - Compare the blind-spot share in the table with the $\color{#6A1B9A}{\blacksquare}$ violet inside the
 #   $\color{#E65100}{\blacksquare}$ orange blob. If the biased head
 #   marks the blob far more than the clean head, it copied the teacher's mistake onto an image it never saw
 #   labelled.
@@ -756,11 +793,23 @@ clf, cls_sec = train_tile_classifier(tile_x, tile_y, CLS_STEPS)
 with torch.no_grad():
     fit_acc = float(((clf(tile_x)[:, 0] > 0).long() == tile_y).float().mean())
 vessel_tile_share = held_out_vessel_tile_share(TILE_PATCHES)
-print(
-    f"tile classifier · {int((tile_y == 1).sum())} 'vessel' tiles, {int((tile_y == 0).sum())} 'no vessel' "
-    f"tiles from the strokes · fit accuracy {fit_acc:.0%} · {cls_sec:.1f} s on {DEVICE}"
+show_result(
+    "Tile classifier on the stroke tiles",
+    {
+        "yes": int((tile_y == 1).sum()),
+        "no": int((tile_y == 0).sum()),
+        "acc": fit_acc,
+        "held": vessel_tile_share,
+    },
+    [
+        ("yes", "'vessel' tiles", "a vessel stroke crosses them", "text"),
+        ("no", "'no vessel' tiles", "only background strokes", "text"),
+        ("acc", "fit accuracy", "on these training tiles", "pct"),
+        ("held", "held-out tiles with a vessel", "from the truth, not used", "pct"),
+    ],
+    meta=f"trained in {cls_sec:.1f} s on {DEVICE}",
+    note="The held-out share is evaluation only: it shows how rare a vessel-free tile really is.",
 )
-print(f"held-out truth (evaluation only): {vessel_tile_share:.0%} of the fundus tiles contain a vessel")
 
 # %% [markdown]
 # <!-- callout: question | 🤔 Your prediction -->
@@ -810,16 +859,22 @@ RESULTS["gradcam_head"] = path2_report["gradcam_pseudo"] | {
     "infer_sec": cam_infer,
 }
 cam_truth = float(np.mean([it["mask"][region(it)].mean() for it in scrib_train]))
-print(
-    f"Grad-CAM pseudo-labels made in {cam_sec} s. Checked against the truth on the training images "
-    f"(never used for training):\n"
-    f"  Grad-CAM labels: IoU {cam_quality['iou']:.3f} · recall {cam_quality['recall']:.2f} · "
-    f"{called_vessel(cam_quality['marked'], cam_truth)}\n"
-    f"  SAM labels (cut 0.5): IoU {sam_quality['iou']:.3f} · recall {sam_quality['recall']:.2f} · "
-    f"{called_vessel(sam_quality['marked'], cam_truth)}"
+show_table(
+    "Grad-CAM and SAM pseudo-labels, checked against the truth",
+    [
+        {"name": "Grad-CAM labels", "colour": approach_colours["gradcam_pseudo"], **cam_quality},
+        {"name": "SAM labels (cut 0.5)", "colour": approach_colours["sam_pseudo"], **sam_quality},
+    ],
+    ["iou", "recall", "marked"],
+    refs=[{"name": "really vessel (the ground truth)", "marked": cam_truth, "truth": True}],
+    name_label="pseudo-labels",
+    meta=f"{len(scrib_train)} training images · Grad-CAM maps made in {cam_sec} s · never used for training",
 )
-print(f"Grad-CAM head trained in {cam_head_sec:.1f} s on {DEVICE}")
-print_path2(path2_report)
+path2_table(
+    path2_report,
+    "The heads trained on the strokes and the pseudo-labels",
+    meta=f"{len(spec_eval)} held-out images · Grad-CAM head trained in {cam_head_sec:.1f} s on {DEVICE}",
+)
 show_masks(
     [
         (f"{scrib_ex['name']}", scrib_ex["image"]),
@@ -848,7 +903,7 @@ show_masks(
 #   its question does not need a line. After the cut, the blobs become fat regions with the thin vessels
 #   missing. SAM fails differently, as one big region with a careful edge.
 # - Which is better: neither is the vessel map. A coarse but *local* guess can teach the head more than a
-#   sharp but global one, so compare the held-out lines above before you pick.
+#   sharp but global one, so compare the held-out rows above before you pick.
 # - Other tasks: where the class really is a blob (a defect, a nucleus) and some images contain none, the
 #   same recipe fits much better.
 #
@@ -857,23 +912,25 @@ show_masks(
 # %% [markdown]
 # ### 6.4 Path 2, side by side
 #
-# This cell prints the scribble head of section 4 and the two pseudo-label heads in one table, draws their
+# This cell shows the scribble head of section 4 and the two pseudo-label heads in one table, draws their
 # error maps on the held-out demo image and writes the annotation effort for section 8: the same strokes
 # for all three. What to look for: $\color{#6A1B9A}{\blacksquare}$ violet is what each head got right,
 # $\color{#E65100}{\blacksquare}$ orange is what it invented, $\color{#2E7D32}{\blacksquare}$ green is
-# what it missed. Recall is the share of the true vessels a head finds; "calls … vessel" is the share of the
-# fundus it calls vessel, next to the share that really is.
+# what it missed. Recall is the share of the true vessels a head finds; "calls vessel" is the share of the
+# fundus it calls vessel, next to the share that really is (the "really vessel" row).
 
 # %%
 # @title Path 2 side by side: table and error maps { display-mode: "form" }
 RESULTS["path2_effort_min"] = {
     k: round(effort_minutes(n_strokes=n_strokes), 2) for k in ("sam_pseudo", "gradcam_pseudo")
 }
-print_path2(path2_report)
-print(
-    f"{'everything is foreground':<46}{RESULTS['specialised_everything_iou']:>6.3f}\n"
-    f"annotation for all three: {n_strokes} strokes on {len(scrib_train)} images "
-    f"(≈ {effort_minutes(n_strokes=n_strokes):.1f} min); the pseudo-labels add compute, not annotation"
+path2_table(
+    path2_report,
+    "The scribble head and the two pseudo-label heads",
+    meta=f"{len(spec_eval)} held-out images · annotation for all three: {n_strokes} strokes on "
+    f"{len(scrib_train)} images (≈ {effort_minutes(n_strokes=n_strokes):.1f} min)",
+    note="The pseudo-labels add compute, not annotation.",
+    refs=[{"name": "everything is foreground", "iou": RESULTS["specialised_everything_iou"], "marked": 1.0}],
 )
 
 

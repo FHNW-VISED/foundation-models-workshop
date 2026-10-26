@@ -73,6 +73,7 @@ Check: `lint` = scripts/lint_notebook.py · `test` = smoke test · `review` = re
 | N-065 | Methods are explained with drawn schematics (a diagram of the mechanism, the loss as a picture) placed next to the text, and long prose or text formulas that the picture covers fold into a "same in words" block. A map of the method families shows where each section sits. | review |
 | N-066 | The notebook ends with an honest reference point: the published state of the art on its task (sourced, with the protocol differences named) next to the learners' own numbers, and what closes the gap, so nobody leaves thinking the methods are useless. | review |
 | N-067 | Before a notebook ships, its main methods get a small tuning pass on the training data (threshold, training steps, head size), so a weak number shows the method's limit and not an untuned default. The tuning stays out of the learner's path unless it teaches something. | review |
+| N-068 | Results are never a raw `print` table. Every printed result uses one standard card: a title saying what ran, small grey details (images, seconds, device), then tiles (one approach) or a table (several) with the same plain column names everywhere, a one-line meaning under each, a bar under each share, and reference rows (truth, "everything", baselines) in grey under a divider. One-line status lines, hints and worked arithmetic stay plain text. | review |
 
 ## Rules for notebooks made with Susanne Suter
 
@@ -87,3 +88,6 @@ Where one of them contradicts an L-rule in SPEC.md, it wins too, and the SPEC is
 | SN-004 | Quoted reference material (the Karpathy *Recipe* quotes) uses the theory blue; it does not get a colour of its own. | review |
 | SN-005 | Learning objectives are written with Bloom's-taxonomy verbs, so each one states the level asked: describe, explain, apply, implement, justify. | review |
 | SN-006 | Screen every photo a student can see before the notebook is handed over: no nudity, swimwear or bare torsos. Search the dataset's captions or tags for such words where they exist, look at every match, and list the excluded ids with a reason in the data-building script, removed after sampling so the rest of the selection stays the same. A caption search does not see pixels, so anything she or a reviewer spots later is excluded the same way. | review |
+| SN-007 | Now and then, a **clickable multiple-choice question** (an HTML cell: pick an answer, *check answer*, optionally an explanation or the solution) so learners commit to an answer before they see it. Occasional, not in every section. | review |
+| SN-008 | **Capitals follow PEP 8**: only true constants/settings are in CAPITALS, never results. Consistency across the notebook matters more than the convention. Agrees with base N-058. | lint (N-058) |
+| SN-009 | Material that doesn't fit the lesson is **moved to a "lost and found" section** at the end, not deleted. It stays out of the main path. | review |

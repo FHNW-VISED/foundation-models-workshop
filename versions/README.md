@@ -20,3 +20,4 @@ Never edit a version folder.
 | v11 | 2026-10-26 | SAM 3 downloads itself into the cache when HF_TOKEN is set | 6d44a0d |
 | v12 | 2026-10-26 | Review round 3: plain numbers, panel tags, blue score maps, one-shot browser, Q15 both predictions, 10.3 state of the art, rules N-060–N-067 | 2b757ec |
 | v13 | 2026-10-26 | Diagrams: method map, you-are-here maps and 23 drawn explanations (first pass) | afab8be |
+| v14 | 2026-10-26 | Standard result cards (N-068) and a small U-Net trained live in 10.3 | c43345e |
