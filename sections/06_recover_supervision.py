@@ -632,18 +632,29 @@ show_table(
     name_label="head",
     meta=f"held-out demo image · the blind spot covers {blob_demo.mean():.1%} of the image",
 )
+blob_rim = blob_demo & ~ndi.binary_erosion(blob_demo, iterations=max(2, max(demo["mask"].shape) // 200))
+
+
+def head_on_blob(pred: np.ndarray) -> np.ndarray:
+    """A head's mask in violet with the blind spot's outline in orange on top, so both are visible."""
+    return overlay(overlay(demo["image"], pred, THEME["works"]), blob_rim, THEME["fails"], alpha=1.0)
+
+
 show_masks(
     [
         (
-            "the teacher's blind spot\n(it calls this vessel)",
+            "the teacher's labels:\nthe blind spot is called vessel",
             overlay(demo["image"], blob_demo, THEME["fails"]),
         ),
-        ("head trained on\nthe strokes alone", overlay(demo["image"], p_clean, THEME["works"])),
-        ("head trained on\nthe biased teacher", overlay(demo["image"], p_biased, THEME["works"])),
+        (f"head trained on the strokes alone\nmarks {p_clean[blob_demo].mean():.0%} of the blind spot",
+         head_on_blob(p_clean)),
+        (f"head trained on the biased teacher\nmarks {p_biased[blob_demo].mean():.0%} of the blind spot",
+         head_on_blob(p_biased)),
     ],
     width=3.0,
+    roles=["input", "prediction", "prediction"],
     legend=[
-        ("invented", "orange: the blind spot, called vessel by the teacher"),
+        ("invented", "orange: the blind spot (filled on the left, outlined on the right)"),
         ("mask", "violet: what the head marks as vessel"),
     ],
     note="no ground truth in this picture: the teacher's mistake is invented on purpose",

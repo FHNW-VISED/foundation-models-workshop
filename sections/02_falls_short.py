@@ -270,10 +270,11 @@ sam_playground(spec_eval, "Retina: click, box, or a word", text_prompt=True, def
 #
 # **clDice** compares *centre lines* (each vessel thinned to a one-pixel line) instead:
 #
-# 1. `tprec` = the part of the prediction's centre line that lies inside the true vessels. Invented
-#    branches lower it.
-# 2. `tsens` = the part of the true centre line that lies inside the prediction. Missed branches lower it.
-# 3. clDice = 2 · tprec · tsens ÷ (tprec + tsens). Example: tprec 1.0 and tsens 0.25 give 0.40.
+# 1. **Share of the prediction's line on the truth** = the part of the prediction's centre line that lies
+#    inside the true vessels. Invented branches lower it.
+# 2. **Share of the truth's line covered** = the part of the true centre line that lies inside the
+#    prediction. Missed branches lower it.
+# 3. clDice = 2 · share 1 · share 2 ÷ (share 1 + share 2). Example: shares 1.0 and 0.25 give 0.40.
 #
 # The workshop is not about vessels, so this is the only place clDice gets this much room. The figure below
 # shows all of it on a made-up vessel tree.
@@ -282,9 +283,10 @@ sam_playground(spec_eval, "Retina: click, box, or a word", text_prompt=True, def
 # This collapsed cell is clDice as code (the three steps above); you do not need to read it.
 
 # %%
-# @title Reference: clDice (tprec, tsens, harmonic mean) { display-mode: "form" }
+# @title Reference: clDice (the two centre-line shares, harmonic mean) { display-mode: "form" }
 def cldice_parts(pred: np.ndarray, truth: np.ndarray, sk_pred=None, sk_truth=None) -> tuple:
-    """tprec, tsens and the two centre lines of two boolean masks (skeletons are computed when not given)."""
+    """Share of the prediction's line on the truth (tprec), share of the truth's line covered (tsens) and
+    the two centre lines of two boolean masks (skeletons are computed when not given)."""
     sk_pred = skeleton(pred) if sk_pred is None else sk_pred
     sk_truth = skeleton(truth) if sk_truth is None else sk_truth
     if not sk_pred.any() or not sk_truth.any():
@@ -295,7 +297,7 @@ def cldice_parts(pred: np.ndarray, truth: np.ndarray, sk_pred=None, sk_truth=Non
 
 
 def cldice(pred: np.ndarray, truth: np.ndarray, sk_pred=None, sk_truth=None) -> float:
-    """clDice: harmonic mean of topology precision and topology sensitivity (0.0 when a skeleton is empty)."""
+    """clDice: harmonic mean of the two centre-line shares (0.0 when a skeleton is empty)."""
     tprec, tsens, _, _ = cldice_parts(pred, truth, sk_pred, sk_truth)
     return 2 * tprec * tsens / (tprec + tsens) if tprec + tsens else 0.0
 
@@ -347,7 +349,7 @@ def toy_prediction(case: str, size: int = 128) -> np.ndarray:
 
 
 def explain_cldice(case: str) -> None:
-    """Draw the four steps of clDice on one case, and IoU next to clDice for all three cases."""
+    """Draw clDice on one case in three pictures, and IoU next to clDice for all three cases."""
     if case not in TOY_CASES:
         raise SystemExit(f"CASE must be one of {TOY_CASES}.")
     truth = vessel_toy()
@@ -372,75 +374,76 @@ def explain_cldice(case: str) -> None:
     n_in, n_all = int((sk_pred & truth).sum()), int(sk_pred.sum())
     m_in, m_all = int((sk_truth & pred).sum()), int(sk_truth.sum())
 
-    fig, axes = plt.subplots(
-        1, 5, figsize=(15, 3.8), gridspec_kw={"width_ratios": [1, 1, 1, 1, 1.25]}
-    )
-    img = paint(paint(blank, truth, THEME["truth"], 0.6), sk_truth, white)
+    fig, axes = plt.subplots(1, 4, figsize=(14, 3.9), gridspec_kw={"width_ratios": [1, 1, 1, 1.3]})
+    img = paint(paint(blank, pred, THEME["background"], 0.45), truth, THEME["truth"], 0.7)
+    img = paint(paint(img, sk_pred, white), sk_truth, white)
     axes[0].imshow(img)
-    axes[0].set_title("1 · truth + centre line", fontsize=9)
-    img = paint(paint(blank, pred, THEME["background"], 0.85), sk_pred, white)
-    axes[1].imshow(img)
-    axes[1].set_title(f"2 · prediction ({case})\n+ centre line", fontsize=9)
-    img = paint(blank, truth, THEME["truth"], 0.35)
+    axes[0].set_title(f"the truth and the prediction\n({case})", fontsize=9)
+    img = paint(blank, truth, THEME["truth"], 0.3)
     img = paint(paint(img, thick(sk_pred & ~truth), THEME["fails"]), thick(sk_pred & truth), THEME["works"])
-    axes[2].imshow(img)
-    axes[2].set_title(f"3 · tprec = {tprec:.2f}\n{n_in} of {n_all} counted", fontsize=9)
-    img = paint(blank, pred, THEME["background"], 0.5)
+    axes[1].imshow(img)
+    axes[1].set_title(f"the prediction's centre line:\n{tprec:.0%} of it lies on the truth", fontsize=9)
+    img = paint(blank, pred, THEME["background"], 0.45)
     img = paint(paint(img, thick(sk_truth & ~pred), THEME["truth"]), thick(sk_truth & pred), THEME["works"])
-    axes[3].imshow(img)
-    axes[3].set_title(f"4 · tsens = {tsens:.2f}\n{m_in} of {m_all} counted", fontsize=9)
-    for ax in axes[:4]:
+    axes[2].imshow(img)
+    axes[2].set_title(f"the truth's centre line:\n{tsens:.0%} of it lies inside the prediction", fontsize=9)
+    for ax in axes[:3]:
         ax.axis("off")
 
     x = np.arange(len(TOY_CASES))
     vals = [(results[c][5], results[c][6]) for c in TOY_CASES]
-    axes[4].bar(x - 0.2, [v[0] for v in vals], 0.4, color=THEME["background"], label="IoU")
-    axes[4].bar(x + 0.2, [v[1] for v in vals], 0.4, color=THEME["works"], label="clDice")
+    axes[3].bar(x - 0.2, [v[0] for v in vals], 0.4, color="#616161", label="IoU")
+    axes[3].bar(x + 0.2, [v[1] for v in vals], 0.4, color=THEME["score"], label="clDice")
     for xi, (a, b) in zip(x, vals, strict=True):
-        axes[4].text(xi - 0.2, a + 0.02, f"{a:.2f}", ha="center", fontsize=7)
-        axes[4].text(xi + 0.2, b + 0.02, f"{b:.2f}", ha="center", fontsize=7)
-    axes[4].set_xticks(x, [c.replace(" ", "\n", 1) for c in TOY_CASES], fontsize=8)
-    axes[4].get_xticklabels()[TOY_CASES.index(case)].set_fontweight("bold")
-    axes[4].set_ylim(0, 1.15)
-    axes[4].set_title("IoU vs clDice, all three cases\n(bold = the case drawn)", fontsize=9)
-    axes[4].legend(fontsize=7, frameon=False, loc="upper right")
+        axes[3].text(xi - 0.2, a + 0.02, f"{a:.2f}", ha="center", fontsize=7)
+        axes[3].text(xi + 0.2, b + 0.02, f"{b:.2f}", ha="center", fontsize=7)
+    axes[3].set_xticks(x, [c.replace(" ", "\n", 1) for c in TOY_CASES], fontsize=8)
+    axes[3].get_xticklabels()[TOY_CASES.index(case)].set_fontweight("bold")
+    axes[3].set_ylim(0, 1.15)
+    axes[3].set_title("IoU and clDice for the three cases\n(bold = the case drawn)", fontsize=9)
+    axes[3].legend(fontsize=7, frameon=False, loc="upper right")
     add_key(
         fig,
         [
-            ("truth", "green: truth, and truth line the prediction misses"),
-            ("prediction (grey)", THEME["background"]),
-            ("centre line (white)", "#FFFFFF"),
-            ("counted (violet)", THEME["works"]),
-            ("orange: prediction line outside the truth (invented)", THEME["fails"]),
+            ("truth (green; in the right picture, the part of its line the prediction leaves out)",
+             THEME["truth"]),
+            ("prediction", THEME["background"]),
+            ("centre lines (left picture)", "#FFFFFF"),
+            ("centre-line pixels that count: inside the other mask", THEME["works"]),
+            ("prediction's line outside the truth (invented)", THEME["fails"]),
         ],
+        note="clDice combines the two shares of the middle and right pictures (their harmonic mean); "
+        "IoU compares whole areas",
     )
     plt.show()
     print(
-        f"clDice = 2 · tprec · tsens ÷ (tprec + tsens) = 2 · {tprec:.2f} · {tsens:.2f} ÷ "
-        f"({tprec:.2f} + {tsens:.2f}) = {cld_c:.2f}   (IoU is {iou_c:.2f})"
+        f"clDice = 2 · {tprec:.2f} · {tsens:.2f} ÷ ({tprec:.2f} + {tsens:.2f}) = {cld_c:.2f}   "
+        f"(IoU is {iou_c:.2f})\n"
+        f"share of the prediction's line on the truth = {n_in} of {n_all} line pixels = {tprec:.2f}; "
+        f"share of the truth's line covered = {m_in} of {m_all} = {tsens:.2f}"
     )
 
 
 # %% [markdown]
 # This cell draws clDice on a made-up vessel tree (a thick trunk, two branches and six capillaries). Pick a
-# case in the `CASE` field and the figure redraws. The four steps below match the four left panels, with the
-# numbers of the default case, "too wide" (a prediction that draws every vessel twice as wide). The fifth
-# panel puts IoU next to clDice for all three cases. A blob's centre line is a short stub in its middle: here
-# the stub misses every vessel, so clDice is 0.
+# case in the `CASE` field and the figure redraws. It shows the default case, "too wide" (a prediction that
+# draws every vessel twice as wide), in three pictures and one bar chart; the bar chart puts IoU next to
+# clDice for all three cases. A blob's centre line is a short stub in its middle: here the stub misses every
+# vessel, so clDice is 0.
 #
-# 1. **Thin the true vessels to their centre line** ($\square$ white line on the
-#    $\color{#2E7D32}{\blacksquare}$ green truth, panel 1).
-# 2. **Thin the prediction the same way** ($\square$ white line on the $\color{#9E9E9E}{\blacksquare}$ grey
-#    prediction, panel 2).
-# 3. **tprec**: of the prediction's centre line, how much lies inside the true vessels?
-#    $\color{#6A1B9A}{\blacksquare}$ Violet pixels count,
-#    $\color{#E65100}{\blacksquare}$ orange ones do not. 490 of 529 pixels = 0.93.
-# 4. **tsens**: of the true centre line, how much is covered by the prediction? 534 of 534 = 1.00.
-#    Then clDice = 2 · 0.93 · 1.00 ÷ (0.93 + 1.00) = 0.96, while IoU for the same masks is only 0.57.
+# 1. **The truth and the prediction** ($\color{#2E7D32}{\blacksquare}$ green truth over the
+#    $\color{#9E9E9E}{\blacksquare}$ grey prediction, each with its $\square$ white centre line).
+# 2. **The prediction's centre line**: how much of it lies on the true vessels?
+#    $\color{#6A1B9A}{\blacksquare}$ Violet pixels do, $\color{#E65100}{\blacksquare}$ orange ones do not.
+#    Here 490 of 529 pixels = 0.93.
+# 3. **The truth's centre line**: how much of it lies inside the prediction? The
+#    $\color{#6A1B9A}{\blacksquare}$ violet part does, a $\color{#2E7D32}{\blacksquare}$ green part would be
+#    left out. Here 534 of 534 = 1.00. Then clDice = 2 · 0.93 · 1.00 ÷ (0.93 + 1.00) = 0.96, while IoU for the
+#    same masks is only 0.57.
 #
 # What to look for: in "too wide" the prediction is fat but its centre line still follows the truth, so
-# clDice stays high and IoU drops. Try "capillaries missed": now tsens drops, because the thin branches are
-# gone.
+# clDice stays high and IoU drops. Try "capillaries missed": now the truth's line is no longer covered,
+# because the thin branches are gone.
 
 # %%
 # @title See clDice on a made-up vessel tree { display-mode: "form", run: "auto" }
@@ -783,10 +786,11 @@ plt.show()
 #
 # Numbers average the failures away; the gallery shows them. It sorts the evaluation images from worst to
 # best (by the head's IoU at the higher resolution) and shows three at a time. Each row is one image: the
-# photo, SAM's mask from a box ($\color{#6A1B9A}{\blacksquare}$ violet), the head's mask
-# ($\color{#6A1B9A}{\blacksquare}$ violet) and the ground truth ($\color{#2E7D32}{\blacksquare}$ green). What
-# to look
-# for: the kind of mistake, whole regions marked for SAM, missing thin vessels for the head.
+# photo, then SAM's mask from a box and the head's mask, both drawn as errors against the truth
+# ($\color{#6A1B9A}{\blacksquare}$ violet = vessel found, $\color{#E65100}{\blacksquare}$ orange = invented,
+# $\color{#2E7D32}{\blacksquare}$ green = vessel missed), and last the ground truth alone. What to look for:
+# the kind of mistake, whole regions in $\color{#E65100}{\blacksquare}$ orange for SAM, thin vessels in
+# $\color{#2E7D32}{\blacksquare}$ green for the head.
 
 # %% [markdown]
 # This collapsed cell ranks the evaluation images by the head's IoU and draws the gallery.
@@ -794,27 +798,27 @@ plt.show()
 # %%
 # @title Helper: the failure gallery, worst images first { display-mode: "form" }
 def gallery_row(k: int, side: int) -> None:
-    """One row for image k: the photo, SAM with a box, the head at `side` px, and the ground truth."""
+    """One row for image k: the photo, SAM with a box and the head at `side` px as error maps, the truth."""
     it = spec_eval[k]
     head_mask = spec_head_preds[side][k]
     show_masks(
         [
             (it["name"], it["image"]),
-            (
-                pred_title("SAM from a box", sam_box_masks[k], it),
-                overlay(it["image"], sam_box_masks[k], THEME["works"]),
-            ),
-            (
-                pred_title(f"linear head, features @ {side} px", head_mask, it),
-                overlay(it["image"], head_mask, THEME["works"]),
-            ),
+            (pred_title("SAM from a box", sam_box_masks[k], it), error_panel(it, sam_box_masks[k])),
+            (pred_title(f"linear head, features @ {side} px", head_mask, it), error_panel(it, head_mask)),
             (
                 f"ground truth\nvessels cover {100 * it['mask'][region(it)].mean():.0f} % of the fundus",
                 overlay(it["image"], it["mask"], THEME["truth"]),
             ),
         ],
         width=2.8,
-        legend=[model_key("the model's mask"), ("truth", "vessels (ground truth)")],
+        roles=["input", "errors", "errors", "truth"],
+        legend=[
+            "found",
+            "invented",
+            ("missed", "missed (truth only); the last panel shows every true vessel"),
+            "unscored",
+        ],
         note=MARKED_NOTE,
     )
 
