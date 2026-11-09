@@ -590,7 +590,8 @@ RESULTS["credits"] = {
 #   SAM 2.1 is Apache-2.0.
 # - **SAM 2.1** hiera-small (Meta),
 #   [facebook/sam2.1-hiera-small](https://huggingface.co/facebook/sam2.1-hiera-small). SAM 3, if you used
-#   it, comes under Meta's own SAM 3 licence, which you accepted on Hugging Face.
+#   it, comes under Meta's [SAM License](https://huggingface.co/facebook/sam3). The workshop copy
+#   (`SAM3_SOURCE = workshop`) is Meta's files unchanged, with the licence text in its repo.
 # - **Oxford-IIIT Pet**: Parkhi, Vedaldi, Zisserman and Jawahar, *Cats and Dogs*, CVPR 2012,
 #   [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The subset shipped with this workshop
 #   is resized and shared under the same licence.

@@ -56,3 +56,16 @@ def test_settings_rule_n058(tmp_path):
     for fine in ("RESULTS", "MODE", "STEPS", "FLAG"):
         assert f" {fine} " not in found, found
     assert len(lint_notebook.problems) == 4, found
+
+
+def test_sam3_source_switch():
+    """Both notebooks let the learner pick where SAM 3 comes from: our copy (default) or Meta's original."""
+    import re
+
+    main = (ROOT / "sections" / "00_setup.py").read_text()
+    setup = (ROOT / "setup_check.py").read_text()
+    param = 'SAM3_SOURCE = "workshop"  # @param ["workshop", "meta"]'
+    assert param in main and param in setup
+    workshop_ids = {re.search(r'"(simopippa/sam3-[\w-]+)"', text).group(1) for text in (main, setup)}
+    assert len(workshop_ids) == 1, workshop_ids  # the same copy in both notebooks
+    assert '"facebook/sam3"' in main and '"facebook/sam3"' in setup  # Meta's original stays one switch away
