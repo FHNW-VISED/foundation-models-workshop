@@ -506,6 +506,12 @@ RESULTS["models"] = {"dino": DINO_SOURCE, "sam": SAM_ID, "device": DEVICE}
 # %% [markdown]
 # This cell defines the interactive SAM tool used in sections 1, 2 and 7: click a dot, drag a box, or (in
 # section 7) type a word, and SAM answers with a mask you can compare with the ground truth. Run it once.
+#
+# The word prompts use SAM 3, which is optional. `SAM3_SOURCE` in this cell's form says where it comes from:
+# - `workshop` (default): our copy of Meta's weights, open only around the workshop. Nothing to do.
+# - `meta`: Meta's original at huggingface.co/facebook/sam3, for after the workshop. Request access there,
+#   wait for Meta's approval email, then add a read token in Colab's 🔑 Secrets as `HF_TOKEN` (notebook
+#   access on). Pick `meta` in the form and run this cell again.
 
 # %%
 # @title Interactive SAM: click, box, or a word { display-mode: "form" }
@@ -517,7 +523,11 @@ from string import Template
 from IPython.display import HTML, JSON, display
 
 PLAY_PX = 560  # long side of the playground image on screen
-SAM3_ID = "facebook/sam3"
+SAM3_SOURCE = "workshop"  # @param ["workshop", "meta"]
+if SAM3_SOURCE == "meta":
+    SAM3_ID = "facebook/sam3"  # Meta's original: needs your own approval and HF_TOKEN
+else:
+    SAM3_ID = "simopippa/sam3-amld2027-workshop"  # our copy of the same files, open only around the workshop
 HEAD_STEPS = 30 if SMOKE else 200  # training steps for every linear head in the notebook
 _SAM3: dict = {}  # SAM 3 is loaded on the first text request and kept here
 
@@ -541,13 +551,15 @@ def hf_token() -> str | None:
 
 
 def fetch_sam3() -> Path | None:
-    """SAM 3 not in the cache but a token is set: download it once into the cache, as setup_check would."""
+    """SAM 3 not in the cache: download it once into the cache, as setup_check would.
+
+    The workshop copy needs no token; Meta's original needs your HF_TOKEN (and Meta's approval)."""
     import hashlib
 
     from huggingface_hub import snapshot_download
 
     token = hf_token()
-    if SMOKE or token is None:
+    if SMOKE or (token is None and SAM3_SOURCE == "meta"):
         return None
     folder = MODELS_DIR / SAM3_ID.replace("/", "--")
     print(f"SAM 3 is not in your cache yet: downloading it once (~3.4 GB, a few minutes) into {folder}")
@@ -571,7 +583,7 @@ def fetch_sam3() -> Path | None:
 
 
 def load_sam3() -> dict:
-    """SAM 3 from the cache, downloaded once if a token is set: {"model", "proc", "dtype"} or {"error"}."""
+    """SAM 3 from the cache, downloaded once if needed: {"model", "proc", "dtype"} or {"error"}."""
     if _SAM3:
         return _SAM3
     folder = model_folder(SAM3_ID)
@@ -580,11 +592,19 @@ def load_sam3() -> dict:
             folder = fetch_sam3()
         except Exception as err:  # noqa: BLE001 - 403 while approval is pending, no network, a full Drive
             pending = "403" in str(err) or "authorized" in str(err) or "awaiting" in str(err)
-            _SAM3["error"] = (
-                f"SAM 3 could not be downloaded: Meta has not approved your access to {SAM3_ID} yet."
-                if pending
-                else f"SAM 3 could not be downloaded ({type(err).__name__}). SAM 2.1 still works."
-            )
+            closed = pending or type(err).__name__ == "RepositoryNotFoundError" or "401" in str(err)
+            if SAM3_SOURCE == "workshop" and closed:
+                _SAM3["error"] = (
+                    "SAM 3 could not be downloaded: the workshop copy is closed (it is open only around the "
+                    "workshop). Pick SAM3_SOURCE = meta in the form above to use Meta's original. "
+                    "SAM 2.1 still works."
+                )
+            elif pending:
+                _SAM3["error"] = (
+                    f"SAM 3 could not be downloaded: Meta has not approved your access to {SAM3_ID} yet."
+                )
+            else:
+                _SAM3["error"] = f"SAM 3 could not be downloaded ({type(err).__name__}). SAM 2.1 still works."
             return _SAM3
     try:
         from transformers import Sam3Model, Sam3Processor

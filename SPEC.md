@@ -70,7 +70,7 @@ These appear verbatim in the title banner.
 | Runs on | Google Colab, **T4 GPU expected** (W-13), and **every step must complete on CPU** in reasonable time using precomputed features and fallback checkpoints (W-7) |
 | Python | 3.12; Colab preinstalls torch, transformers 5.18, timm 1.0.30 |
 | **DINOv3** | `timm` **`vit_small_patch16_dinov3.lvd1689m`**: ungated on HF (verified 2026-10-19 "gated: False"), DINOv3 licence attached. Show the licence notice. Participants need no account (W-4) |
-| **SAM** | **[OPEN, W18]** Default: **SAM 2.1 hiera-small** (`facebook/sam2.1-hiera-small`, Apache-2.0, ungated, verified). SAM 3 is an **optional upgrade** if the participant has Meta's approval on HF, or if FHNW re-hosts it after legal sign-off. SAM 3 runs in fp16 via transformers, never Meta's bf16 path, on a T4 |
+| **SAM** | Default: **SAM 2.1 hiera-small** (`facebook/sam2.1-hiera-small`, Apache-2.0, ungated, verified). SAM 3 is an **optional upgrade**. **W18 decided by Simone 2026-11-09:** a setting `SAM3_SOURCE` (`@param`, in both notebooks) picks the source: `workshop` (default) = our unmodified copy `simopippa/sam3-amld2027-workshop` (Meta's files at revision `3c879f3`, LICENSE included, no `sam3.pt`), open only around the workshop, no token needed while open; `meta` = `facebook/sam3` with the participant's own approval and `HF_TOKEN`. When the copy is closed, the notebook says so and points to `meta`. No FHNW legal review (his decision). SAM 3 runs in fp16 via transformers, never Meta's bf16 path, on a T4 |
 | Grad-CAM | `grad-cam` (pytorch-grad-cam, MIT); the only `%pip install` |
 | Licence checks | Re-check the DINOv3/SAM 3 terms ~4 weeks before each event (Meta can change them) |
 | Precomputed | DINOv3 patch features for every workshop image, plus a checkpoint for every training step ("not done in 3 min? load ours") (W-7), downloaded by the setup check |
@@ -257,7 +257,7 @@ Q14–Q16 in 06; Q17–Q18 in 07; Q19–Q20 in 08; Q21–Q22 in 09; Q23 in 10). 
 - The 19-Nov AMLD agenda draft can be read off §6 (W-14).
 
 ## 10. Open questions
-- **W18**: how participants get SAM 3. Default: SAM 2.1, plus SAM 3 if the participant already has access. FHNW legal is to be asked about re-hosting.
+- ~~**W18**: how participants get SAM 3.~~ Decided 2026-11-09 (Simone): the `SAM3_SOURCE` switch, see §models. Still open: the dates the copy is open (proposal: from the day the setup check is sent, ~1 week before, to the end of the workshop day, then private again).
 - **Specialised dataset**: the bake-off (issue #1) → Simone picks. Provisional: retina (HRF).
 - Grad-CAM on retina (section 06): is it meaningful? The bake-off reports.
 - Minutes-per-stroke assumption for "annotation effort" (section 08): default 2 s per scribble stroke and ~3–5 h per full vessel map (FIVES paper). Stated in the notebook as assumptions.
