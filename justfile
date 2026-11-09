@@ -44,3 +44,7 @@ version label: build
 # The newest version in versions/ must equal SPEC.md and the built notebooks (true on main, always)
 version-check: build
     uv run python scripts/version.py check
+
+# Does the SAM 3 workshop copy download, load and segment? (~3.4 GB, temporary). anonymous="--anonymous" = as a participant
+sam3-copy anonymous="":
+    uv run python scripts/check_sam3_copy.py {{anonymous}}
