@@ -6,8 +6,8 @@
 #
 # The question is the one you face on a real project: not "which approach has the highest number" but
 # "which approach would I pay for". A recipe can win on accuracy and lose on annotation hours, or win on
-# average and fail badly on one image in five. Three pictures follow the table: a trade-off plot, a violin
-# plot, and the winner's best and worst images.
+# average and fail badly on one image in five. Three pictures follow the table: a trade-off plot, a strip
+# plot of the score on every image, and the winner's best and worst images.
 
 # %% [markdown]
 # <!-- callout: objective | Objective -->
@@ -46,7 +46,7 @@
 # @title Comparison helpers: every approach, its predictions, seconds and effort { display-mode: "form" }
 approach_colours |= {"full_masks": THEME["works"]}
 approach_names |= {"full_masks": "full masks: complete maps (section 2)"}
-ALL_APPROACHES = [  # the short names Q19 accepts
+ALL_APPROACHES = [  # the approaches Q19 accepts (by their readable names in COMPARE_LABEL)
     "zero_shot",
     "one_shot",
     "scribbles",
@@ -148,36 +148,66 @@ print(
 # %% [markdown]
 # ### 8.1 Look first, then predict
 #
-# This cell shows every approach's mask on one held-out image, next to the image and its hidden ground truth.
+# This cell shows every approach on one held-out image, one row per family. The first row is the photo, its
+# hidden ground truth and the complete-mask head; the other rows are the approaches of sections 4 to 7.
+# `SHOW_IMAGE` chooses which held-out image it shows: 0 is the first, the highest number the last.
 #
-# What to look for: who follows the thin vessels, who paints blobs, who marks almost nothing.
-# $\color{#6A1B9A}{\blacksquare}$ Violet is
-# always a model's mask and $\color{#2E7D32}{\blacksquare}$ green is the ground truth. A title's colour is
-# the approach's colour in the
-# charts below.
+# What to look for: who follows the thin vessels, who paints blobs, who marks almost nothing. In every
+# approach's picture
+# $\color{#6A1B9A}{\blacksquare}$ violet is a vessel it found, $\color{#E65100}{\blacksquare}$ orange is a
+# mark that is not a vessel, and $\color{#2E7D32}{\blacksquare}$ green is a vessel it missed. A title's colour
+# is the approach's colour in the charts below.
 
 # %%
 # @title All approaches on one held-out image { display-mode: "form" }
-k_show = 0  # which held-out image to look at
-it_show = spec_eval[k_show]
-truth_img = overlay(it_show["image"], it_show["mask"], THEME["truth"])
-gallery = [
-    (f"{it_show['name']} · image", it_show["image"], "#311B92"),
-    ("ground truth (scoring only)", truth_img, THEME["truth"]),
+SHOW_IMAGE = 0  # @param {type:"slider", min:0, max:24, step:1}
+if not isinstance(SHOW_IMAGE, int) or not 0 <= SHOW_IMAGE < len(spec_eval):
+    raise SystemExit(f"SHOW_IMAGE must be a whole number from 0 to {len(spec_eval) - 1}.")
+it_show = spec_eval[SHOW_IMAGE]
+truth_img = overlay(it_show["image"], it_show["mask"], THEME["truth"], unscored=~region(it_show))
+
+
+def approach_cell(k: str) -> tuple:
+    """One approach's error map on the shown image: (title, picture, title colour, tag)."""
+    pred = compare_reports[k]["held_preds"][SHOW_IMAGE]
+    return (COMPARE_LABEL[k], error_map(it_show["image"], pred, it_show), approach_colours[k], "errors")
+
+
+grid_rows = [  # (row label, the panels of that row)
+    (
+        "reference",
+        [
+            (it_show["name"], it_show["image"], "#311B92", "input"),
+            ("ground truth (scoring only)", truth_img, THEME["truth"], "truth"),
+            approach_cell("full_masks"),
+        ],
+    ),
+    ("ladder · section 4", [approach_cell(k) for k in ("zero_shot", "one_shot", "scribbles")]),
+    ("path 1 · section 5", [approach_cell(k) for k in ("naive", "masked", "pu")]),
+    ("path 2 · section 6", [approach_cell(k) for k in ("sam_pseudo", "gradcam_pseudo")]),
+    (
+        "path 3 · section 7",
+        [approach_cell(k) for k in ("sam_clicks", "sam_boxes", *(["sam3_text"] if has_sam3 else []))],
+    ),
 ]
-for k in compare_order:
-    pred = compare_reports[k]["held_preds"][k_show] & region(it_show)
-    shown = overlay(it_show["image"], pred, THEME["works"])
-    gallery.append((f"{COMPARE_LABEL[k]}\n{k}", shown, approach_colours[k]))
-g_cols = 5
-g_rows = -(-len(gallery) // g_cols)
-fig, axes = plt.subplots(g_rows, g_cols, figsize=(2.6 * g_cols, 2.9 * g_rows))
-for ax in np.ravel(axes):
+g_cols = max(len(cells) for _, cells in grid_rows)
+fig, axes = plt.subplots(len(grid_rows), g_cols, figsize=(2.9 * g_cols, 3.0 * len(grid_rows)), squeeze=False)
+for ax in axes.ravel():
     ax.axis("off")
-for ax, (title, img, colour) in zip(np.ravel(axes), gallery, strict=False):
-    ax.imshow(img)
-    ax.set_title(title, fontsize=8, color=colour)
-add_key(fig, ["mask", "truth"], "title colour = the approach's colour in the charts below")
+for row_axes, (row_label, cells) in zip(axes, grid_rows, strict=True):
+    row_axes[0].text(
+        -0.06, 0.5, row_label, transform=row_axes[0].transAxes, rotation=90, ha="right", va="center",
+        fontsize=9, fontweight="bold", color="#311B92",
+    )
+    for ax, (title, img, colour, role) in zip(row_axes, cells, strict=False):
+        ax.imshow(img)
+        ax.set_title(title, fontsize=8, color=colour)
+        tag_panel(ax, role)
+add_key(
+    fig,
+    ["found", "invented", ("missed", "missed (truth only); the truth panel is all green"), "unscored"],
+    "title colour = the approach's colour in the charts below",
+)
 plt.show()
 
 # %% [markdown]
@@ -186,16 +216,17 @@ plt.show()
 # the **steadiest** (the smallest spread of IoU from image to image)?
 #
 # - Choose your two picks from the dropdowns in the next cell and run it; leave them blank to skip. The
-#   short names are the second line of each picture title above. The table further down shows where
-#   they landed.
+#   names are the picture titles above. The table further down shows where they landed.
 
 # %%
 # Q19 — your two predictions (pick from the dropdowns, or leave blank to skip)
-MY_WINNER = ""  # @param ["", "zero_shot", "one_shot", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
-MY_STEADIEST = ""  # @param ["", "zero_shot", "one_shot", "scribbles", "naive", "masked", "pu", "sam_pseudo", "gradcam_pseudo", "sam_clicks", "sam_boxes", "full_masks"]
+MY_WINNER = ""  # @param ["", "zero-shot box", "one-shot (go-deeper)", "scribble head", "naive (gaps = bg)", "masked loss", "PU loss", "SAM pseudo-labels", "Grad-CAM labels", "SAM from clicks", "SAM from boxes", "full masks"]
+MY_STEADIEST = ""  # @param ["", "zero-shot box", "one-shot (go-deeper)", "scribble head", "naive (gaps = bg)", "masked loss", "PU loss", "SAM pseudo-labels", "Grad-CAM labels", "SAM from clicks", "SAM from boxes", "full masks"]
+KEY_OF_NAME = {COMPARE_LABEL[k]: k for k in ALL_APPROACHES}  # the dropdown shows names; the code below uses keys
 for label, pick in (("MY_WINNER", MY_WINNER), ("MY_STEADIEST", MY_STEADIEST)):
-    if not isinstance(pick, str) or (pick and pick not in ALL_APPROACHES):
-        raise SystemExit(f'{label} must be "" or one of: {", ".join(ALL_APPROACHES)}.')
+    if not isinstance(pick, str) or (pick and pick not in KEY_OF_NAME):
+        raise SystemExit(f'{label} must be "" or one of: {", ".join(KEY_OF_NAME)}.')
+PICK_WINNER, PICK_STEADIEST = KEY_OF_NAME.get(MY_WINNER, ""), KEY_OF_NAME.get(MY_STEADIEST, "")  # as keys
 print(f"your picks · highest IoU: {MY_WINNER or '(none)'} · steadiest: {MY_STEADIEST or '(none)'}")
 
 # %% [markdown]
@@ -218,7 +249,7 @@ def spread(per_image_iou: list[float]) -> float:
 # %%
 # @title Score every approach and show the table { display-mode: "form" }
 comparison = []
-iou_per_image = {}  # approach -> its IoU on each held-out image (drawn as violins below)
+iou_per_image = {}  # approach -> its IoU on each held-out image (drawn as dots below)
 for k in compare_order:
     rep = compare_reports[k]
     pairs = zip(rep["held_preds"], spec_eval, strict=True)
@@ -252,11 +283,11 @@ winner = ranked[0]["approach"]
 steadiest = min(comparison, key=lambda r: r["reliability"])["approach"]
 by_spread = [r["approach"] for r in sorted(comparison, key=lambda r: r["reliability"])]
 picks = []
-if MY_WINNER in by_spread:
-    rank = [r["approach"] for r in ranked].index(MY_WINNER) + 1
+if PICK_WINNER in by_spread:
+    rank = [r["approach"] for r in ranked].index(PICK_WINNER) + 1
     picks.append(f"your IoU pick {MY_WINNER} ranks {rank} of {len(ranked)}")
-if MY_STEADIEST in by_spread:
-    rank = by_spread.index(MY_STEADIEST) + 1
+if PICK_STEADIEST in by_spread:
+    rank = by_spread.index(PICK_STEADIEST) + 1
     picks.append(f"your steadiness pick {MY_STEADIEST} ranks {rank} of {len(by_spread)}")
 table_rows = [
     {
@@ -293,69 +324,86 @@ show_list(
     [f"{COMPARE_LABEL[r['approach']]}: {r['scalability']}" for r in ranked],
     numbered=False,
 )
-if not (MY_WINNER or MY_STEADIEST):
+if not (PICK_WINNER or PICK_STEADIEST):
     print("no prediction written in Q19; fine, but next time guess first: it is the cheapest lesson here")
 
 # %% [markdown]
 # ### 8.3 The trade-off in one picture
 #
-# This cell draws the table twice. On the left, each approach is a dot: how much annotation it needed
-# (log scale) against how well it did (IoU), with a bar for its spread. On the right, the seconds each
-# approach took.
+# This cell draws the table as one plot: each approach is a dot, placed by how much annotation it needed
+# (log scale) and how well it did (IoU), with a bar for its spread. When a name had to move away from its dot
+# to stay readable, a thin line joins them.
 #
 # What to look for: the dots near the top-left are accurate and cheap. A short bar is a steady approach. The
 # dashed line is the score of marking everything, so a dot near it has learned almost nothing.
 
 # %%
-# @title Trade-off plot: accuracy against annotation, and compute { display-mode: "form" }
-fig, (ax, bx) = plt.subplots(1, 2, figsize=(10, 4.2), gridspec_kw={"width_ratios": [1.25, 1]})
+# @title Trade-off plot: accuracy against annotation { display-mode: "form" }
+fig, ax = plt.subplots(figsize=(9, 5))
 top = min(1.0, 1.25 * max(r["iou"] + r["reliability"] for r in comparison) + 0.05)
-gap = 0.045 * top  # labels of approaches with about the same effort are stacked at least this far apart
-groups, last = [], None
-for r in sorted(comparison, key=lambda r: r["effort_min"]):
-    lx = np.log10(max(r["effort_min"], 0.01))
-    if last is None or lx - last > 0.35:
-        groups.append([])
-    groups[-1].append(r)
+gap = 0.05 * top  # names in one cluster are stacked at least this far apart
+efforts = {r["approach"]: max(r["effort_min"], 0.01) for r in comparison}
+clusters, last = [], None  # dots whose effort is within one factor of 10 of the next share a column of names
+for r in sorted(comparison, key=lambda r: efforts[r["approach"]]):
+    lx = np.log10(efforts[r["approach"]])
+    if last is None or lx - last >= 1.0:
+        clusters.append([])
+    clusters[-1].append(r)
     last = lx
-label_y = {}
-for group in groups:
-    y_prev = -1.0
-    for r in sorted(group, key=lambda r: r["iou"]):
-        label_y[r["approach"]] = y_prev = max(r["iou"], y_prev + gap)
+label_at = {}  # approach -> (x, y) of its name
+for cluster in clusters:
+    x_name = 1.5 * max(efforts[r["approach"]] for r in cluster)  # right of the cluster's right-most dot
+    cluster = sorted(cluster, key=lambda r: r["iou"])
+    ys = []
+    for r in cluster:  # push up from the lowest so no two names are closer than `gap`
+        ys.append(max(r["iou"], ys[-1] + gap) if ys else r["iou"])
+    over = ys[-1] - (top - gap)
+    if over > 0:  # the pile reached the top of the plot: shift it down, keeping the gaps
+        ys = [max(y - over, 0.02 + gap * i) for i, y in enumerate(ys)]
+    for r, y in zip(cluster, ys, strict=True):
+        label_at[r["approach"]] = (x_name, y)
 for r in comparison:
-    x, colour = max(r["effort_min"], 0.01), approach_colours[r["approach"]]
-    ax.errorbar(x, r["iou"], yerr=r["reliability"], fmt="o", ms=7, capsize=3, color=colour)
-    ax.annotate(
-        r["approach"],
-        (x, r["iou"]),
-        xytext=(x * 1.25, label_y[r["approach"]]),
-        fontsize=7,
-        color=colour,
-        va="center",
-    )
+    k, colour = r["approach"], approach_colours[r["approach"]]
+    x, (lx, ly) = efforts[k], label_at[k]
+    ax.plot([x, lx], [r["iou"], ly], color="#BDBDBD", lw=0.8, zorder=1)  # leader line, dot to name
+    ax.errorbar(x, r["iou"], yerr=r["reliability"], fmt="o", ms=7, capsize=3, color=colour, zorder=3)
+    ax.text(lx * 1.06, ly, COMPARE_LABEL[k], fontsize=8, color=colour, va="center", ha="left", zorder=4)
 ax.axhline(
     RESULTS["specialised_everything_iou"], color=THEME["background"], ls="--", label='IoU of "everything"'
 )
 ax.plot([], [], "o", color="#616161", label="dot = mean IoU, bar = ± spread")
 ax.set_xscale("log")
-ax.set_xlim(right=ax.get_xlim()[1] * 4)  # room for the labels of the right-most points
+ax.set_xlim(min(efforts.values()) / 2, max(efforts.values()) * 25)  # room for the names right of the last dot
 ax.set_xlabel("annotation effort, ≈ minutes (log scale)")
 ax.set_ylabel("mean IoU on the hidden ground truth (± spread)")
 ax.set_ylim(0, top)
 ax.set_title("Accuracy against annotation")
-ax.legend(fontsize=7, frameon=False, loc="upper left")
-names = [r["approach"] for r in ranked][::-1]
-bx.barh(names, [r["seconds"] for r in ranked][::-1], color=[approach_colours[k] for k in names])
+ax.legend(fontsize=8, frameon=False, loc="upper left")
+add_key(fig, None, "higher is more accurate · further left is cheaper · colour = approach, as in the table")
+plt.show()
+
+# %% [markdown]
+# This cell shows the second cost: the seconds each approach took in this session, training and inference
+# together. What to look for: seconds matter little for the trained heads and a lot for anything that runs
+# SAM on every image.
+
+# %%
+# @title Compute plot: seconds per approach { display-mode: "form" }
+fig, bx = plt.subplots(figsize=(7, 0.34 * len(ranked) + 1.2))
+bar_names = [COMPARE_LABEL[r["approach"]] for r in ranked][::-1]
+bar_secs = [r["seconds"] for r in ranked][::-1]
+bars = bx.barh(bar_names, bar_secs, color=[approach_colours[r["approach"]] for r in ranked][::-1])
+bx.bar_label(bars, labels=[f"{v:.0f} s" for v in bar_secs], fontsize=7, padding=3)
+bx.set_xlim(0, 1.15 * max(bar_secs))
 bx.set_xlabel(f"seconds, training + inference ({DEVICE})")
-bx.tick_params(axis="y", labelsize=7)
+bx.tick_params(axis="y", labelsize=8)
 bx.set_title("Compute (sorted by IoU, best at the top)")
-add_key(fig, None, "colour = approach · left: higher is more accurate, further left is cheaper · right: shorter bar is faster")
+add_key(fig, None, "colour = approach, as in the table · a shorter bar is faster")
 plt.show()
 
 # %% [markdown]
 # <!-- diagram: s08-reading-tradeoff | How to read the trade-off plot -->
-# A sketch of the two panels above, not your numbers: where the good corner is, what a long bar means, and
+# A sketch of the trade-off plot and the compute bars above, not your numbers: where the good corner is, what a long bar means, and
 # which dots are a fair comparison.
 
 # %% [markdown]
@@ -366,7 +414,7 @@ plt.show()
 #   **bottom-left** is cheap and weak, and the **far right** is the complete-mask head, hours away.
 # - **The vertical bar is the spread**: a slightly lower dot with a much shorter bar can be the safer choice.
 # - **Dots at the same x** are the fairest comparison: the same strokes, used in different ways.
-# - **Right panel**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
+# - **Compute bars**: seconds matter little for the heads and a lot for anything that runs SAM on every image.
 #
 # </details>
 
@@ -412,34 +460,33 @@ plt.show()
 # %% [markdown]
 # ### 8.4 Who is steady, and who fails on some images
 #
-# This cell draws, for each approach, one dot per held-out image and a violin around the dots. The bar is the
-# median image, and approaches are sorted by mean IoU, best on the left.
+# This cell draws, for each approach, one dot per held-out image (spread sideways a little so they do not
+# hide each other) and a thick bar at the median image. Approaches are sorted by mean IoU, best on the left.
 #
-# What to look for: a tall violin means the approach is good on some images and bad on others. Compare two
-# approaches with the same mean: the one with the lower bottom dots is the riskier one.
+# What to look for: dots spread far apart mean the approach is good on some images and bad on others.
+# Compare two approaches with the same mean: the one with the lower bottom dots is the riskier one.
 
 # %%
-# @title Violin plot: each approach's IoU over the held-out images { display-mode: "form" }
-fig, ax = plt.subplots(figsize=(10, 3.8))
+# @title Strip plot: each approach's IoU on every held-out image { display-mode: "form" }
+fig, ax = plt.subplots(figsize=(10, 4.4))
+jitter = np.random.default_rng(0)  # seeded: the dots sit in the same place on every run
 for x, r in enumerate(ranked):
     vals = np.asarray(iou_per_image[r["approach"]], float)
     colour = approach_colours[r["approach"]]
-    if len(vals) >= 2 and np.ptp(vals) > 1e-9:  # a violin needs some spread to draw
-        body = ax.violinplot(vals, positions=[x], widths=0.8, showextrema=False)["bodies"][0]
-        body.set_facecolor(colour)
-        body.set_edgecolor(colour)
-        body.set_alpha(0.3)
-    ax.scatter(np.full(len(vals), x), vals, s=12, color=colour, zorder=3)
-    ax.plot([x - 0.3, x + 0.3], [np.median(vals)] * 2, color=colour, lw=2.5, zorder=4)
+    ax.scatter(x + jitter.uniform(-0.18, 0.18, len(vals)), vals, s=16, color=colour, alpha=0.8, zorder=3)
+    median = np.median(vals)
+    ax.plot([x - 0.3, x + 0.3], [median] * 2, color="white", lw=6, solid_capstyle="butt", zorder=4)
+    ax.plot([x - 0.3, x + 0.3], [median] * 2, color=colour, lw=4, solid_capstyle="butt", zorder=5)
 line_all = RESULTS["specialised_everything_iou"]
 ax.axhline(line_all, color=THEME["background"], ls="--", label='mean IoU of "everything"')
-ax.plot([], [], "o", ms=3, color="#616161", label="dot = one held-out image")
-ax.plot([], [], "-", lw=2.5, color="#616161", label="bar = median image")
-ax.set_xticks(range(len(ranked)), [r["approach"] for r in ranked], rotation=45, ha="right", fontsize=7)
+ax.plot([], [], "o", ms=4, color="#616161", label="dot = one held-out image")
+ax.plot([], [], "-", lw=4, color="#616161", label="bar = median image")
+ax.set_xticks(range(len(ranked)), [COMPARE_LABEL[r["approach"]] for r in ranked], rotation=45, ha="right", fontsize=8)
+ax.set_xlim(-0.6, len(ranked) - 0.4)
 ax.set_ylabel("IoU on one held-out image")
 ax.set_title("Per-image IoU, best mean on the left")
-ax.legend(fontsize=7, frameon=False, loc="upper right")
-add_key(fig, None, "colour = approach, as in the table · wide or tall violin = unsteady")
+ax.legend(fontsize=8, frameon=False, loc="upper right")
+add_key(fig, None, "colour = approach, as in the table · dots spread far apart = unsteady")
 plt.show()
 
 # %% [markdown]
@@ -456,7 +503,7 @@ panels = []
 w_picks = (("worst", w_order[0]), ("typical (median)", w_order[len(w_order) // 2]), ("best", w_order[-1]))
 for tag, n in w_picks:
     it_n, pred_n = spec_eval[n], compare_reports[winner]["held_preds"][n]
-    panels.append((f"{winner}\n{tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
+    panels.append((f"{COMPARE_LABEL[winner]}\n{tag} · IoU {w_iou[n]:.2f}", error_map(it_n["image"], pred_n, it_n)))
 show_masks(panels, width=3.4, legend=["found", "invented", "missed", "unscored"])
 
 # %% [markdown]

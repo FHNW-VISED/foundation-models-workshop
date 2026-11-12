@@ -835,6 +835,7 @@ show_table(
 )
 pet_order = np.argsort(zero_shot_all["box"])  # the same three pets in both rows
 picked = [("worst", pet_order[0]), ("median", pet_order[n_eval // 2]), ("best", pet_order[-1])]
+picked = [(label, pos) for i, (label, pos) in enumerate(picked) if pos not in [q for _, q in picked[:i]]]
 sam_row, head_row, boxes = [], [], []
 for label, pos in picked:
     it = pets_eval[int(pos)]
@@ -846,9 +847,10 @@ for label, pos in picked:
 show_masks(
     sam_row + head_row,
     prompts=boxes + [None] * len(head_row),
-    ncols=3,
+    ncols=len(sam_row),
+    roles=["errors"] * (len(sam_row) + len(head_row)),
     legend=["found", "invented", "missed", "unscored", ("box", "box given to SAM")],
-    note="Pets chosen by SAM's box IoU (worst, median, best); the head is shown on the same three.",
+    note="Pets chosen by SAM's box IoU (worst, median, best); the head is shown on the same pets.",
 )
 
 # %% [markdown]
