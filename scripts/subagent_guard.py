@@ -1,7 +1,8 @@
-"""PreToolUse hook for night runs: subagents are never Fable (Simone's rule, 2026-10-20).
+"""PreToolUse hook for subagent calls: subagents are never Fable (Simone's rule, 2026-10-20).
 
-Allowed: haiku or sonnet (the default, via CLAUDE_CODE_SUBAGENT_MODEL), opus only for the heaviest
-tasks. Blocked: model "fable", and subagent_type "fork", which always inherits the parent's model.
+Allowed: an explicit model, haiku or sonnet; opus only for the heaviest tasks. Blocked: model "fable",
+subagent_type "fork" (it always inherits the parent's model), and a call that names no model at all
+(Simone, 2026-11-11: the agent must choose the tier on purpose).
 Exit code 2 blocks the call and shows stderr to the agent.
 """
 
@@ -17,6 +18,13 @@ if "fable" in model or args.get("subagent_type") == "fork":
     print(
         "Blocked: subagents must never run on Fable (and a fork inherits Fable). "
         "Use model 'haiku' or 'sonnet'; 'opus' only for the heaviest tasks.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+if not model.strip():
+    print(
+        "Blocked: this subagent call names no model. Pass model 'haiku' or 'sonnet'; "
+        "'opus' only for the heaviest tasks.",
         file=sys.stderr,
     )
     sys.exit(2)
