@@ -7,18 +7,19 @@
 #   scripts/night.sh                 # run all open `night` issues
 #   scripts/night.sh --max 3         # at most 3 issues
 #   scripts/night.sh --dry-run       # show what would run, call nothing
-#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-opus-5-5)
+#   scripts/night.sh --model <id>    # model for claude (default: $NIGHT_MODEL or claude-sonnet-5-5)
 # Resumable: re-running on the same day continues night/<date> and skips issues already committed there.
 # NIGHT_DATE=YYYY-MM-DD continues an earlier night's branch; NIGHT_UNTIL=<epoch s> starts no issue after it.
 # Claude session limit: the issue is undone (no failure label), the reset time goes to build/night.limit, run stops.
 set -euo pipefail
 
-LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-opus-5-5}"; RETRIES=1
+LABEL="night"; MAX=99; DRY=0; MODEL="${NIGHT_MODEL:-claude-sonnet-5-5}"; RETRIES=1
+MODEL_SRC="default"; [[ -z "${NIGHT_MODEL:-}" ]] || MODEL_SRC="NIGHT_MODEL"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --label) LABEL="$2"; shift 2 ;;
     --max) MAX="$2"; shift 2 ;;
-    --model) MODEL="$2"; shift 2 ;;
+    --model) MODEL="$2"; MODEL_SRC="--model"; shift 2 ;;
     --retries) RETRIES="$2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
@@ -26,10 +27,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Show what the night will spend. Sonnet builds; anything else is allowed but loudly flagged.
+echo "model: ${MODEL:-claude CLI default} (from $MODEL_SRC)"
+if [[ "$(printf '%s' "$MODEL" | tr '[:upper:]' '[:lower:]')" != *sonnet* ]]; then
+  echo "WARNING: not Sonnet. The efficiency rule says Sonnet builds, Opus only for the SPEC and the final review." >&2
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 for bin in gh claude just uv git; do command -v "$bin" >/dev/null || { echo "missing: $bin" >&2; exit 1; }; done
 [[ -z "$(git status --porcelain)" ]] || { echo "working tree not clean — commit or stash first" >&2; exit 1; }
+
+# This repo's scripts must equal the vault template's (a copy once ran Opus for weeks unnoticed).
+# A missing template folder only warns; NIGHT_SKIP_TEMPLATE_CHECK=1 skips the check.
+if [[ "${NIGHT_SKIP_TEMPLATE_CHECK:-}" != 1 ]]; then
+  python3 scripts/template_diff.py || { echo "scripts differ from the vault template (list above); fix them or set NIGHT_SKIP_TEMPLATE_CHECK=1" >&2; exit 4; }
+fi
 
 # One run per repo at a time: a second launch (by another agent or by hand) refuses instead of colliding.
 mkdir -p build
@@ -60,7 +73,7 @@ CLAUDE_ARGS+=(--settings "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Agent|Task\
 
 # The gate must not be weakened by the agent it gates: undo edits to these paths unless the
 # issue's FILES line names them explicitly.
-PROTECTED=(tests scripts RULES.md justfile .github AGENTS.md CLAUDE.md versions)
+PROTECTED=(tests scripts RULES.md RULES-review.md justfile .github AGENTS.md CLAUDE.md .claude versions)
 revert_protected() {  # $1 issue number, $2 issue body
   local files_line; files_line=$(grep -m1 '^FILES:' <<<"$2" || true)
   for p in "${PROTECTED[@]}"; do
@@ -81,11 +94,18 @@ section_marked_done() {  # $1 issue body; succeeds if no SECTION line or the row
   grep -qE "^\|[[:space:]]*[0-9]+[[:space:]]*\|[[:space:]]*sections/${nn}_[^|]*\|.*\|[[:space:]]*done[[:space:]]*\|[[:space:]]*$" SPEC.md
 }
 
+RULES_READ="RULES.md"
+[[ ! -f RULES-review.md ]] || RULES_READ="RULES-review.md (RULES.md is the full source)"
+
 prompt_for() {  # $1 issue number, $2 title, $3 body, $4 optional failure tail
   cat <<EOF
 You are implementing GitHub issue #$1 "$2" in this repository, unattended (nobody can answer questions).
-Follow AGENTS.md exactly: read SPEC.md, RULES.md, this issue, and only the files the issue names; use \`just api\` for earlier definitions.
+Follow AGENTS.md exactly: read SPEC.md, $RULES_READ, this issue, and only the files the issue names; use \`just api\` for earlier definitions.
 Finish only when \`just check\` passes, then update the section's Status in SPEC.md and write reports/latest-task.md.
+Night-run override of AGENTS.md: do not open FACILITATION.md. If this issue finishes a section, put that section's facilitation row
+under a heading \`## Facilitation row\` in reports/latest-task.md: one markdown table line with the same five columns as the table header
+\`| Section | You present (what to say) | They do | Pause / interaction | Min |\`. night.sh copies it into FACILITATION.md.
+Any Agent call must name model haiku or sonnet.
 
 --- ISSUE #$1 ---
 $3
@@ -140,7 +160,13 @@ for n in $ISSUES; do
     STOPPED="#$n (session limit)"
     break
   elif [[ "$ok" == 1 ]]; then
+    # The agent never opens FACILITATION.md: its row goes in from latest-task.md; git add -A below commits it with the issue.
+    fac_note=""
+    if [[ -f reports/latest-task.md && -f FACILITATION.md && -f scripts/facilitation_row.py ]]; then
+      fac_out=$(python3 scripts/facilitation_row.py reports/latest-task.md FACILITATION.md 2>&1) || fac_note="facilitation row not written: $(head -1 <<<"${fac_out:-script failed}")"
+    fi
     { echo "## ✅ #$n — $title"; echo; cat reports/latest-task.md 2>/dev/null || echo "(no task note written)"; echo; } >> "$REPORT"
+    if [[ -n "$fac_note" ]]; then { echo "$fac_note"; echo; } >> "$REPORT"; fi
     rm -f reports/latest-task.md
     git add -A
     git commit --quiet -m "night: #$n $title" -m "Refs #$n"
@@ -161,7 +187,10 @@ done
 
 [[ -s "$LOGDIR/protected.txt" ]] && { echo "## ⚠️ Protected files the agent tried to change (reverted)"; cat "$LOGDIR/protected.txt"; echo; } >> "$REPORT"
 { echo "---"; echo "Finished $(date +%H:%M): $DONE issue(s) done${STOPPED:+, stopped at $STOPPED}. Raw logs (local only): \`$LOGDIR\`."; } >> "$REPORT"
-git add "$REPORT" && git commit --quiet -m "night: report $DATE"
+[[ -f scripts/handoff.py ]] && python3 scripts/handoff.py night "$REPORT" || true   # morning phase starts from this
+git add "$REPORT"
+[[ ! -f reports/handoff.md ]] || git add reports/handoff.md
+git commit --quiet -m "night: report $DATE"
 git push --quiet -u origin "$BRANCH"
 if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
   gh pr create --draft --base main --head "$BRANCH" --title "Night run $DATE" --body-file "$REPORT" >/dev/null
