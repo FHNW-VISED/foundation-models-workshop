@@ -252,7 +252,8 @@ DINO_ID = "timm/vit_small_patch16_dinov3.lvd1689m"
 DINO_LICENCE = "DINOv3 License (Meta)"
 SAM_ID = "facebook/sam2.1-hiera-small"
 SAM_LICENCE = "Apache-2.0"
-SAM3_ID = "facebook/sam3"
+SAM3_ID = "facebook/sam3"  # Meta's original (gated: Meta approves each account by hand)
+SAM3_WORKSHOP_ID = "simopippa/sam3-amld2027-workshop"  # our unmodified copy, open only around the workshop
 # The SAM 3 repo is 6.9 GB because it also holds a second copy of the weights (sam3.pt, 3.45 GB). The
 # notebook needs only the config, the tokenizer files and model.safetensors, about 3.5 GB.
 SAM3_FILES = ["*.json", "*.txt", "model.safetensors", "*.model"]
@@ -386,21 +387,30 @@ cache_model("SAM 2.1 hiera-small", SAM_ID, SAM_LICENCE, load_sam)
 # ## 6. Optional: SAM 3
 #
 # SAM 3 lets you segment with a word ("the retinal vessels") in the main notebook. The workshop never
-# requires it. It is gated on Hugging Face, and Meta approves each account by hand. To use it:
+# requires it. `SAM3_SOURCE` in this cell's form says where it comes from:
 #
-# 1. Request access at huggingface.co/facebook/sam3 and wait for Meta's approval email.
-# 2. Create a read token at huggingface.co/settings/tokens.
-# 3. In Colab, open 🔑 Secrets (left bar), add a secret named `HF_TOKEN` with that token and switch on
-#    "Notebook access".
-# 4. Run this cell. It downloads only the files the notebook needs (about 3.5 GB).
+# - `workshop` (default): our copy of Meta's weights, open only around the workshop. Just run the cell.
+# - `meta`: Meta's original, for after the workshop. It is gated on Hugging Face and Meta approves each
+#   account by hand:
+#   1. Request access at huggingface.co/facebook/sam3 and wait for Meta's approval email.
+#   2. Create a read token at huggingface.co/settings/tokens.
+#   3. In Colab, open 🔑 Secrets (left bar), add a secret named `HF_TOKEN` with that token and switch on
+#      "Notebook access".
+#   4. Pick `meta` in the form and run this cell. Pick `meta` in the main notebook too.
 #
-# Without a token, or while the approval is pending, the cell says so and moves on.
+# Either way the cell downloads only the files the notebook needs (about 3.5 GB). If the source is not
+# available, the cell says so and moves on.
 
 # %%
-# @title Cache SAM 3 if you have access { display-mode: "form" }
+# @title Cache SAM 3 (optional) { display-mode: "form" }
+SAM3_SOURCE = "workshop"  # @param ["workshop", "meta"]
+if SAM3_SOURCE == "meta":
+    sam3_id = SAM3_ID  # Meta's original: needs your own approval and HF_TOKEN
+else:
+    sam3_id = SAM3_WORKSHOP_ID  # our copy, open only around the workshop: no token needed
 if not TRY_SAM3:
     record("SAM 3 (optional)", None, "skipped", icon="⏭️")
-elif HF_TOKEN is None:
+elif HF_TOKEN is None and SAM3_SOURCE == "meta":
     record(
         "SAM 3 (optional)",
         None,
@@ -409,18 +419,26 @@ elif HF_TOKEN is None:
     )
 else:
     try:
-        folder = model_dir(SAM3_ID)
+        folder = model_dir(sam3_id)
         if is_cached(folder):
-            record("SAM 3 (optional)", True, f"{SAM3_ID} · already cached")
+            record("SAM 3 (optional)", True, f"{sam3_id} · already cached")
         else:
             # plain files, no symlinks, and not the duplicate sam3.pt
-            snapshot_download(SAM3_ID, local_dir=folder, token=HF_TOKEN, allow_patterns=SAM3_FILES)
-            checked, bad = verify_snapshot(SAM3_ID, folder, HF_TOKEN, SAM3_FILES)
+            snapshot_download(sam3_id, local_dir=folder, token=HF_TOKEN, allow_patterns=SAM3_FILES)
+            checked, bad = verify_snapshot(sam3_id, folder, HF_TOKEN, SAM3_FILES)
             if not bad:
                 mark_cached(folder)
-            record("SAM 3 (optional)", not bad, f"{SAM3_ID} cached ({checked} weight files checked)")
+            record("SAM 3 (optional)", not bad, f"{sam3_id} cached ({checked} weight files checked)")
     except Exception as err:  # noqa: BLE001 - optional: never a ❌
-        if "403" in str(err) or "authorized" in str(err) or type(err).__name__ == "GatedRepoError":
+        closed = type(err).__name__ in ("RepositoryNotFoundError", "GatedRepoError") or any(
+            code in str(err) for code in ("401", "403", "404")
+        )
+        if SAM3_SOURCE == "workshop" and closed:
+            msg = (
+                f"the workshop copy {sam3_id} is closed (it is open only around the workshop). Pick "
+                "SAM3_SOURCE = meta to use Meta's original. SAM 2.1 is enough."
+            )
+        elif "403" in str(err) or "authorized" in str(err) or type(err).__name__ == "GatedRepoError":
             msg = (
                 "403: this account is not in the authorized list yet. Meta has not approved your request at "
                 f"huggingface.co/{SAM3_ID}; run this cell again after the approval email. SAM 2.1 is enough."
