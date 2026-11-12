@@ -22,3 +22,4 @@ Never edit a version folder.
 | v13 | 2026-10-26 | Diagrams: method map, you-are-here maps and 23 drawn explanations (first pass) | afab8be |
 | v14 | 2026-10-26 | Standard result cards (N-068) and a small U-Net trained live in 10.3 | c43345e |
 | v15 | 2026-11-09 | SAM 3 source switch: workshop copy or Meta's original | 15cf452 |
+| v16 | 2026-11-12 | comprehension fixes for the figures in sections 1, 2, 6, 8 | 5b46fa7 |
